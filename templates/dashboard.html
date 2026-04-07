@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Вектор | Дашборд План/Факт</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="app-container">
+        <div class="app-header">
+            <div class="logo-container">
+                <h1 class="app-logo">Вектор</h1>
+                <p class="app-subtitle">Управление вахтовым персоналом</p>
+            </div>
+            <div class="header-right">
+                <div class="system-switcher">
+                    <button class="system-btn active" onclick="window.location.href='/dashboard'">
+                        <i class="fas fa-chart-line"></i>
+                        <span>Дашборд</span>
+                    </button>
+                    <button class="system-btn" onclick="window.location.href='/selection'">
+                        <i class="fas fa-user-check"></i>
+                        <span>Подбор объектов</span>
+                    </button>
+                    {% if current_user.is_authenticated and (current_user.role == 'admin' or current_user.role == 'manager') %}
+                    <button class="system-btn" onclick="window.location.href='/admin'">
+                        <i class="fas fa-users-cog"></i>
+                        <span>Админ-панель</span>
+                    </button>
+                    {% endif %}
+                </div>
+                <div class="user-info" id="userInfo"></div>
+            </div>
+        </div>
+
+        <!-- Контент дашборда -->
+        <div class="dashboard-content">
+            <div class="dashboard-header">
+                <div class="date-controls">
+                    <div class="date-field">
+                        <label for="date-picker">Дата просмотра:</label>
+                        <input type="date" id="date-picker" class="date-picker" value="">
+                    </div>
+                </div>
+                <div class="header-actions">
+                    <div class="refresh-container">
+                        <button id="refresh-button" class="refresh-btn" onclick="manualRefresh()">
+                            <span class="refresh-icon">↻</span>
+                            Обновить
+                        </button>
+                        <div class="update-time" id="update-time">Обновлено: --:--</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="two-panel">
+                <div class="panel-card">
+                    <h2 class="panel-title">
+                        Офисы
+                        <span>направления за сегодня</span>
+                    </h2>
+                    <div class="office-list" id="offices-container">
+                        <div class="loading">Загрузка данных...</div>
+                    </div>
+                    <div class="no-data-image" id="noDataImage" style="display: none;">
+                        <img src="{{ url_for('static', filename='images/Math.png') }}" alt="Нет данных">
+                        <p>Сегодня никто не направлен 😢</p>
+                    </div>
+                </div>
+
+                <div class="panel-card">
+                    <h2 class="panel-title">
+                        План / Факт
+                        <span>на сегодня</span>
+                    </h2>
+                    <div class="summary-block" id="summary-container">
+                        <div class="loading">Загрузка статистики...</div>
+                    </div>
+                    <div class="discrepancy-section">
+                        <div class="discrepancy-list" id="plan-fact-container">
+                            <div class="loading">Загрузка...</div>
+                        </div>
+                    </div>
+                    <div class="export-container">
+                        <h3 class="export-title">📥 Выгрузка отчёта</h3>
+                        <div class="export-period-selector">
+                            <div class="export-date-field">
+                                <label for="report-from">С:</label>
+                                <input type="date" id="report-from" class="date-picker small" value="">
+                            </div>
+                            <div class="export-date-field">
+                                <label for="report-to">По:</label>
+                                <input type="date" id="report-to" class="date-picker small" value="">
+                            </div>
+                        </div>
+                        <div class="export-period-info" id="exportPeriodInfo">
+                            Период: <span id="periodDisplay">сегодня</span>
+                        </div>
+                        <button id="export-full-report" class="export-btn" onclick="exportFullReport()">
+                            <span class="export-icon">📊</span>
+                            Скачать отчёт
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно входа -->
+    <div class="login-modal" id="loginModal" style="display: none;">
+        <div class="login-content">
+            <h2>🔒 Доступ к системе</h2>
+            <div class="password-input">
+                <input type="text" id="login-username" placeholder="Имя пользователя" autocomplete="username">
+                <input type="password" id="login-password" placeholder="Пароль" autocomplete="current-password" onkeypress="handleEnterKey(event)">
+                <button class="login-btn" onclick="checkPassword()">Войти</button>
+                <div class="error-message" id="errorMessage">Неверное имя пользователя или пароль</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='common.js') }}"></script>
+    <script src="{{ url_for('static', filename='dashboard.js') }}"></script>
+    
+    <script>
+        // Инициализация после загрузки
+        document.addEventListener('DOMContentLoaded', function() {
+            // Инициализируем дату
+            const datePicker = document.getElementById('date-picker');
+            if (datePicker) {
+                const today = getTodayDate();
+                datePicker.value = today;
+                datePicker.addEventListener('change', function(e) {
+                    loadDashboardForDate(e.target.value);
+                });
+            }
+            
+            // Инициализируем отчет
+            const reportFrom = document.getElementById('report-from');
+            const reportTo = document.getElementById('report-to');
+            if (reportFrom) {
+                reportFrom.value = getTodayDate();
+                reportFrom.addEventListener('change', updatePeriodDisplay);
+            }
+            if (reportTo) {
+                reportTo.value = getTodayDate();
+                reportTo.addEventListener('change', updatePeriodDisplay);
+            }
+            
+            updatePeriodDisplay();
+            loadDashboardForDate(getTodayDate());
+        });
+    </script>
+</body>
+</html>

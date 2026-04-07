@@ -1,0 +1,953 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Вектор | Админ-панель</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .add-user-btn {
+            background: var(--primary, #A42C30);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 2px 8px rgba(164, 44, 48, 0.3);
+        }
+        
+        .add-user-btn:hover {
+            background: var(--primary-dark, #8B2529);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(164, 44, 48, 0.4);
+        }
+        
+        .add-user-btn:active {
+            transform: translateY(0);
+        }
+        
+        .admin-page {
+            background: white;
+            border-radius: 20px;
+            padding: 25px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        }
+        
+        .admin-page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid var(--primary);
+        }
+        
+        .admin-page-header h2 {
+            color: var(--dark);
+            margin: 0;
+            font-size: 1.5rem;
+        }
+        
+        .admin-page-header h2 i {
+            color: var(--primary);
+            margin-right: 10px;
+        }
+        
+        .admin-filters {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 25px;
+            flex-wrap: wrap;
+            align-items: flex-end;
+        }
+        
+        .admin-filters .filter-group {
+            margin-bottom: 0;
+            flex: 1;
+            min-width: 150px;
+        }
+        
+        .admin-filters .filter-group input,
+        .admin-filters .filter-group select {
+            width: 100%;
+            padding: 10px 14px;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            font-size: 0.9rem;
+        }
+        
+        .refresh-btn-small {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .refresh-btn-small:hover {
+            background: var(--primary-dark);
+        }
+        
+        .users-table-container {
+            padding: 20px;
+            overflow-x: auto;
+        }
+        
+        .users-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+        
+        .users-table th {
+            text-align: left;
+            padding: 12px 15px;
+            background: #f8f9fa;
+            border-bottom: 2px solid var(--primary);
+            font-weight: 600;
+            color: var(--dark);
+        }
+        
+        .users-table td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #e9ecef;
+            vertical-align: middle;
+        }
+        
+        .users-table tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .role-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        
+        .role-admin {
+            background: #fee2e2;
+            color: #e74c3c;
+        }
+        
+        .role-manager {
+            background: #fff3e0;
+            color: #f39c12;
+        }
+        
+        .role-viewer {
+            background: #e3f2fd;
+            color: #3498db;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        
+        .status-active {
+            background: #e8f5e9;
+            color: #27ae60;
+        }
+        
+        .status-inactive {
+            background: #f5f5f5;
+            color: #95a5a6;
+        }
+        
+        .actions-cell {
+            white-space: nowrap;
+        }
+        
+        .action-btn {
+            background: none;
+            border: none;
+            padding: 6px 10px;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.2s;
+            font-size: 1rem;
+        }
+        
+        .action-btn.edit-btn {
+            color: #3498db;
+        }
+        
+        .action-btn.edit-btn:hover {
+            background: #e3f2fd;
+            color: #2980b9;
+        }
+        
+        .action-btn.delete-btn {
+            color: #e74c3c;
+        }
+        
+        .action-btn.delete-btn:hover {
+            background: #fee2e2;
+            color: #c0392b;
+        }
+        
+        .action-btn.perms-btn {
+            color: #9b59b6;
+        }
+        
+        .action-btn.perms-btn:hover {
+            background: #f3e5f5;
+            color: #8e44ad;
+        }
+        
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10002;
+        }
+        
+        .modal-content {
+            background: white;
+            border-radius: 24px;
+            width: 90%;
+            max-width: 650px;
+            max-height: 90vh;
+            overflow: hidden;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.3);
+            animation: modalSlideIn 0.3s ease;
+        }
+        
+        .modal-large .modal-content {
+            max-width: 850px;
+        }
+        
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .modal-header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+            padding: 18px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .modal-header h3 {
+            color: white;
+            margin: 0;
+            font-size: 1.2rem;
+        }
+        
+        .modal-close {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.8rem;
+            cursor: pointer;
+            line-height: 1;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: background 0.2s;
+        }
+        
+        .modal-close:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+        
+        .modal-body {
+            padding: 24px;
+            max-height: calc(90vh - 70px);
+            overflow-y: auto;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: var(--dark);
+        }
+        
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 10px 14px;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            font-size: 0.95rem;
+            transition: border-color 0.2s;
+        }
+        
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        
+        .form-group.checkbox {
+            display: flex;
+            align-items: center;
+        }
+        
+        .form-group.checkbox label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            margin-bottom: 0;
+        }
+        
+        .form-group.checkbox input {
+            width: auto;
+        }
+        
+        .hint {
+            font-size: 0.75rem;
+            color: #95a5a6;
+            font-weight: normal;
+            margin-left: 8px;
+        }
+        
+        .form-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            margin-top: 24px;
+            padding-top: 16px;
+            border-top: 1px solid #e9ecef;
+        }
+        
+        .btn-cancel {
+            background: #f5f5f5;
+            color: #7f8c8d;
+            border: none;
+            padding: 10px 24px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+        
+        .btn-cancel:hover {
+            background: #e9ecef;
+        }
+        
+        .btn-save {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 10px 28px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        
+        .btn-save:hover {
+            background: var(--primary-dark);
+            transform: translateY(-1px);
+        }
+        
+        .permissions-section {
+            margin-bottom: 30px;
+        }
+        
+        .permissions-section h4 {
+            color: var(--dark);
+            margin-bottom: 15px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid var(--primary);
+            display: inline-block;
+        }
+        
+        .modules-perms {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        
+        .perm-checkbox {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            cursor: pointer;
+            padding: 10px 12px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            transition: background 0.2s;
+            border: 1px solid #e9ecef;
+        }
+        
+        .perm-checkbox:hover {
+            background: #e9ecef;
+            border-color: var(--primary-light);
+        }
+        
+        .perm-checkbox input {
+            width: 18px;
+            height: 18px;
+            margin-top: 2px;
+            cursor: pointer;
+        }
+        
+        .perm-checkbox span {
+            font-weight: 500;
+            min-width: 150px;
+            color: var(--dark);
+        }
+        
+        .perm-checkbox-small {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            padding: 4px 8px;
+            border-radius: 6px;
+            transition: background 0.2s;
+        }
+        
+        .perm-checkbox-small:hover {
+            background: #f8f9fa;
+        }
+        
+        .perm-checkbox-small input {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+        
+        .objects-perms-header {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 15px;
+        }
+        
+        .btn-small {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 6px 14px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.75rem;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        
+        .btn-small:hover {
+            background: var(--primary-dark);
+        }
+        
+        .objects-perms-list {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #e9ecef;
+            border-radius: 12px;
+            background: white;
+        }
+        
+        .object-perm-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            border-bottom: 1px solid #e9ecef;
+            transition: background 0.2s;
+        }
+        
+        .object-perm-item:hover {
+            background: #f8f9fa;
+        }
+        
+        .object-perm-item:last-child {
+            border-bottom: none;
+        }
+        
+        .object-perm-name {
+            font-weight: 500;
+            color: var(--dark);
+            flex: 1;
+            font-size: 0.9rem;
+        }
+        
+        .object-perm-checkboxes {
+            display: flex;
+            gap: 20px;
+        }
+        
+        .loading {
+            text-align: center;
+            color: var(--gray);
+            padding: 40px;
+            font-style: italic;
+        }
+        
+        .empty-state {
+            text-align: center;
+            color: #b29fd6;
+            padding: 16px;
+            font-style: italic;
+        }
+        
+        .error-state {
+            text-align: center;
+            padding: 40px;
+            background: #fff5f5;
+            border-radius: 16px;
+            margin: 20px;
+            border: 1px solid #fee2e2;
+        }
+        
+        .retry-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 30px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        
+        /* Адаптивные стили для мобильных */
+        @media (max-width: 768px) {
+            .admin-page {
+                padding: 15px;
+            }
+            
+            .admin-page-header {
+                flex-direction: column;
+                gap: 15px;
+                text-align: center;
+            }
+            
+            .admin-page-header h2 {
+                font-size: 1.2rem;
+            }
+            
+            .add-user-btn {
+                width: 100%;
+                justify-content: center;
+                padding: 10px 20px;
+                font-size: 0.85rem;
+            }
+            
+            .admin-filters {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .admin-filters .filter-group {
+                width: 100%;
+                min-width: auto;
+            }
+            
+            .admin-filters .filter-group input,
+            .admin-filters .filter-group select {
+                padding: 8px 12px;
+                font-size: 0.85rem;
+            }
+            
+            .refresh-btn-small {
+                width: 100%;
+                padding: 10px;
+            }
+            
+            .users-table-container {
+                padding: 10px;
+                overflow-x: auto;
+            }
+            
+            .users-table {
+                font-size: 0.75rem;
+                min-width: 600px;
+            }
+            
+            .users-table th,
+            .users-table td {
+                padding: 8px 10px;
+            }
+            
+            .actions-cell {
+                display: flex;
+                gap: 5px;
+                flex-wrap: wrap;
+            }
+            
+            .action-btn {
+                padding: 4px 8px;
+                font-size: 0.85rem;
+                min-height: 36px;
+                min-width: 36px;
+            }
+            
+            /* Скрываем полное имя и email на очень маленьких экранах */
+            .users-table th:nth-child(3),
+            .users-table td:nth-child(3),
+            .users-table th:nth-child(4),
+            .users-table td:nth-child(4) {
+                display: none;
+            }
+            
+            .modal-content {
+                width: 95%;
+                max-width: 95%;
+                margin: 10px;
+            }
+            
+            .modal-header {
+                padding: 15px;
+            }
+            
+            .modal-header h3 {
+                font-size: 1rem;
+            }
+            
+            .modal-body {
+                padding: 15px;
+            }
+            
+            .form-group label {
+                font-size: 0.85rem;
+            }
+            
+            .form-group input,
+            .form-group select {
+                padding: 8px 12px;
+                font-size: 0.85rem;
+            }
+            
+            .form-actions {
+                flex-direction: column-reverse;
+                gap: 10px;
+            }
+            
+            .btn-cancel,
+            .btn-save {
+                width: 100%;
+                padding: 10px;
+            }
+            
+            .objects-perms-header {
+                flex-direction: column;
+                gap: 8px;
+            }
+            
+            .btn-small {
+                width: 100%;
+                padding: 8px;
+            }
+            
+            .object-perm-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+                padding: 12px;
+            }
+            
+            .object-perm-name {
+                font-size: 0.85rem;
+            }
+            
+            .object-perm-checkboxes {
+                width: 100%;
+            }
+            
+            .perm-checkbox-small {
+                width: 100%;
+                justify-content: space-between;
+            }
+            
+            .perm-checkbox {
+                padding: 8px 12px;
+            }
+            
+            .perm-checkbox span {
+                font-size: 0.85rem;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .users-table th:nth-child(7),
+            .users-table td:nth-child(7) {
+                display: none;
+            }
+            
+            .user-badge {
+                font-size: 0.7rem;
+                padding: 4px 10px;
+            }
+            
+            .logout-button {
+                font-size: 0.7rem;
+                padding: 4px 10px;
+            }
+        }
+        
+        /* Стили для карточек пользователей на мобильных */
+        .users-cards {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        .user-card {
+            background: white;
+            border: 1px solid #e9ecef;
+            border-radius: 12px;
+            padding: 15px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        
+        .user-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        
+        .user-card-name {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .user-card-name strong {
+            font-size: 1rem;
+        }
+        
+        .user-card-info {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding: 10px 0;
+            border-top: 1px solid #f0f0f0;
+            border-bottom: 1px solid #f0f0f0;
+            margin: 10px 0;
+            font-size: 0.85rem;
+            color: #666;
+        }
+        
+        .user-card-info i {
+            width: 20px;
+            color: var(--primary);
+        }
+        
+        .user-card-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .user-card-actions .action-btn {
+            flex: 1;
+            min-width: 80px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            background: #f8f9fa;
+            font-size: 0.8rem;
+        }
+        
+        .user-card-actions .action-btn i {
+            margin-right: 5px;
+        }
+        
+        .user-card-actions .edit-btn:hover {
+            background: #e3f2fd;
+        }
+        
+        .user-card-actions .delete-btn:hover {
+            background: #fee2e2;
+        }
+        
+        .user-card-actions .perms-btn:hover {
+            background: #f3e5f5;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div class="app-header">
+            <div class="logo-container">
+                <h1 class="app-logo">Вектор</h1>
+                <p class="app-subtitle">Управление вахтовым персоналом</p>
+            </div>
+            <div class="header-right">
+                <div class="system-switcher">
+                    <button class="system-btn" onclick="window.location.href='/dashboard'">
+                        <i class="fas fa-chart-line"></i>
+                        <span>Дашборд</span>
+                    </button>
+                    <button class="system-btn" onclick="window.location.href='/selection'">
+                        <i class="fas fa-user-check"></i>
+                        <span>Подбор объектов</span>
+                    </button>
+                    {% if current_user.is_authenticated and (current_user.role == 'admin' or current_user.role == 'manager') %}
+                    <button class="system-btn active" onclick="window.location.href='/admin'">
+                        <i class="fas fa-users-cog"></i>
+                        <span>Админ-панель</span>
+                    </button>
+                    {% endif %}
+                </div>
+                <div class="user-info" id="userInfo"></div>
+            </div>
+        </div>
+
+        <div class="admin-page">
+            <div class="admin-page-header">
+                <h2><i class="fas fa-users"></i> Управление пользователями</h2>
+                <button class="add-user-btn" onclick="openAddUserModal()">
+                    <i class="fas fa-plus"></i> Добавить пользователя
+                </button>
+            </div>
+            
+            <div class="admin-filters">
+                <div class="filter-group">
+                    <input type="text" id="searchUsers" placeholder="🔍 Поиск по имени..." onkeyup="filterUsers()">
+                </div>
+                <div class="filter-group">
+                    <select id="filterRole" onchange="filterUsers()">
+                        <option value="all">Все роли</option>
+                        <option value="admin">Администраторы</option>
+                        <option value="manager">Руководители</option>
+                        <option value="viewer">Менеджеры</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <select id="filterStatus" onchange="filterUsers()">
+                        <option value="all">Все статусы</option>
+                        <option value="active">Активные</option>
+                        <option value="inactive">Заблокированные</option>
+                    </select>
+                </div>
+                <button class="refresh-btn-small" onclick="loadUsers()">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+            </div>
+            
+            <div id="usersTableContainer" class="users-table-container">
+                <div class="loading">Загрузка пользователей...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно для управления пользователями -->
+    <div class="modal" id="userModal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">Добавить пользователя</h3>
+                <button class="modal-close" onclick="closeUserModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="userForm" onsubmit="event.preventDefault(); saveUser();">
+                    <input type="hidden" id="userId">
+                    
+                    <div class="form-group">
+                        <label for="username">Имя пользователя *</label>
+                        <input type="text" id="username" name="username" required autocomplete="off">
+                    </div>
+                    
+                    <div class="form-group" id="passwordField">
+                        <label for="password">Пароль <span class="hint">(минимум 4 символа)</span></label>
+                        <input type="password" id="password" name="password" autocomplete="new-password">
+                    </div>
+                    
+                    <div class="form-group" id="confirmPasswordField">
+                        <label for="confirmPassword">Подтверждение пароля</label>
+                        <input type="password" id="confirmPassword" name="confirm_password" autocomplete="new-password">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="fullName">Полное имя</label>
+                        <input type="text" id="fullName" name="full_name" autocomplete="off">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="email">Email</label>
+                        <input type="email" id="email" name="email" autocomplete="off">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="userRole">Роль</label>
+                        <select id="userRole" name="role">
+                            <option value="viewer">Менеджер (только просмотр)</option>
+                            <option value="manager">Руководитель</option>
+                            <option value="admin">Администратор</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group checkbox">
+                        <label>
+                            <input type="checkbox" id="isActive" checked>
+                            <span>Активен</span>
+                        </label>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="button" class="btn-cancel" onclick="closeUserModal()">Отмена</button>
+                        <button type="submit" class="btn-save">Сохранить</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно для управления правами доступа -->
+    <div class="modal modal-large" id="permissionsModal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>🔐 Управление правами доступа</h3>
+                <button class="modal-close" onclick="closePermissionsModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="permissionsContainer">
+                    <div class="loading">Загрузка прав...</div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn-cancel" onclick="closePermissionsModal()">Отмена</button>
+                    <button type="button" class="btn-save" onclick="savePermissions()">Сохранить права</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='common.js') }}"></script>
+    <script src="{{ url_for('static', filename='admin.js') }}"></script>
+</body>
+</html>

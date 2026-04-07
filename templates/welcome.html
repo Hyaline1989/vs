@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Вектор | Панель управления</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        body {
+            background: linear-gradient(135deg, #A42C30 0%, #C14A4E 100%);
+            min-height: 100vh;
+        }
+        
+        .welcome-page {
+            background: white;
+            border-radius: 28px;
+            padding: 40px;
+            text-align: center;
+            max-width: 800px;
+            margin: 0 auto;
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
+        }
+        
+        .welcome-icon {
+            font-size: 80px;
+            color: var(--primary);
+            margin-bottom: 20px;
+        }
+        
+        .welcome-title {
+            font-size: 2rem;
+            color: var(--dark);
+            margin-bottom: 10px;
+        }
+        
+        .welcome-subtitle {
+            color: var(--gray);
+            font-size: 1rem;
+            margin-bottom: 30px;
+        }
+        
+        .welcome-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 40px 0;
+        }
+        
+        .welcome-card {
+            background: #f8f9fa;
+            border-radius: 20px;
+            padding: 25px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            text-decoration: none;
+            color: var(--dark);
+            display: block;
+        }
+        
+        .welcome-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            background: white;
+            border: 1px solid var(--primary-bg);
+        }
+        
+        .welcome-card-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+        
+        .welcome-card-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        
+        .welcome-card-desc {
+            font-size: 0.85rem;
+            color: var(--gray);
+        }
+        
+        .welcome-footer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e9ecef;
+            color: var(--gray);
+            font-size: 0.85rem;
+        }
+        
+        .user-badge-large {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            background: var(--primary-bg);
+            padding: 10px 20px;
+            border-radius: 40px;
+            margin-bottom: 20px;
+        }
+        
+        .logout-link {
+            color: var(--danger);
+            text-decoration: none;
+            margin-left: 10px;
+        }
+        
+        .logout-link:hover {
+            text-decoration: underline;
+        }
+        
+        .app-container {
+            padding: 40px 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div class="welcome-page">
+            <div class="welcome-icon">
+                <i class="fas fa-chalkboard-user"></i>
+            </div>
+            
+            <div class="user-badge-large" id="userWelcomeBadge">
+                <i class="fas fa-user-circle"></i>
+                <span id="userName">Загрузка...</span>
+                <span id="userRole" class="user-role"></span>
+            </div>
+            
+            <h1 class="welcome-title">Добро пожаловать в систему!</h1>
+            <p class="welcome-subtitle">
+                Вы успешно авторизовались в CRM-системе "Вектор".<br>
+                Выберите нужный раздел для работы.
+            </p>
+            
+            <div class="welcome-cards" id="welcomeCards">
+                <div class="loading">Загрузка доступных разделов...</div>
+            </div>
+            
+            <div class="welcome-footer">
+                <i class="fas fa-info-circle"></i> 
+                Если у вас есть вопросы, обратитесь к системному администратору.
+                <a href="#" onclick="logout(); return false;" class="logout-link">
+                    <i class="fas fa-sign-out-alt"></i> Выйти из системы
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='common.js') }}"></script>
+    
+    <script>
+        // Используем глобальную переменную из common.js, не объявляем новую
+        
+        // Загрузка данных пользователя
+        async function loadUserData() {
+            try {
+                const response = await fetch('/api/auth/me', { credentials: 'include' });
+                if (response.ok) {
+                    window.currentUser = await response.json();
+                    const permissions = window.currentUser.module_permissions || {};
+                    displayUserInfo();
+                    renderWelcomeCards(permissions);
+                } else {
+                    window.location.href = '/';
+                }
+            } catch (error) {
+                console.error('Ошибка загрузки данных:', error);
+                window.location.href = '/';
+            }
+        }
+        
+        // Отображение информации о пользователе
+        function displayUserInfo() {
+            if (!window.currentUser) return;
+            
+            // Обновляем приветственный бейдж
+            const userNameSpan = document.getElementById('userName');
+            const userRoleSpan = document.getElementById('userRole');
+            if (userNameSpan) {
+                userNameSpan.textContent = window.currentUser.full_name || window.currentUser.username;
+            }
+            if (userRoleSpan) {
+                userRoleSpan.textContent = window.currentUser.role_display;
+            }
+        }
+        
+        // Рендер карточек доступных разделов
+        function renderWelcomeCards(permissions) {
+            const container = document.getElementById('welcomeCards');
+            if (!container) return;
+            
+            let cardsHtml = '';
+            
+            // Карточка дашборда
+            if (permissions.dashboard !== false) {
+                cardsHtml += `
+                    <a href="/dashboard" class="welcome-card">
+                        <div class="welcome-card-icon">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                        <div class="welcome-card-title">Дашборд План/Факт</div>
+                        <div class="welcome-card-desc">
+                            Просмотр плановых и фактических показателей, 
+                            анализ выполнения KPI по объектам
+                        </div>
+                    </a>
+                `;
+            }
+            
+            // Карточка подбора объектов
+            if (permissions.selection !== false) {
+                cardsHtml += `
+                    <a href="/selection" class="welcome-card">
+                        <div class="welcome-card-icon">
+                            <i class="fas fa-user-check"></i>
+                        </div>
+                        <div class="welcome-card-title">Подбор объектов</div>
+                        <div class="welcome-card-desc">
+                            Подбор подходящих объектов для кандидатов 
+                            по возрасту, полу, гражданству
+                        </div>
+                    </a>
+                `;
+            }
+            
+            // Карточка админ-панели (только для админов и руководителей)
+            if (window.currentUser.role === 'admin' || window.currentUser.role === 'manager') {
+                cardsHtml += `
+                    <a href="/admin" class="welcome-card">
+                        <div class="welcome-card-icon">
+                            <i class="fas fa-users-cog"></i>
+                        </div>
+                        <div class="welcome-card-title">Админ-панель</div>
+                        <div class="welcome-card-desc">
+                            Управление пользователями, правами доступа,
+                            настройка системы
+                        </div>
+                    </a>
+                `;
+            }
+            
+            if (!cardsHtml) {
+                cardsHtml = `
+                    <div class="no-access-message" style="grid-column: 1/-1;">
+                        <i class="fas fa-lock" style="font-size: 48px; color: var(--gray);"></i>
+                        <p>У вас нет доступа ни к одному из разделов системы.</p>
+                        <p>Обратитесь к администратору для настройки прав.</p>
+                    </div>
+                `;
+            }
+            
+            container.innerHTML = cardsHtml;
+        }
+        
+        // Инициализация
+        document.addEventListener('DOMContentLoaded', function() {
+            loadUserData();
+        });
+    </script>
+</body>
+</html>

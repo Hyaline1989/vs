@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Подбор объектов - CRM Комплект</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+    <style>
+        /* Дополнительные стили для подбора объектов */
+        .position-stats {
+            display: flex;
+            gap: 15px;
+            margin-top: 5px;
+            font-size: 0.85rem;
+            flex-wrap: wrap;
+        }
+        .position-stats span {
+            background: rgba(255, 255, 255, 0.15);
+            padding: 2px 8px;
+            border-radius: 15px;
+        }
+        .no-positions {
+            text-align: center;
+            padding: 20px;
+            color: rgba(255, 255, 255, 0.7);
+            font-style: italic;
+        }
+        @media (max-width: 768px) {
+            .position-stats {
+                flex-direction: column;
+                gap: 5px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- ШАПКА -->
+        <div class="app-header">
+            <div class="logo-container">
+                <h1 class="app-logo">Подбор объектов</h1>
+                <div class="app-subtitle">Система подбора персонала по объектам</div>
+            </div>
+            <div class="header-right">
+                <div class="system-switcher">
+                    <button class="system-btn" onclick="window.location.href='/dashboard'">
+                        <i class="fas fa-chart-line"></i> <span>Дашборд</span>
+                    </button>
+                    <button class="system-btn active" onclick="window.location.href='/selection'">
+                        <i class="fas fa-bullseye"></i> <span>Подбор объектов</span>
+                    </button>
+                    <button class="system-btn" id="adminPanelBtn" style="display: none;" onclick="window.location.href='/admin'">
+                        <i class="fas fa-users-cog"></i> <span>Админ-панель</span>
+                    </button>
+                </div>
+                <div class="user-info" id="userInfo"></div>
+            </div>
+        </div>
+
+        <!-- Админ-контролы (видны только админам) -->
+        <div id="adminControls" class="admin-controls" style="display: none;">
+            <h3><i class="fas fa-crown"></i> Управление объектами</h3>
+            <p>Перетаскивайте объекты для изменения порядка, используйте чекбоксы для скрытия/показа</p>
+            <div class="admin-buttons">
+                <button class="admin-btn save" onclick="saveGlobalOrder()">Сохранить порядок</button>
+                <button class="admin-btn reset" onclick="resetGlobalOrder()">Сбросить порядок</button>
+            </div>
+        </div>
+
+        <!-- Отладочная информация (только для админов) -->
+        <div class="debug-controls">
+            <button class="debug-toggle" onclick="toggleDebug()">Отладка</button>
+        </div>
+        <div id="debugInfo" class="debug-info" style="display: none;"></div>
+
+        <!-- ФИЛЬТРЫ -->
+        <div class="filters">
+            <div class="filter-group">
+                <label for="age">Возраст кандидата</label>
+                <input type="number" id="age" value="25" min="18" max="70" step="1" onchange="filterAndDisplayObjects()">
+            </div>
+            <div class="filter-group">
+                <label for="gender">Пол</label>
+                <select id="gender" onchange="filterAndDisplayObjects()">
+                    <option value="все">Все</option>
+                    <option value="мужчина">Мужчина</option>
+                    <option value="женщина">Женщина</option>
+                    <option value="семейные">Семейные пары</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label for="nationality">Гражданство</label>
+                <select id="nationality" onchange="filterAndDisplayObjects()">
+                    <option value="РФ">РФ</option>
+                    <option value="СНГ">СНГ</option>
+                    <option value="РБ">РБ</option>
+                    <option value="все">Все</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label for="hasConviction">Наличие судимости</label>
+                <select id="hasConviction" onchange="filterAndDisplayObjects()">
+                    <option value="false">Без судимости</option>
+                    <option value="true">С судимостью</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- РЕЗУЛЬТАТЫ -->
+        <div class="results-count" id="resultsCount"></div>
+        <div id="results" class="results-grid"></div>
+
+        <!-- МЕНЮ УПРАВЛЕНИЯ ОБЪЕКТАМИ (для админов) -->
+        <div id="objectMenu" class="object-menu" style="display: none;">
+            <div class="menu-header">
+                <h3><i class="fas fa-list"></i> Управление объектами</h3>
+                <button class="menu-close" onclick="toggleObjectMenu()">✕</button>
+            </div>
+            <div class="menu-controls">
+                <button onclick="saveGlobalOrder()">Сохранить порядок</button>
+            </div>
+            <div id="menuItems" class="menu-items"></div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='common.js') }}"></script>
+    <script src="{{ url_for('static', filename='selection.js') }}"></script>
+    
+    <script>
+        // Дополнительная инициализация для админ-панели
+        document.addEventListener('DOMContentLoaded', async function() {
+            // Проверяем, является ли пользователь админом для показа кнопки в админку
+            try {
+                const response = await fetch('/api/auth/me', { credentials: 'include' });
+                if (response.ok) {
+                    const user = await response.json();
+                    if (user.role === 'admin' || user.is_system_admin) {
+                        const adminBtn = document.getElementById('adminPanelBtn');
+                        if (adminBtn) adminBtn.style.display = 'flex';
+                    }
+                }
+            } catch (error) {
+                console.error('Ошибка проверки прав:', error);
+            }
+            
+            // Загружаем данные подбора
+            await loadSelectionData();
+            
+            // Добавляем обработчик для Enter в поле возраста
+            const ageInput = document.getElementById('age');
+            if (ageInput) {
+                ageInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        filterAndDisplayObjects();
+                    }
+                });
+            }
+        });
+        
+        // Функция для переключения меню объектов (мобильная версия)
+        function toggleObjectMenu() {
+            const menu = document.getElementById('objectMenu');
+            if (menu) {
+                if (menu.style.display === 'none' || menu.style.display === '') {
+                    menu.style.display = 'block';
+                    document.body.style.overflow = 'hidden';
+                } else {
+                    menu.style.display = 'none';
+                    document.body.style.overflow = '';
+                }
+            }
+        }
+        
+        // Добавляем кнопку для мобильного меню
+        function addMobileMenuButton() {
+            if (window.innerWidth <= 768 && window.isAdmin) {
+                let menuBtn = document.getElementById('mobileMenuBtn');
+                if (!menuBtn) {
+                    menuBtn = document.createElement('button');
+                    menuBtn.id = 'mobileMenuBtn';
+                    menuBtn.className = 'mobile-menu-toggle';
+                    menuBtn.innerHTML = '<i class="fas fa-bars"></i>';
+                    menuBtn.onclick = toggleObjectMenu;
+                    document.body.appendChild(menuBtn);
+                }
+            } else {
+                const menuBtn = document.getElementById('mobileMenuBtn');
+                if (menuBtn) menuBtn.remove();
+            }
+        }
+        
+        // Следим за изменением размера окна
+        window.addEventListener('resize', function() {
+            addMobileMenuButton();
+        });
+        
+        // Вызываем после загрузки
+        setTimeout(addMobileMenuButton, 1000);
+    </script>
+</body>
+</html>
