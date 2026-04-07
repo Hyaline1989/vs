@@ -2711,3 +2711,63 @@ body {
     background: rgba(255, 255, 255, 0.3);
     border-radius: 10px;
 }
+
+/* Стили для форм с двумя колонками */
+.form-row {
+    display: flex;
+    gap: 15px;
+    flex-wrap: wrap;
+}
+
+.form-row .form-group {
+    flex: 1;
+}
+
+/* Стили для ссылок на объекты */
+.object-link {
+    color: var(--primary);
+    margin-left: 8px;
+    font-size: 0.8rem;
+    text-decoration: none;
+}
+
+.object-link:hover {
+    color: var(--primary-dark);
+    text-decoration: underline;
+}
+
+/* Кнопка возврата */
+.return-btn {
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 10px 24px;
+    border-radius: 30px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+}
+
+.return-btn:hover {
+    background: var(--primary-dark);
+    transform: translateY(-1px);
+}
+
+/* Стиль для кнопки добавления объекта - красный */
+.objects-header .add-user-btn {
+    background: var(--primary);
+    color: white;
+    border: none;
+}
+
+.objects-header .add-user-btn:hover {
+    background: var(--primary-dark);
+    transform: translateY(-2px);
+}
+
+.objects-header .add-user-btn i {
+    margin-right: 8px;
+}

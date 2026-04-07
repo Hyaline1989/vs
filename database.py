@@ -789,3 +789,123 @@ def save_global_order(order_list):
     except Exception as e:
         logger.error(f"Ошибка при сохранении глобального порядка: {e}")
         return False
+    
+# ========== ФУНКЦИИ ДЛЯ УПРАВЛЕНИЯ ОБЪЕКТАМИ (CRUD) ==========
+
+def get_object_by_id(object_id):
+    """Получает объект по ID"""
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        cursor.execute('SELECT id, name, visible, priority FROM objects_settings WHERE id = ?', (object_id,))
+        row = cursor.fetchone()
+        conn.close()
+        
+        if row:
+            return {
+                'id': row[0],
+                'name': row[1],
+                'visible': bool(row[2]),
+                'priority': bool(row[3])
+            }
+        return None
+    except Exception as e:
+        logger.error(f"Ошибка при получении объекта: {e}")
+        return None
+
+
+def get_objects_base():
+    """Получает все объекты из objects_settings"""
+    return get_objects_settings()
+
+
+def create_object(name, age_min, age_max, allowed_genders, allowed_nationalities, 
+                  allows_conviction, link='', visible=True, priority=False):
+    """Создаёт новый объект"""
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        
+        # Получаем следующий ID
+        cursor.execute('SELECT MAX(id) FROM objects_settings')
+        max_id = cursor.fetchone()[0]
+        new_id = (max_id or 0) + 1
+        
+        # Добавляем в objects_settings
+        cursor.execute('''
+            INSERT INTO objects_settings (id, name, visible, priority)
+            VALUES (?, ?, ?, ?)
+        ''', (new_id, name, 1 if visible else 0, 1 if priority else 0))
+        
+        conn.commit()
+        conn.close()
+        
+        logger.info(f"✅ Создан новый объект: {name} (ID: {new_id})")
+        return new_id
+    except sqlite3.IntegrityError:
+        logger.warning(f"Объект с именем {name} уже существует")
+        return None
+    except Exception as e:
+        logger.error(f"Ошибка при создании объекта: {e}")
+        return None
+
+
+def update_object_settings_extended(object_id, updates):
+    """
+    Обновляет настройки объекта с дополнительными полями
+    updates может содержать: name, visible, priority, age_min, age_max, 
+    allowed_genders, allowed_nationalities, allows_conviction, link
+    """
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        
+        # Обновляем objects_settings
+        settings_updates = []
+        params = []
+        
+        if 'visible' in updates:
+            settings_updates.append('visible = ?')
+            params.append(1 if updates['visible'] else 0)
+        if 'priority' in updates:
+            settings_updates.append('priority = ?')
+            params.append(1 if updates['priority'] else 0)
+        if 'name' in updates:
+            settings_updates.append('name = ?')
+            params.append(updates['name'])
+        
+        if settings_updates:
+            params.append(object_id)
+            cursor.execute(f'UPDATE objects_settings SET {", ".join(settings_updates)} WHERE id = ?', params)
+        
+        conn.commit()
+        conn.close()
+        
+        logger.info(f"Обновлён объект {object_id}")
+        return True
+    except Exception as e:
+        logger.error(f"Ошибка при обновлении объекта: {e}")
+        return False
+
+
+def delete_object(object_id):
+    """Удаляет объект из БД"""
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        
+        # Удаляем права доступа к объекту
+        cursor.execute('DELETE FROM user_object_permissions WHERE object_id = ?', (object_id,))
+        # Удаляем настройки объекта
+        cursor.execute('DELETE FROM objects_settings WHERE id = ?', (object_id,))
+        
+        conn.commit()
+        deleted = cursor.rowcount
+        conn.close()
+        
+        if deleted:
+            logger.info(f"Удалён объект {object_id}")
+        return deleted > 0
+    except Exception as e:
+        logger.error(f"Ошибка при удалении объекта: {e}")
+        return False    

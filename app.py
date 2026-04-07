@@ -20,8 +20,8 @@ from models import User
 
 # Импортируем blueprint'ы и их инициализаторы
 from routes import (
-    auth_bp, admin_bp, dashboard_bp, selection_bp, admin_pages_bp,
-    init_dashboard_apis, init_selection_apis, clear_cache
+    auth_bp, admin_bp, dashboard_bp, selection_bp, admin_pages_bp, objects_admin_bp,
+    init_dashboard_apis, init_selection_apis
 )
 
 # Настройка логирования
@@ -113,6 +113,7 @@ app.register_blueprint(admin_bp)
 app.register_blueprint(dashboard_bp)
 app.register_blueprint(selection_bp)
 app.register_blueprint(admin_pages_bp)
+app.register_blueprint(objects_admin_bp)
 
 # ========== СТРАНИЦЫ ==========
 @app.route('/')
@@ -165,7 +166,7 @@ def selection_page():
 @app.route('/admin')
 @login_required
 def admin_panel():
-    """Страница управления пользователями"""
+    """Страница управления пользователями и объектами"""
     try:
         # Проверяем права доступа
         if current_user.role not in ['admin', 'manager']:
