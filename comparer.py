@@ -7,10 +7,17 @@ import logging
 logger = logging.getLogger(__name__)
 
 class DataComparer:
-    def __init__(self, bitrix_api, google_api):
+    def __init__(self, bitrix_api, google_api=None):
         self.bitrix = bitrix_api
-        self.google = google_api
+        self.google = google_api  # Оставляем для совместимости, но не используем
         self.normalizer = ObjectNameNormalizer()
+    
+    def _get_plan_requirements(self, target_date):
+        """
+        Получает план (потребности) из БД
+        """
+        from database import get_plan_requirements_for_date
+        return get_plan_requirements_for_date(target_date)
     
     def compare_by_date(self, target_date):
         """Сравнивает данные за указанную дату"""
@@ -21,8 +28,8 @@ class DataComparer:
             logger.info("=" * 50)
             logger.info(f"Сравниваем данные за {target_date.strftime('%Y-%m-%d')}")
             
-            # Получаем максимальные потребности из базы данных (с приоритетами)
-            requirements_data = self.google.get_requirements_for_date(target_date)
+            # ========== ИЗМЕНЕНО: Получаем план из БД вместо Google Sheets ==========
+            requirements_data = self._get_plan_requirements(target_date)
             
             # Преобразуем в формат для сравнения
             requirements = {}
@@ -36,7 +43,7 @@ class DataComparer:
                 else:
                     requirements[obj_name] = data
             
-            logger.info(f"Из Google (макс) получено {len(requirements)} объектов")
+            logger.info(f"Из БД (план) получено {len(requirements)} объектов")
             logger.info(f"Приоритетных объектов: {len(priorities)}")
             
             # Получаем фактические направленные из Bitrix
@@ -47,8 +54,8 @@ class DataComparer:
             req_normalized = self.normalizer.normalize_dict(requirements)
             deals_normalized = self.normalizer.normalize_dict(deals)
             
-            logger.info(f"Нормализованные Google: {req_normalized}")
-            logger.info(f"Нормализованные Bitrix: {deals_normalized}")
+            logger.info(f"Нормализованные План (БД): {list(req_normalized.keys())[:10]}")
+            logger.info(f"Нормализованные Bitrix: {list(deals_normalized.keys())[:10]}")
             
             # Создаем обратную карту для восстановления оригинальных названий
             original_names = {}
@@ -87,7 +94,7 @@ class DataComparer:
                         'count': plan,
                         'is_high': priorities.get(original, False)
                     }
-                    logger.info(f"Только в заявке: '{original}' план={plan}")
+                    logger.info(f"Только в плане: '{original}' план={plan}")
             
             for norm_name, fact in deals_remaining.items():
                 original = original_names.get(norm_name, norm_name)
@@ -131,9 +138,11 @@ class DataComparer:
             }
             
             logger.info(f"ИТОГИ за {target_date.strftime('%Y-%m-%d')}:")
-            logger.info(f"  only_plan ({len(only_plan)}): {only_plan}")
-            logger.info(f"  only_fact ({len(only_fact)}): {only_fact}")
-            logger.info(f"  negative_delta ({len(negative_delta)}): {negative_delta}")
+            logger.info(f"  План всего: {total_plan}, Факт всего: {total_fact}")
+            logger.info(f"  only_plan ({len(only_plan)}): {list(only_plan.keys())[:5]}")
+            logger.info(f"  only_fact ({len(only_fact)}): {list(only_fact.keys())[:5]}")
+            logger.info(f"  negative_delta ({len(negative_delta)})")
+            logger.info(f"  positive_delta ({len(positive_delta)})")
             logger.info("=" * 50)
             
             return result

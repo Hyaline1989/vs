@@ -95,7 +95,8 @@ def inject_globals():
 # ========== ИНИЦИАЛИЗАЦИЯ API ==========
 bitrix_api = BitrixAPI(BITRIX_WEBHOOK_URL)
 google_api = GoogleSheetsAPI()
-comparer = DataComparer(bitrix_api, google_api)
+# Comparer теперь не зависит от google_api (план берётся из БД)
+comparer = DataComparer(bitrix_api)
 
 # Инициализируем blueprint'ы с API
 init_dashboard_apis(bitrix_api, google_api, comparer)
@@ -138,7 +139,6 @@ def welcome():
 def dashboard_page():
     """Страница дашборда"""
     try:
-        # Проверяем права доступа к модулю
         if not current_user.can_view_dashboard():
             logger.warning(f"Пользователь {current_user.username} пытается зайти в дашборд без прав")
             return render_template('no_access.html', 
@@ -156,7 +156,6 @@ def dashboard_page():
 def selection_page():
     """Страница подбора объектов"""
     try:
-        # Проверяем права доступа к модулю
         if not current_user.can_view_selection():
             logger.warning(f"Пользователь {current_user.username} пытается зайти в подбор объектов без прав")
             return render_template('no_access.html', 
@@ -174,7 +173,6 @@ def selection_page():
 def admin_panel():
     """Страница управления пользователями и объектами"""
     try:
-        # Проверяем права доступа
         if current_user.role not in ['admin', 'manager']:
             logger.warning(f"Пользователь {current_user.username} пытается зайти в админку без прав")
             return render_template('no_access.html', 
@@ -188,232 +186,8 @@ def admin_panel():
                              message="Произошла ошибка при загрузке страницы",
                              return_url="/welcome"), 500
 
-# ========== ДИАГНОСТИЧЕСКИЕ ЭНДПОИНТЫ ==========
-@app.route('/api/debug/google-sheets')
-def debug_google_sheets():
-    """Диагностический эндпоинт для проверки Google Sheets (только для админов)"""
-    from flask_login import current_user
-    from database import get_all_max_requirements
-    from datetime import datetime
-    
-    if not current_user.is_authenticated:
-        return jsonify({'error': 'Unauthorized'}), 401
-    
-    if not current_user.is_admin():
-        return jsonify({'error': 'Forbidden'}), 403
-    
-    # Запускаем диагностику
-    try:
-        google_api.debug_csv_content()
-    except Exception as e:
-        logger.error(f"Ошибка при диагностике: {e}")
-        return jsonify({'error': str(e)}), 500
-    
-    # Получаем данные из БД за сегодня
-    today_data = get_all_max_requirements(datetime.now())
-    
-    # Получаем данные из БД за последние 7 дней
-    from datetime import timedelta
-    week_data = {}
-    for i in range(7):
-        date = datetime.now() - timedelta(days=i)
-        week_data[date.strftime('%Y-%m-%d')] = len(get_all_max_requirements(date))
-    
-    return jsonify({
-        'status': 'ok',
-        'today_requirements_count': len(today_data),
-        'today_requirements': {k: v for k, v in list(today_data.items())[:20]},
-        'week_requirements_counts': week_data,
-        'message': 'Диагностика завершена, смотрите логи сервера'
-    })
-
-@app.route('/api/debug/database')
-def debug_database():
-    """Диагностический эндпоинт для проверки базы данных"""
-    from flask_login import current_user
-    from database import get_all_max_requirements, get_all_dates, get_all_vacancy_data
-    from datetime import datetime, timedelta
-    
-    if not current_user.is_authenticated:
-        return jsonify({'error': 'Unauthorized'}), 401
-    
-    if not current_user.is_admin():
-        return jsonify({'error': 'Forbidden'}), 403
-    
-    all_dates = get_all_dates()
-    
-    # Получаем статистику по последним 7 дням
-    stats = {}
-    for i in range(7):
-        date = datetime.now() - timedelta(days=i)
-        date_str = date.strftime('%Y-%m-%d')
-        data = get_all_max_requirements(date)
-        stats[date_str] = {
-            'count': len(data),
-            'total_need': sum(item['count'] for item in data.values()),
-            'priority_count': sum(1 for item in data.values() if item.get('is_high', False))
-        }
-    
-    # Получаем статистику по вакансиям из новой системы
-    today_vacancy = get_all_vacancy_data(datetime.now().strftime('%Y-%m-%d'))
-    vacancy_stats = {
-        'total_objects': len(today_vacancy),
-        'total_positions': sum(len(v.get('positions', [])) for v in today_vacancy.values()),
-        'total_need': sum(
-            v.get('rf', {}).get('men', 0) + v.get('rf', {}).get('women', 0) + v.get('rf', {}).get('family', 0) +
-            v.get('cis', {}).get('men', 0) + v.get('cis', {}).get('women', 0) + v.get('cis', {}).get('family', 0)
-            for v in today_vacancy.values()
-        )
-    }
-    
-    return jsonify({
-        'status': 'ok',
-        'all_dates': all_dates[:30],
-        'last_7_days_stats': stats,
-        'vacancy_stats': vacancy_stats,
-        'database_file': 'requirements.db'
-    })
-
-@app.route('/api/debug/priority-check')
-def debug_priority_check():
-    """Диагностический эндпоинт для проверки приоритетов в БД"""
-    from flask_login import current_user
-    from database import get_all_max_requirements
-    from datetime import datetime
-    
-    if not current_user.is_authenticated:
-        return jsonify({'error': 'Unauthorized'}), 401
-    
-    if not current_user.is_admin():
-        return jsonify({'error': 'Forbidden'}), 403
-    
-    today = datetime.now()
-    requirements = get_all_max_requirements(today)
-    
-    priority_objects = []
-    for name, data in requirements.items():
-        if data.get('is_high', False):
-            priority_objects.append({
-                'name': name,
-                'count': data['count'],
-                'is_high': data['is_high']
-            })
-    
-    return jsonify({
-        'date': today.strftime('%Y-%m-%d'),
-        'total_objects': len(requirements),
-        'priority_objects': priority_objects,
-        'all_requirements': {k: v for k, v in list(requirements.items())[:20]}
-    })
-
-@app.route('/api/debug/csv-structure')
-@login_required
-def debug_csv_structure():
-    """Диагностика структуры CSV (только для админов)"""
-    from flask_login import current_user
-    
-    if not current_user.is_authenticated:
-        return jsonify({'error': 'Unauthorized'}), 401
-    
-    if not current_user.is_admin():
-        return jsonify({'error': 'Forbidden'}), 403
-    
-    try:
-        result = google_api.debug_csv_structure()
-        return jsonify({'status': 'ok', 'message': 'Смотрите логи сервера для деталей'})
-    except Exception as e:
-        logger.error(f"Ошибка диагностики CSV: {e}")
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/debug/vacancy-data')
-@login_required
-def debug_vacancy_data():
-    """Проверка данных вакансий из БД (только для админов)"""
-    from flask_login import current_user
-    from database import get_all_vacancy_data
-    from datetime import datetime
-    
-    if not current_user.is_authenticated:
-        return jsonify({'error': 'Unauthorized'}), 401
-    
-    if not current_user.is_admin():
-        return jsonify({'error': 'Forbidden'}), 403
-    
-    try:
-        # Получаем данные из новой БД
-        vacancy_data = get_all_vacancy_data(datetime.now().strftime('%Y-%m-%d'))
-        
-        # Ограничиваем вывод для безопасности
-        limited_data = {}
-        for obj_name, data in list(vacancy_data.items())[:20]:
-            limited_data[obj_name] = {
-                'rf_men': data.get('rf', {}).get('men', 0),
-                'rf_women': data.get('rf', {}).get('women', 0),
-                'rf_family': data.get('rf', {}).get('family', 0),
-                'cis_men': data.get('cis', {}).get('men', 0),
-                'cis_women': data.get('cis', {}).get('women', 0),
-                'cis_family': data.get('cis', {}).get('family', 0),
-                'positions_count': len(data.get('positions', [])),
-                'positions': [p.get('name', '') for p in data.get('positions', [])[:5]]
-            }
-        
-        return jsonify({
-            'source': 'DATABASE (new system)',
-            'total_objects': len(vacancy_data),
-            'data': limited_data
-        })
-    except Exception as e:
-        logger.error(f"Ошибка получения данных вакансий из БД: {e}")
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/debug/migrate-status')
-@login_required
-def debug_migrate_status():
-    """Проверка статуса миграции данных"""
-    from flask_login import current_user
-    from database import get_all_vacancy_data
-    from datetime import datetime
-    
-    if not current_user.is_authenticated or not current_user.is_admin():
-        return jsonify({'error': 'Forbidden'}), 403
-    
-    try:
-        # Проверяем наличие данных в новой системе
-        today = datetime.now().strftime('%Y-%m-%d')
-        vacancy_count = len(get_all_vacancy_data(today))
-        
-        # Проверяем наличие данных в старой системе (Google Sheets)
-        old_vacancy = google_api.get_vacancy_data() if google_api else {}
-        old_count = len(old_vacancy)
-        
-        return jsonify({
-            'new_system': {
-                'has_data': vacancy_count > 0,
-                'objects_count': vacancy_count,
-                'date': today
-            },
-            'old_system': {
-                'has_data': old_count > 0,
-                'objects_count': old_count
-            },
-            'needs_migration': vacancy_count == 0 and old_count > 0
-        })
-    except Exception as e:
-        logger.error(f"Ошибка проверки статуса миграции: {e}")
-        return jsonify({'error': str(e)}), 500
-
 # ========== ФОНОВЫЕ ЗАДАЧИ ==========
-def update_requirements_for_last_n_days(n_days=7):
-    today = datetime.now()
-    updated_count = 0
-    for i in range(n_days):
-        target_date = today - timedelta(days=i)
-        if google_api.update_requirements_for_date(target_date):
-            updated_count += 1
-    return updated_count
-
 scheduler = BackgroundScheduler()
-# Фоновые задачи для Google Sheets отключены (переходим на ручное управление через БД)
 scheduler.add_job(func=cleanup_old_records, trigger="cron", hour=3, minute=0, args=[30], 
                   id='cleanup_database')
 scheduler.start()
@@ -435,6 +209,6 @@ def health():
 # ========== ЗАПУСК ПРИЛОЖЕНИЯ ==========
 if __name__ == '__main__':
     logger.info("🚀 Запуск объединённого CRM Dashboard...")
-    logger.info("📊 Система управления вакансиями переведена на БД (без Google Sheets)")
+    logger.info("📊 Дашборд использует план из БД (вакансии)")
     debug_mode = FLASK_ENV == 'development'
     app.run(debug=debug_mode, host='0.0.0.0', port=5001)

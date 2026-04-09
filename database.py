@@ -1181,6 +1181,53 @@ def get_all_vacancy_data(date=None):
         return {}
 
 
+def get_plan_requirements_for_date(target_date):
+    """
+    Получает суммарный план (потребность) по всем объектам за указанную дату
+    из таблиц vacancy_requirements
+    Возвращает словарь: {объект: {'count': сумма, 'is_high': приоритет}}
+    """
+    if isinstance(target_date, str):
+        date_str = target_date
+    else:
+        date_str = target_date.strftime('%Y-%m-%d')
+    
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        
+        # Получаем суммарные потребности по объектам
+        cursor.execute('''
+            SELECT vo.name, 
+                   SUM(vr.rf_men + vr.rf_women + vr.rf_family + 
+                       vr.cis_men + vr.cis_women + vr.cis_family) as total_count,
+                   MAX(vr.is_high) as is_high
+            FROM vacancy_objects vo
+            JOIN vacancy_positions vp ON vp.object_id = vo.id
+            JOIN vacancy_requirements vr ON vr.position_id = vp.id
+            WHERE vr.date = ?
+            GROUP BY vo.id, vo.name
+        ''', (date_str,))
+        
+        rows = cursor.fetchall()
+        conn.close()
+        
+        result = {}
+        for name, count, is_high in rows:
+            if count > 0:
+                result[name] = {
+                    'count': count,
+                    'is_high': bool(is_high)
+                }
+        
+        logger.info(f"📊 Получен план из БД за {date_str}: {len(result)} объектов, всего {sum(r['count'] for r in result.values())} чел.")
+        return result
+        
+    except Exception as e:
+        logger.error(f"Ошибка при получении плана из БД: {e}")
+        return {}
+
+
 def save_vacancy_object(name):
     """Создаёт новый объект вакансии"""
     try:

@@ -1,6 +1,6 @@
 # routes/dashboard.py
 # -*- coding: utf-8 -*-
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, redirect
 from flask_login import current_user
 from datetime import datetime, timedelta
 import re
@@ -8,7 +8,6 @@ import logging
 
 from database import get_user_module_permissions
 from bitrix_api import BitrixAPI
-from google_sheets import GoogleSheetsAPI
 from comparer import DataComparer
 from config import BITRIX_WEBHOOK_URL
 
@@ -19,7 +18,6 @@ dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/api')
 
 # Инициализируем API (будет переопределено в app.py)
 bitrix_api = None
-google_api = None
 comparer = None
 
 # Кэш для данных
@@ -48,9 +46,8 @@ def clear_cache():
 
 def init_dashboard_apis(bitrix, google, comp):
     """Инициализирует API для dashboard blueprint"""
-    global bitrix_api, google_api, comparer
+    global bitrix_api, comparer
     bitrix_api = bitrix
-    google_api = google
     comparer = comp
 
 
@@ -112,14 +109,12 @@ def dashboard_today():
         return jsonify({'error': 'Forbidden'}), 403
     
     today = datetime.now().strftime('%Y-%m-%d')
-    # Перенаправляем на основной эндпоинт
-    from flask import redirect
     return redirect(f'/api/dashboard?date={today}')
 
 
 @dashboard_bp.route('/update-requirements', methods=['POST'])
 def update_requirements():
-    """Ручное обновление потребностей"""
+    """Ручное обновление потребностей (очистка кэша)"""
     if not current_user.is_authenticated:
         return jsonify({'error': 'Unauthorized'}), 401
     
@@ -128,21 +123,10 @@ def update_requirements():
         return jsonify({'error': 'Forbidden'}), 403
     
     try:
-        data = request.get_json() if request.is_json else {}
-        date_str = data.get('date')
-        
-        if date_str:
-            target_date = datetime.strptime(date_str, '%Y-%m-%d')
-            result = google_api.update_requirements_for_date(target_date)
-        else:
-            result = google_api.update_requirements_for_today()
-        
-        if result:
-            clear_cache()  # Очищаем кэш после обновления
-            return jsonify({'status': 'ok', 'message': 'Обновление запущено'})
-        return jsonify({'status': 'error', 'message': 'Ошибка при обновлении'}), 500
+        clear_cache()
+        return jsonify({'status': 'ok', 'message': 'Кэш очищен, данные будут загружены заново'})
     except Exception as e:
-        logger.error(f"Ошибка при ручном обновлении: {e}", exc_info=True)
+        logger.error(f"Ошибка при обновлении: {e}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
 
