@@ -8,6 +8,59 @@ let hasUnsavedChanges = false;
 let currentUserRole = null;
 let currentVacancyDate = new Date().toISOString().split('T')[0];
 
+// ========== СИСТЕМА УВЕДОМЛЕНИЙ (всплывающие сообщения) ==========
+function showToast(message, type = 'info') {
+    // Удаляем старые уведомления
+    const oldToast = document.getElementById('selectionToast');
+    if (oldToast) oldToast.remove();
+    
+    const toast = document.createElement('div');
+    toast.id = 'selectionToast';
+    toast.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 12px 24px;
+        border-radius: 8px;
+        color: white;
+        font-weight: 500;
+        z-index: 10000;
+        animation: slideIn 0.3s ease;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    `;
+    
+    const colors = {
+        success: '#27ae60',
+        error: '#e74c3c',
+        info: '#3498db',
+        warning: '#f39c12'
+    };
+    
+    toast.style.background = colors[type] || colors.info;
+    toast.textContent = message;
+    
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.style.animation = 'slideOut 0.3s ease';
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}
+
+// Добавляем стили для анимации
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes slideIn {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+    }
+    @keyframes slideOut {
+        from { transform: translateX(0); opacity: 1; }
+        to { transform: translateX(100%); opacity: 0; }
+    }
+`;
+document.head.appendChild(style);
+
 // ========== ЗАГРУЗКА ДАННЫХ ==========
 async function loadSelectionData() {
     try {
@@ -30,7 +83,7 @@ async function loadSelectionData() {
         const data = await response.json();
         
         if (data.error) {
-            showNotification('Ошибка загрузки данных: ' + escapeHtml(data.error), 'error');
+            showToast('Ошибка загрузки данных: ' + escapeHtml(data.error), 'error');
             return;
         }
         
@@ -50,7 +103,7 @@ async function loadSelectionData() {
         if (debugMode) updateDebugInfo();
     } catch (error) {
         console.error('Ошибка загрузки:', error);
-        showNotification('Ошибка загрузки данных', 'error');
+        showToast('Ошибка загрузки данных', 'error');
     }
 }
 
@@ -200,14 +253,14 @@ function displayResults(objectsToDisplay) {
 // ========== ГЛАВНОЕ МОДАЛЬНОЕ ОКНО С ТАБЛИЦЕЙ ==========
 async function openRequirementsModal() {
     if (!window.isAdmin) {
-        showNotification('Только администратор может управлять потребностями', 'error');
+        showToast('Только администратор может управлять потребностями', 'error');
         return;
     }
     
     let modal = document.getElementById('requirementsModal');
     if (modal) modal.remove();
     
-    showNotification('Загрузка...', 'info');
+    showToast('Загрузка...', 'info');
     
     try {
         // Загружаем актуальные данные из БД
@@ -215,7 +268,7 @@ async function openRequirementsModal() {
         renderRequirementsTable();
     } catch (error) {
         console.error('Ошибка:', error);
-        showNotification('Ошибка загрузки', 'error');
+        showToast('Ошибка загрузки', 'error');
     }
 }
 
@@ -453,7 +506,7 @@ function closeAddObjectModal() {
 async function createNewObject() {
     const name = document.getElementById('newObjName')?.value.trim();
     if (!name) {
-        showNotification('Введите название объекта', 'error');
+        showToast('Введите название объекта', 'error');
         return;
     }
     
@@ -465,7 +518,7 @@ async function createNewObject() {
     }
     
     if (positions.length === 0) {
-        showNotification('Добавьте хотя бы одну должность', 'error');
+        showToast('Добавьте хотя бы одну должность', 'error');
         return;
     }
     
@@ -480,7 +533,7 @@ async function createNewObject() {
         
         if (!response.ok) {
             const err = await response.json();
-            showNotification('Ошибка: ' + (err.error || 'Не удалось создать объект'), 'error');
+            showToast('Ошибка: ' + (err.error || 'Не удалось создать объект'), 'error');
             return;
         }
         
@@ -505,12 +558,12 @@ async function createNewObject() {
             }))
         };
         
-        showNotification(`Объект "${name}" создан с ${positions.length} должностями`, 'success');
+        showToast(`Объект "${name}" создан`, 'success');
         closeAddObjectModal();
         renderRequirementsTable();
     } catch (error) {
         console.error('Ошибка:', error);
-        showNotification('Ошибка создания объекта', 'error');
+        showToast('Ошибка создания объекта', 'error');
     }
 }
 
@@ -547,7 +600,7 @@ function closeAddPositionModal() {
 async function createNewPosition(objectName) {
     const positionName = document.getElementById('newPositionName')?.value.trim();
     if (!positionName) {
-        showNotification('Введите название должности', 'error');
+        showToast('Введите название должности', 'error');
         return;
     }
     
@@ -561,7 +614,7 @@ async function createNewPosition(objectName) {
         
         if (!response.ok) {
             const err = await response.json();
-            showNotification('Ошибка: ' + (err.error || 'Не удалось добавить должность'), 'error');
+            showToast('Ошибка: ' + (err.error || 'Не удалось добавить должность'), 'error');
             return;
         }
         
@@ -575,17 +628,18 @@ async function createNewPosition(objectName) {
             cis: { men: 0, women: 0, family: 0 }
         });
         
-        showNotification(`Должность "${positionName}" добавлена`, 'success');
+        showToast(`Должность "${positionName}" добавлена`, 'success');
         closeAddPositionModal();
         renderRequirementsTable();
     } catch (error) {
         console.error('Ошибка:', error);
-        showNotification('Ошибка добавления должности', 'error');
+        showToast('Ошибка добавления должности', 'error');
     }
 }
 
 // ========== УДАЛЕНИЕ ==========
 async function deleteObject(objectName) {
+    // ТОЛЬКО ЗДЕСЬ ОСТАВЛЯЕМ CONFIRM для защиты от случайного удаления
     if (!confirm(`Удалить объект "${objectName}" и все его должности?`)) return;
     
     try {
@@ -596,19 +650,20 @@ async function deleteObject(objectName) {
         
         if (response.ok) {
             delete vacancyData[objectName];
-            showNotification(`Объект "${objectName}" удалён`, 'success');
+            showToast(`Объект "${objectName}" удалён`, 'success');
             renderRequirementsTable();
         } else {
             const err = await response.json();
-            showNotification('Ошибка: ' + (err.error || 'Не удалось удалить'), 'error');
+            showToast('Ошибка: ' + (err.error || 'Не удалось удалить'), 'error');
         }
     } catch (error) {
         console.error('Ошибка:', error);
-        showNotification('Ошибка удаления', 'error');
+        showToast('Ошибка удаления', 'error');
     }
 }
 
 async function deletePosition(objectName, positionName) {
+    // ТОЛЬКО ЗДЕСЬ ОСТАВЛЯЕМ CONFIRM для защиты от случайного удаления
     if (!confirm(`Удалить должность "${positionName}"?`)) return;
     
     try {
@@ -625,20 +680,21 @@ async function deletePosition(objectName, positionName) {
                 const index = obj.positions.findIndex(p => p.name === positionName);
                 if (index !== -1) obj.positions.splice(index, 1);
             }
-            showNotification(`Должность "${positionName}" удалена`, 'success');
+            showToast(`Должность "${positionName}" удалена`, 'success');
             renderRequirementsTable();
         } else {
             const err = await response.json();
-            showNotification('Ошибка: ' + (err.error || 'Не удалось удалить'), 'error');
+            showToast('Ошибка: ' + (err.error || 'Не удалось удалить'), 'error');
         }
     } catch (error) {
         console.error('Ошибка:', error);
-        showNotification('Ошибка удаления', 'error');
+        showToast('Ошибка удаления', 'error');
     }
 }
 
 // ========== СОХРАНЕНИЕ ВСЕХ ДАННЫХ ==========
 async function saveAllData() {
+    // НИКАКИХ CONFIRM - сразу сохраняем
     try {
         // Собираем все данные из таблицы
         const objectsData = {};
@@ -702,7 +758,7 @@ async function saveAllData() {
                 if (obj) obj.priority = chk.checked;
             }
             
-            showNotification('✅ Все данные сохранены в базу данных', 'success');
+            showToast('✅ Все данные сохранены', 'success');
             
             // Обновляем vacancyData из БД
             await loadVacancyData();
@@ -713,11 +769,11 @@ async function saveAllData() {
             setTimeout(() => closeRequirementsModal(), 500);
         } else {
             const err = await response.json();
-            showNotification('❌ Ошибка: ' + (err.error || 'Не удалось сохранить'), 'error');
+            showToast('❌ Ошибка: ' + (err.error || 'Не удалось сохранить'), 'error');
         }
     } catch (error) {
         console.error('Ошибка сохранения:', error);
-        showNotification('❌ Ошибка сохранения', 'error');
+        showToast('❌ Ошибка сохранения', 'error');
     }
 }
 
@@ -757,11 +813,11 @@ async function saveGlobalOrder() {
             hasUnsavedChanges = false;
             const saveBtn = document.getElementById('saveOrderBtn');
             if (saveBtn) { saveBtn.innerHTML = 'Сохранить порядок'; saveBtn.style.background = '#27ae60'; }
-            showNotification('✅ Порядок сохранён', 'success');
+            showToast('✅ Порядок сохранён', 'success');
         }
     } catch(e) { 
         console.error(e); 
-        showNotification('❌ Ошибка сохранения порядка', 'error');
+        showToast('❌ Ошибка сохранения порядка', 'error');
     }
 }
 
@@ -805,11 +861,6 @@ function escapeHtml(str) {
 function escapeUrl(str) { 
     if(!str) return '#'; 
     return str; 
-}
-
-function showNotification(msg, type) { 
-    console.log(msg); 
-    alert(msg); 
 }
 
 // Глобальные функции
