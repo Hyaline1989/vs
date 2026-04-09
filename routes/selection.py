@@ -6,9 +6,9 @@ import logging
 
 from database import (
     get_objects_settings, update_object_settings, get_global_order, save_global_order,
-    get_user_module_permissions, get_user_object_permissions, get_all_max_requirements
+    get_user_module_permissions, get_user_object_permissions, get_all_max_requirements,
+    get_objects_settings_extended  # ДОБАВЛЕНО: для получения полных данных из БД
 )
-from config import OBJECTS_BASE
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
@@ -33,49 +33,64 @@ def selection_settings():
         return jsonify({'error': 'Unauthorized'}), 401
     
     try:
+        # ЗАГРУЖАЕМ ОБЪЕКТЫ ИЗ БАЗЫ ДАННЫХ (вместо OBJECTS_BASE)
+        db_objects = get_objects_settings_extended()
+        
+        # Оставляем только видимые объекты
+        db_objects = [obj for obj in db_objects if obj.get('visible', True)]
+        
         objects_settings = get_objects_settings()
         global_order = get_global_order()
         
+        # Если нет сохранённого порядка, создаём из ID объектов в БД
         if not global_order:
-            global_order = [obj['id'] for obj in OBJECTS_BASE]
+            global_order = [obj['id'] for obj in db_objects]
             save_global_order(global_order)
         
-        # Получаем приоритеты из базы данных потребностей за сегодня
+        # Получаем приоритеты и потребности из базы данных за сегодня
         today = datetime.now()
         today_requirements = get_all_max_requirements(today)
         
+        # Создаём словарь для быстрого поиска потребностей по нормализованным названиям
+        from normalizer import ObjectNameNormalizer
+        normalizer = ObjectNameNormalizer()
+        
+        req_by_normalized = {}
+        for req_name, req_data in today_requirements.items():
+            normalized = normalizer.normalize(req_name)
+            req_by_normalized[normalized] = req_data
+        
         objects = []
-        for base_obj in OBJECTS_BASE:
-            setting = next((s for s in objects_settings if s['id'] == base_obj['id']), None)
+        for db_obj in db_objects:
+            setting = next((s for s in objects_settings if s['id'] == db_obj['id']), None)
             
-            # Получаем приоритет из базы данных потребностей
-            db_priority = False
-            for req_name, req_data in today_requirements.items():
-                # Нормализуем название для сравнения
-                from normalizer import ObjectNameNormalizer
-                normalizer = ObjectNameNormalizer()
-                normalized_obj_name = normalizer.normalize(base_obj['name'])
-                normalized_req_name = normalizer.normalize(req_name)
-                
-                if normalized_obj_name == normalized_req_name:
-                    db_priority = req_data.get('is_high', False)
-                    logger.info(f"Объект {base_obj['name']} имеет приоритет из БД: {db_priority}")
-                    break
+            # Нормализуем название объекта
+            normalized_obj_name = normalizer.normalize(db_obj['name'])
             
+            # Получаем потребность из БД
+            req_data = req_by_normalized.get(normalized_obj_name, {})
+            requirement_count = req_data.get('count', 0)
+            db_priority = req_data.get('is_high', False)
+            
+            if requirement_count > 0:
+                logger.debug(f"Объект {db_obj['name']}: потребность={requirement_count}, приоритет={db_priority}")
+            
+            # Используем данные из БД
             objects.append({
-                'id': base_obj['id'],
-                'name': base_obj['name'],
-                'ageMin': base_obj['ageMin'],
-                'ageMax': base_obj['ageMax'],
-                'allowedGenders': base_obj['allowedGenders'],
-                'allowedNationalities': base_obj['allowedNationalities'],
-                'allowsConviction': base_obj['allowsConviction'],
-                'link': base_obj['link'],
+                'id': db_obj['id'],
+                'name': db_obj['name'],
+                'ageMin': db_obj.get('ageMin', 18),
+                'ageMax': db_obj.get('ageMax', 55),
+                'allowedGenders': db_obj.get('allowedGenders', ['мужчина', 'женщина']),
+                'allowedNationalities': db_obj.get('allowedNationalities', ['РФ']),
+                'allowsConviction': db_obj.get('allowsConviction', False),
+                'link': db_obj.get('link', ''),
                 'visible': setting['visible'] if setting else True,
-                'priority': db_priority  # Используем приоритет из БД потребностей
+                'priority': db_priority,  # Приоритет из БД потребностей
+                'requirement': requirement_count  # Добавляем текущую потребность
             })
         
-        logger.info(f"Загружено {len(objects)} объектов, из них приоритетных: {sum(1 for o in objects if o['priority'])}")
+        logger.info(f"Загружено {len(objects)} объектов из БД, из них приоритетных: {sum(1 for o in objects if o['priority'])}, с потребностями: {sum(1 for o in objects if o['requirement'] > 0)}")
         
         # Фильтрация по правам для подбора объектов
         if current_user.role != 'admin':

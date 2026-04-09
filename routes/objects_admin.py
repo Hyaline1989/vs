@@ -5,9 +5,14 @@ from flask_login import current_user
 import logging
 
 from database import (
-    get_objects_settings, update_object_settings, 
-    get_object_by_id, create_object, delete_object,
-    get_objects_base, get_global_order, save_global_order
+    get_objects_settings_extended,
+    update_object_settings_full,
+    get_object_by_id, 
+    create_object_extended, 
+    delete_object,
+    get_objects_base, 
+    get_global_order, 
+    save_global_order
 )
 from config import OBJECTS_BASE
 
@@ -24,13 +29,8 @@ def get_objects():
     if current_user.role not in ['admin']:
         return jsonify({'error': 'Forbidden'}), 403
     
-    objects = get_objects_settings()
-    
-    # Добавляем полную информацию из OBJECTS_BASE
-    base_dict = {obj['id']: obj for obj in OBJECTS_BASE}
-    for obj in objects:
-        if obj['id'] in base_dict:
-            obj.update(base_dict[obj['id']])
+    # Используем расширенную функцию
+    objects = get_objects_settings_extended()
     
     return jsonify({
         'objects': objects,
@@ -94,8 +94,8 @@ def create_object_api():
     visible = bool(data.get('visible', True))
     priority = bool(data.get('priority', False))
     
-    # Создаём объект
-    object_id = create_object(
+    # Используем новую функцию
+    object_id = create_object_extended(
         name=data['name'],
         age_min=age_min,
         age_max=age_max,
@@ -174,11 +174,14 @@ def update_object_api(object_id):
         return jsonify({'error': 'Нет данных для обновления'}), 400
     
     # Проверяем, что возраст min <= max
-    if 'age_min' in updates and 'age_max' in updates:
-        if updates['age_min'] > updates['age_max']:
+    age_min = updates.get('age_min')
+    age_max = updates.get('age_max')
+    if age_min is not None and age_max is not None:
+        if age_min > age_max:
             return jsonify({'error': 'Минимальный возраст не может быть больше максимального'}), 400
     
-    success = update_object_settings(object_id, updates)
+    # Используем новую функцию
+    success = update_object_settings_full(object_id, updates)
     
     if not success:
         return jsonify({'error': 'Ошибка при обновлении объекта'}), 500

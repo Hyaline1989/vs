@@ -8,6 +8,7 @@ from routes.dashboard import dashboard_bp
 from routes.selection import selection_bp
 from routes.admin_pages import admin_pages_bp
 from routes.objects_admin import objects_admin_bp
+from routes.requirements_admin import requirements_admin_bp
 
 # Список всех blueprint'ов для удобного импорта
 __all__ = [
@@ -17,6 +18,7 @@ __all__ = [
     'selection_bp',
     'admin_pages_bp',
     'objects_admin_bp',
+    'requirements_admin_bp',
     'init_dashboard_apis',
     'init_selection_apis'
 ]

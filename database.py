@@ -41,16 +41,39 @@ def init_db():
         if 'is_high' not in columns:
             cursor.execute("ALTER TABLE requirement_history ADD COLUMN is_high INTEGER DEFAULT 0")
         
-        # Таблица для настроек объектов
+        # Таблица для настроек объектов с расширенными полями
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS objects_settings (
                 id INTEGER PRIMARY KEY,
                 name TEXT NOT NULL,
                 visible INTEGER DEFAULT 1,
                 priority INTEGER DEFAULT 0,
+                age_min INTEGER DEFAULT 18,
+                age_max INTEGER DEFAULT 55,
+                allowed_genders TEXT DEFAULT 'мужчина,женщина',
+                allowed_nationalities TEXT DEFAULT 'РФ',
+                allows_conviction INTEGER DEFAULT 0,
+                link TEXT,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
+        
+        # Проверяем существование новых колонок и добавляем их, если их нет
+        cursor.execute("PRAGMA table_info(objects_settings)")
+        columns = [column[1] for column in cursor.fetchall()]
+        
+        if 'age_min' not in columns:
+            cursor.execute("ALTER TABLE objects_settings ADD COLUMN age_min INTEGER DEFAULT 18")
+        if 'age_max' not in columns:
+            cursor.execute("ALTER TABLE objects_settings ADD COLUMN age_max INTEGER DEFAULT 55")
+        if 'allowed_genders' not in columns:
+            cursor.execute("ALTER TABLE objects_settings ADD COLUMN allowed_genders TEXT DEFAULT 'мужчина,женщина'")
+        if 'allowed_nationalities' not in columns:
+            cursor.execute("ALTER TABLE objects_settings ADD COLUMN allowed_nationalities TEXT DEFAULT 'РФ'")
+        if 'allows_conviction' not in columns:
+            cursor.execute("ALTER TABLE objects_settings ADD COLUMN allows_conviction INTEGER DEFAULT 0")
+        if 'link' not in columns:
+            cursor.execute("ALTER TABLE objects_settings ADD COLUMN link TEXT")
         
         # Таблица для глобального порядка объектов
         cursor.execute('''
@@ -707,21 +730,56 @@ def init_objects_settings():
         cursor = conn.cursor()
         
         for obj in OBJECTS_BASE:
+            # Безопасно получаем значения с дефолтными
+            obj_id = obj.get('id', 0)
+            obj_name = obj.get('name', '')
+            
+            # Проверяем, существует ли уже объект
+            cursor.execute('SELECT id FROM objects_settings WHERE id = ?', (obj_id,))
+            if cursor.fetchone():
+                continue  # Пропускаем, если уже есть
+            
+            # Безопасно получаем остальные поля
+            age_min = obj.get('ageMin', 18)
+            age_max = obj.get('ageMax', 55)
+            
+            allowed_genders = obj.get('allowedGenders', ['мужчина', 'женщина'])
+            if isinstance(allowed_genders, list):
+                genders_str = ','.join(allowed_genders)
+            else:
+                genders_str = str(allowed_genders)
+            
+            allowed_nationalities = obj.get('allowedNationalities', ['РФ'])
+            if isinstance(allowed_nationalities, list):
+                nationalities_str = ','.join(allowed_nationalities)
+            else:
+                nationalities_str = str(allowed_nationalities)
+            
+            allows_conviction = 1 if obj.get('allowsConviction', False) else 0
+            link = obj.get('link', '')
+            
             cursor.execute('''
-                INSERT OR IGNORE INTO objects_settings (id, name, visible, priority)
-                VALUES (?, ?, ?, ?)
-            ''', (obj['id'], obj['name'], 1, 0))
+                INSERT OR IGNORE INTO objects_settings 
+                (id, name, visible, priority, age_min, age_max, 
+                 allowed_genders, allowed_nationalities, allows_conviction, link)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                obj_id, obj_name, 1, 0,
+                age_min, age_max, 
+                genders_str, nationalities_str, 
+                allows_conviction, link
+            ))
         
         conn.commit()
         conn.close()
         logger.info(f"Инициализированы настройки для {len(OBJECTS_BASE)} объектов")
         return True
     except Exception as e:
-        logger.error(f"Ошибка при инициализации настроек объектов: {e}")
+        logger.error(f"Ошибка при инициализации настроек объектов: {e}", exc_info=True)
         return False
 
 def get_objects_settings():
-    """Получает все настройки объектов"""
+    """Получает все настройки объектов (базовая версия)"""
     try:
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
@@ -733,8 +791,44 @@ def get_objects_settings():
         logger.error(f"Ошибка при получении настроек объектов: {e}")
         return []
 
+def get_objects_settings_extended():
+    """Получает все настройки объектов с расширенными полями"""
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT id, name, visible, priority, age_min, age_max, 
+                   allowed_genders, allowed_nationalities, allows_conviction, link
+            FROM objects_settings ORDER BY id
+        ''')
+        rows = cursor.fetchall()
+        conn.close()
+        
+        objects = []
+        for row in rows:
+            # Разбиваем строки обратно в списки
+            genders_str = row[6] or 'мужчина,женщина'
+            nationalities_str = row[7] or 'РФ'
+            
+            objects.append({
+                'id': row[0],
+                'name': row[1],
+                'visible': bool(row[2]),
+                'priority': bool(row[3]),
+                'ageMin': row[4] or 18,
+                'ageMax': row[5] or 55,
+                'allowedGenders': [g.strip() for g in genders_str.split(',') if g.strip()],
+                'allowedNationalities': [n.strip() for n in nationalities_str.split(',') if n.strip()],
+                'allowsConviction': bool(row[8]),
+                'link': row[9] or ''
+            })
+        return objects
+    except Exception as e:
+        logger.error(f"Ошибка при получении настроек объектов: {e}")
+        return []
+
 def update_object_settings(object_id, visible, priority):
-    """Обновляет настройки объекта"""
+    """Обновляет базовые настройки объекта"""
     try:
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
@@ -748,6 +842,91 @@ def update_object_settings(object_id, visible, priority):
         return True
     except Exception as e:
         logger.error(f"Ошибка при обновлении настроек объекта: {e}")
+        return False
+
+def create_object_extended(name, age_min, age_max, allowed_genders, allowed_nationalities, 
+                           allows_conviction, link='', visible=True, priority=False):
+    """Создаёт новый объект с расширенными полями"""
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        
+        # Получаем следующий ID
+        cursor.execute('SELECT MAX(id) FROM objects_settings')
+        max_id = cursor.fetchone()[0]
+        new_id = (max_id or 0) + 1
+        
+        # Преобразуем списки в строки
+        genders_str = ','.join(allowed_genders) if isinstance(allowed_genders, list) else allowed_genders
+        nationalities_str = ','.join(allowed_nationalities) if isinstance(allowed_nationalities, list) else allowed_nationalities
+        
+        # Добавляем в objects_settings
+        cursor.execute('''
+            INSERT INTO objects_settings (id, name, visible, priority, age_min, age_max, 
+                                         allowed_genders, allowed_nationalities, allows_conviction, link)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (new_id, name, 1 if visible else 0, 1 if priority else 0,
+              age_min, age_max, genders_str, nationalities_str, 
+              1 if allows_conviction else 0, link))
+        
+        conn.commit()
+        conn.close()
+        
+        logger.info(f"✅ Создан новый объект: {name} (ID: {new_id})")
+        return new_id
+    except sqlite3.IntegrityError:
+        logger.warning(f"Объект с именем {name} уже существует")
+        return None
+    except Exception as e:
+        logger.error(f"Ошибка при создании объекта: {e}")
+        return None
+
+def update_object_settings_full(object_id, updates):
+    """Обновляет все настройки объекта"""
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        
+        # Формируем SQL запрос динамически
+        fields = []
+        params = []
+        
+        field_mapping = {
+            'name': 'name',
+            'visible': 'visible',
+            'priority': 'priority',
+            'age_min': 'age_min',
+            'age_max': 'age_max',
+            'allowed_genders': 'allowed_genders',
+            'allowed_nationalities': 'allowed_nationalities',
+            'allows_conviction': 'allows_conviction',
+            'link': 'link'
+        }
+        
+        for key, db_field in field_mapping.items():
+            if key in updates:
+                fields.append(f"{db_field} = ?")
+                value = updates[key]
+                if key in ['visible', 'priority', 'allows_conviction']:
+                    value = 1 if value else 0
+                elif key in ['allowed_genders', 'allowed_nationalities']:
+                    value = ','.join(value) if isinstance(value, list) else value
+                params.append(value)
+        
+        if not fields:
+            return True
+            
+        params.append(object_id)
+        query = f"UPDATE objects_settings SET {', '.join(fields)} WHERE id = ?"
+        cursor.execute(query, params)
+        
+        conn.commit()
+        conn.close()
+        
+        logger.info(f"✅ Обновлён объект ID {object_id}")
+        return True
+    except Exception as e:
+        logger.error(f"Ошибка при обновлении объекта: {e}")
         return False
 
 def get_global_order():
@@ -793,100 +972,52 @@ def save_global_order(order_list):
 # ========== ФУНКЦИИ ДЛЯ УПРАВЛЕНИЯ ОБЪЕКТАМИ (CRUD) ==========
 
 def get_object_by_id(object_id):
-    """Получает объект по ID"""
+    """Получает объект по ID с расширенными полями"""
     try:
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
-        cursor.execute('SELECT id, name, visible, priority FROM objects_settings WHERE id = ?', (object_id,))
+        cursor.execute('''
+            SELECT id, name, visible, priority, age_min, age_max, 
+                   allowed_genders, allowed_nationalities, allows_conviction, link
+            FROM objects_settings WHERE id = ?
+        ''', (object_id,))
         row = cursor.fetchone()
         conn.close()
         
         if row:
+            genders_str = row[6] or 'мужчина,женщина'
+            nationalities_str = row[7] or 'РФ'
+            
             return {
                 'id': row[0],
                 'name': row[1],
                 'visible': bool(row[2]),
-                'priority': bool(row[3])
+                'priority': bool(row[3]),
+                'ageMin': row[4] or 18,
+                'ageMax': row[5] or 55,
+                'allowedGenders': [g.strip() for g in genders_str.split(',') if g.strip()],
+                'allowedNationalities': [n.strip() for n in nationalities_str.split(',') if n.strip()],
+                'allowsConviction': bool(row[8]),
+                'link': row[9] or ''
             }
         return None
     except Exception as e:
         logger.error(f"Ошибка при получении объекта: {e}")
         return None
 
-
 def get_objects_base():
     """Получает все объекты из objects_settings"""
     return get_objects_settings()
 
-
 def create_object(name, age_min, age_max, allowed_genders, allowed_nationalities, 
                   allows_conviction, link='', visible=True, priority=False):
-    """Создаёт новый объект"""
-    try:
-        conn = sqlite3.connect(DB_NAME)
-        cursor = conn.cursor()
-        
-        # Получаем следующий ID
-        cursor.execute('SELECT MAX(id) FROM objects_settings')
-        max_id = cursor.fetchone()[0]
-        new_id = (max_id or 0) + 1
-        
-        # Добавляем в objects_settings
-        cursor.execute('''
-            INSERT INTO objects_settings (id, name, visible, priority)
-            VALUES (?, ?, ?, ?)
-        ''', (new_id, name, 1 if visible else 0, 1 if priority else 0))
-        
-        conn.commit()
-        conn.close()
-        
-        logger.info(f"✅ Создан новый объект: {name} (ID: {new_id})")
-        return new_id
-    except sqlite3.IntegrityError:
-        logger.warning(f"Объект с именем {name} уже существует")
-        return None
-    except Exception as e:
-        logger.error(f"Ошибка при создании объекта: {e}")
-        return None
-
+    """Создаёт новый объект (совместимость со старым API)"""
+    return create_object_extended(name, age_min, age_max, allowed_genders, allowed_nationalities,
+                                  allows_conviction, link, visible, priority)
 
 def update_object_settings_extended(object_id, updates):
-    """
-    Обновляет настройки объекта с дополнительными полями
-    updates может содержать: name, visible, priority, age_min, age_max, 
-    allowed_genders, allowed_nationalities, allows_conviction, link
-    """
-    try:
-        conn = sqlite3.connect(DB_NAME)
-        cursor = conn.cursor()
-        
-        # Обновляем objects_settings
-        settings_updates = []
-        params = []
-        
-        if 'visible' in updates:
-            settings_updates.append('visible = ?')
-            params.append(1 if updates['visible'] else 0)
-        if 'priority' in updates:
-            settings_updates.append('priority = ?')
-            params.append(1 if updates['priority'] else 0)
-        if 'name' in updates:
-            settings_updates.append('name = ?')
-            params.append(updates['name'])
-        
-        if settings_updates:
-            params.append(object_id)
-            cursor.execute(f'UPDATE objects_settings SET {", ".join(settings_updates)} WHERE id = ?', params)
-        
-        conn.commit()
-        conn.close()
-        
-        logger.info(f"Обновлён объект {object_id}")
-        return True
-    except Exception as e:
-        logger.error(f"Ошибка при обновлении объекта: {e}")
-        return False
-
+    """Обновляет настройки объекта с дополнительными полями (совместимость)"""
+    return update_object_settings_full(object_id, updates)
 
 def delete_object(object_id):
     """Удаляет объект из БД"""
@@ -908,4 +1039,351 @@ def delete_object(object_id):
         return deleted > 0
     except Exception as e:
         logger.error(f"Ошибка при удалении объекта: {e}")
-        return False    
+        return False
+
+# ========== ФУНКЦИИ ДЛЯ УПРАВЛЕНИЯ ВАКАНСИЯМИ (НОВАЯ СИСТЕМА) ==========
+
+def init_vacancy_tables():
+    """Создаёт таблицы для хранения вакансий"""
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        
+        # Таблица объектов вакансий
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS vacancy_objects (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT UNIQUE NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Таблица должностей
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS vacancy_positions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                object_id INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (object_id) REFERENCES vacancy_objects(id) ON DELETE CASCADE,
+                UNIQUE(object_id, name)
+            )
+        ''')
+        
+        # Таблица с количествами по должностям
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS vacancy_requirements (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                position_id INTEGER NOT NULL,
+                date TEXT NOT NULL,
+                rf_men INTEGER DEFAULT 0,
+                rf_women INTEGER DEFAULT 0,
+                rf_family INTEGER DEFAULT 0,
+                cis_men INTEGER DEFAULT 0,
+                cis_women INTEGER DEFAULT 0,
+                cis_family INTEGER DEFAULT 0,
+                is_high INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (position_id) REFERENCES vacancy_positions(id) ON DELETE CASCADE,
+                UNIQUE(position_id, date)
+            )
+        ''')
+        
+        # Индексы
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_vacancy_date ON vacancy_requirements (date)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_vacancy_position ON vacancy_requirements (position_id)')
+        
+        conn.commit()
+        conn.close()
+        logger.info("✅ Таблицы для вакансий созданы")
+        return True
+    except Exception as e:
+        logger.error(f"Ошибка при создании таблиц вакансий: {e}")
+        return False
+
+
+def get_all_vacancy_data(date=None):
+    """
+    Получает все данные о вакансиях за указанную дату
+    Возвращает структуру, аналогичную старой из Google Sheets
+    """
+    if date is None:
+        date = datetime.now().strftime('%Y-%m-%d')
+    
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        
+        # Получаем все объекты
+        cursor.execute('SELECT id, name FROM vacancy_objects ORDER BY name')
+        objects = cursor.fetchall()
+        
+        result = {}
+        
+        for obj_id, obj_name in objects:
+            # Получаем все должности объекта
+            cursor.execute('''
+                SELECT id, name FROM vacancy_positions 
+                WHERE object_id = ? 
+                ORDER BY name
+            ''', (obj_id,))
+            positions = cursor.fetchall()
+            
+            obj_data = {
+                'rf': {'men': 0, 'women': 0, 'family': 0},
+                'cis': {'men': 0, 'women': 0, 'family': 0},
+                'positions': []
+            }
+            
+            for pos_id, pos_name in positions:
+                # Получаем данные за указанную дату
+                cursor.execute('''
+                    SELECT rf_men, rf_women, rf_family, cis_men, cis_women, cis_family, is_high
+                    FROM vacancy_requirements
+                    WHERE position_id = ? AND date = ?
+                ''', (pos_id, date))
+                req = cursor.fetchone()
+                
+                if req:
+                    pos_data = {
+                        'name': pos_name,
+                        'rf': {'men': req[0], 'women': req[1], 'family': req[2]},
+                        'cis': {'men': req[3], 'women': req[4], 'family': req[5]},
+                        'is_high': bool(req[6])
+                    }
+                    # Суммируем в общие итоги
+                    obj_data['rf']['men'] += req[0]
+                    obj_data['rf']['women'] += req[1]
+                    obj_data['rf']['family'] += req[2]
+                    obj_data['cis']['men'] += req[3]
+                    obj_data['cis']['women'] += req[4]
+                    obj_data['cis']['family'] += req[5]
+                else:
+                    pos_data = {
+                        'name': pos_name,
+                        'rf': {'men': 0, 'women': 0, 'family': 0},
+                        'cis': {'men': 0, 'women': 0, 'family': 0},
+                        'is_high': False
+                    }
+                
+                obj_data['positions'].append(pos_data)
+            
+            result[obj_name] = obj_data
+        
+        conn.close()
+        return result
+        
+    except Exception as e:
+        logger.error(f"Ошибка при получении данных вакансий: {e}")
+        return {}
+
+
+def save_vacancy_object(name):
+    """Создаёт новый объект вакансии"""
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO vacancy_objects (name) VALUES (?)
+        ''', (name,))
+        obj_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        logger.info(f"✅ Создан объект вакансии: {name} (ID: {obj_id})")
+        return obj_id
+    except sqlite3.IntegrityError:
+        logger.warning(f"Объект {name} уже существует")
+        return None
+    except Exception as e:
+        logger.error(f"Ошибка при создании объекта: {e}")
+        return None
+
+
+def delete_vacancy_object(object_name):
+    """Удаляет объект вакансии и все связанные данные"""
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        cursor.execute('DELETE FROM vacancy_objects WHERE name = ?', (object_name,))
+        deleted = cursor.rowcount
+        conn.commit()
+        conn.close()
+        if deleted:
+            logger.info(f"🗑️ Удалён объект вакансии: {object_name}")
+        return deleted > 0
+    except Exception as e:
+        logger.error(f"Ошибка при удалении объекта: {e}")
+        return False
+
+
+def save_vacancy_position(object_name, position_name):
+    """Добавляет должность к объекту"""
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        
+        # Получаем ID объекта
+        cursor.execute('SELECT id FROM vacancy_objects WHERE name = ?', (object_name,))
+        obj = cursor.fetchone()
+        if not obj:
+            return None
+        
+        obj_id = obj[0]
+        
+        # Добавляем должность
+        cursor.execute('''
+            INSERT INTO vacancy_positions (object_id, name) VALUES (?, ?)
+        ''', (obj_id, position_name))
+        pos_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        logger.info(f"✅ Добавлена должность: {position_name} к объекту {object_name}")
+        return pos_id
+    except sqlite3.IntegrityError:
+        logger.warning(f"Должность {position_name} уже существует")
+        return None
+    except Exception as e:
+        logger.error(f"Ошибка при добавлении должности: {e}")
+        return None
+
+
+def delete_vacancy_position(object_name, position_name):
+    """Удаляет должность"""
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            DELETE FROM vacancy_positions 
+            WHERE object_id = (SELECT id FROM vacancy_objects WHERE name = ?)
+            AND name = ?
+        ''', (object_name, position_name))
+        deleted = cursor.rowcount
+        conn.commit()
+        conn.close()
+        if deleted:
+            logger.info(f"🗑️ Удалена должность: {position_name} из объекта {object_name}")
+        return deleted > 0
+    except Exception as e:
+        logger.error(f"Ошибка при удалении должности: {e}")
+        return False
+
+
+def save_vacancy_requirements_batch(object_name, date, requirements):
+    """
+    Сохраняет все потребности для объекта за дату
+    requirements: список словарей с данными должностей
+    """
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        
+        # Получаем ID объекта
+        cursor.execute('SELECT id FROM vacancy_objects WHERE name = ?', (object_name,))
+        obj = cursor.fetchone()
+        if not obj:
+            return False
+        obj_id = obj[0]
+        
+        saved_count = 0
+        
+        for req in requirements:
+            position_name = req.get('name')
+            if not position_name:
+                continue
+            
+            # Получаем ID должности
+            cursor.execute('''
+                SELECT id FROM vacancy_positions 
+                WHERE object_id = ? AND name = ?
+            ''', (obj_id, position_name))
+            pos = cursor.fetchone()
+            if not pos:
+                continue
+            pos_id = pos[0]
+            
+            # Сохраняем данные
+            cursor.execute('''
+                INSERT INTO vacancy_requirements 
+                (position_id, date, rf_men, rf_women, rf_family, cis_men, cis_women, cis_family, is_high)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(position_id, date) DO UPDATE SET
+                    rf_men = excluded.rf_men,
+                    rf_women = excluded.rf_women,
+                    rf_family = excluded.rf_family,
+                    cis_men = excluded.cis_men,
+                    cis_women = excluded.cis_women,
+                    cis_family = excluded.cis_family,
+                    is_high = excluded.is_high,
+                    updated_at = CURRENT_TIMESTAMP
+            ''', (
+                pos_id, date,
+                req.get('rf', {}).get('men', 0),
+                req.get('rf', {}).get('women', 0),
+                req.get('rf', {}).get('family', 0),
+                req.get('cis', {}).get('men', 0),
+                req.get('cis', {}).get('women', 0),
+                req.get('cis', {}).get('family', 0),
+                1 if req.get('is_high', False) else 0
+            ))
+            saved_count += 1
+        
+        conn.commit()
+        conn.close()
+        logger.info(f"✅ Сохранено {saved_count} должностей для объекта {object_name}")
+        return True
+    except Exception as e:
+        logger.error(f"Ошибка при сохранении потребностей: {e}")
+        return False
+
+
+def migrate_from_google_sheets():
+    """
+    Миграция: переносит данные из Google Sheets в БД (одноразово)
+    """
+    try:
+        # Инициализируем таблицы
+        init_vacancy_tables()
+        
+        # Получаем данные из Google Sheets
+        from google_sheets import GoogleSheetsAPI
+        google_api = GoogleSheetsAPI()
+        vacancy_data = google_api.get_vacancy_data()
+        
+        today = datetime.now().strftime('%Y-%m-%d')
+        
+        for obj_name, obj_data in vacancy_data.items():
+            # Создаём объект
+            obj_id = save_vacancy_object(obj_name)
+            if not obj_id:
+                continue
+            
+            # Создаём должности и сохраняем данные
+            for pos in obj_data.get('positions', []):
+                pos_id = save_vacancy_position(obj_name, pos['name'])
+                
+                if pos_id:
+                    # Сохраняем данные за сегодня
+                    conn = sqlite3.connect(DB_NAME)
+                    cursor = conn.cursor()
+                    cursor.execute('''
+                        INSERT INTO vacancy_requirements 
+                        (position_id, date, rf_men, rf_women, rf_family, cis_men, cis_women, cis_family, is_high)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ''', (
+                        pos_id, today,
+                        pos['rf']['men'], pos['rf']['women'], pos['rf']['family'],
+                        pos['cis']['men'], pos['cis']['women'], pos['cis']['family'],
+                        0
+                    ))
+                    conn.commit()
+                    conn.close()
+        
+        logger.info("✅ Миграция из Google Sheets завершена")
+        return True
+    except Exception as e:
+        logger.error(f"Ошибка при миграции: {e}")
+        return False

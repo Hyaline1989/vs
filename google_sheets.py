@@ -1,4 +1,4 @@
-# google_sheets.py - исправленная версия с разделением по гражданству (РФ/СНГ)
+# google_sheets.py - исправленная версия (без циклического импорта)
 # -*- coding: utf-8 -*-
 
 import csv
@@ -7,7 +7,6 @@ from io import StringIO
 import logging
 import re
 from config import GOOGLE_SHEET_CSV_URL, GOOGLE_SHEETS_UPDATE_INTERVAL_SECONDS
-from database import get_all_max_requirements, update_max_requirement, delete_requirement
 from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
@@ -99,189 +98,10 @@ class GoogleSheetsAPI:
             logger.error(f"Ошибка при загрузке данных: {e}")
             return self._csv_cache if self._csv_cache else None
     
-    def _parse_csv_to_dict(self, csv_text):
-        """
-        Парсит CSV и возвращает словарь {объект: {'count': потребность, 'is_high': bool}}
-        
-        Структура таблицы:
-        - Столбец A (индекс 0): название объекта
-        - Столбец L (индекс 11): потребность
-        - Столбец M (индекс 12): приоритет (high - приоритетный)
-        """
-        if not csv_text:
-            return {}
-        
-        try:
-            # Определяем разделитель
-            first_line = csv_text.split('\n')[0]
-            delimiter = ','
-            if ';' in first_line and first_line.count(';') > first_line.count(','):
-                delimiter = ';'
-            elif '\t' in first_line:
-                delimiter = '\t'
-            
-            logger.info(f"Парсим CSV с разделителем: '{delimiter}'")
-            
-            csv_data = StringIO(csv_text)
-            csv_reader = csv.reader(csv_data, delimiter=delimiter)
-            rows = list(csv_reader)
-            
-            if not rows:
-                logger.error("CSV файл пуст")
-                return {}
-            
-            # Логируем заголовки для отладки
-            if rows:
-                logger.info(f"Заголовки CSV: {rows[0][:15] if len(rows[0]) > 15 else rows[0]}")
-            
-            # Фиксированные индексы столбцов
-            column_a_idx = 0   # Объект
-            column_l_idx = 11  # Потребность
-            column_m_idx = 12  # Приоритет (high)
-            
-            requirements = {}
-            
-            # Обрабатываем все строки, кроме заголовка
-            for row_num, row in enumerate(rows[1:], start=2):
-                if len(row) <= max(column_a_idx, column_l_idx):
-                    continue
-                
-                object_name = str(row[column_a_idx]).strip() if len(row) > column_a_idx else ''
-                requirement_str = str(row[column_l_idx]).strip() if len(row) > column_l_idx else ''
-                
-                # Получаем значение приоритета из столбца M
-                priority_value = ''
-                if len(row) > column_m_idx:
-                    priority_value = str(row[column_m_idx]).strip()
-                
-                if not object_name:
-                    continue
-                
-                # Проверяем, заполнен ли столбец L
-                if requirement_str and requirement_str not in ['', '-', '–', '—', '0', '0.0', '0,0']:
-                    try:
-                        # Преобразуем потребность в число
-                        cleaned_req = requirement_str.replace(' ', '').replace(',', '.')
-                        cleaned_req = ''.join(ch for ch in cleaned_req if ch.isdigit() or ch == '.')
-                        requirement_float = float(cleaned_req) if cleaned_req else 0
-                        requirement = int(round(requirement_float))
-                    except ValueError:
-                        requirement = 0
-                    
-                    if requirement > 0:
-                        # Нормализуем название объекта
-                        normalized_name = self._normalize_object_name(object_name)
-                        if normalized_name:
-                            # Проверяем приоритет из столбца M
-                            is_high = self._is_high_priority(priority_value)
-                            
-                            # Если объект уже есть, суммируем потребности
-                            if normalized_name in requirements:
-                                requirements[normalized_name]['count'] += requirement
-                                if is_high:
-                                    requirements[normalized_name]['is_high'] = True
-                            else:
-                                requirements[normalized_name] = {
-                                    'count': requirement,
-                                    'is_high': is_high
-                                }
-                            
-                            if is_high:
-                                logger.info(f"🔴 Строка {row_num}: {normalized_name} += {requirement} (ПРИОРИТЕТ! из столбца M: '{priority_value}')")
-                            else:
-                                logger.debug(f"Строка {row_num}: {normalized_name} += {requirement}")
-            
-            logger.info(f"Из CSV получено {len(requirements)} объектов с потребностями")
-            high_count = sum(1 for v in requirements.values() if v['is_high'])
-            logger.info(f"Приоритетных объектов: {high_count}")
-            if high_count > 0:
-                logger.info(f"Список приоритетных: {[k for k, v in requirements.items() if v['is_high']]}")
-            return requirements
-            
-        except Exception as e:
-            logger.error(f"Ошибка при парсинге CSV: {e}", exc_info=True)
-            return {}
-    
-    def update_requirements_for_date(self, target_date):
-        """Обновляет потребности для конкретной даты"""
-        logger.info(f"Обновление потребностей за {target_date.strftime('%Y-%m-%d')}")
-        
-        csv_text = self._get_csv_data(force_refresh=True)
-        if not csv_text:
-            logger.error("Не удалось загрузить CSV данные")
-            return False
-        
-        # Парсим текущие потребности из CSV
-        current_requirements = self._parse_csv_to_dict(csv_text)
-        
-        if current_requirements is None:
-            logger.warning("Не удалось распарсить CSV")
-            return False
-        
-        # Получаем существующие записи из БД за указанную дату
-        existing_requirements = get_all_max_requirements(target_date)
-        
-        logger.info(f"Текущие объекты в CSV: {list(current_requirements.keys())[:10]}")
-        logger.info(f"Существующие объекты в БД: {list(existing_requirements.keys())[:10]}")
-        
-        updated_count = 0
-        deleted_count = 0
-        
-        # 1. Обновляем или создаем записи из CSV
-        for obj_name, data in current_requirements.items():
-            if update_max_requirement(obj_name, data['count'], data['is_high'], target_date):
-                updated_count += 1
-                logger.info(f"✅ Обновлен: {obj_name} -> {data['count']} (приоритет: {data['is_high']})")
-        
-        # 2. Удаляем объекты, которых нет в CSV
-        for obj_name in existing_requirements:
-            if obj_name not in current_requirements:
-                if delete_requirement(obj_name, target_date):
-                    deleted_count += 1
-                    logger.info(f"🗑️ Удален: {obj_name} (отсутствует в CSV)")
-        
-        logger.info(f"Обновление за {target_date.strftime('%Y-%m-%d')} завершено. Обновлено: {updated_count}, Удалено: {deleted_count}")
-        return True
-    
-    def update_requirements_for_today(self):
-        """Фоновая задача: парсит CSV и синхронизирует с БД"""
-        logger.info("=" * 50)
-        logger.info(f"Запуск фонового обновления потребностей за {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}...")
-        
-        return self.update_requirements_for_date(datetime.now())
-    
-    def get_requirements_for_date(self, target_date):
-        """Получает максимальные потребности из базы данных за указанную дату"""
-        try:
-            if isinstance(target_date, str):
-                target_date = datetime.strptime(target_date, '%Y-%m-%d')
-            
-            requirements = get_all_max_requirements(target_date)
-            
-            logger.info(f"Загружено {len(requirements)} потребностей из БД за {target_date.strftime('%Y-%m-%d')}")
-            high_count = sum(1 for v in requirements.values() if v['is_high'])
-            logger.info(f"Из них приоритетных: {high_count}")
-            
-            return requirements
-            
-        except Exception as e:
-            logger.error(f"Ошибка при получении данных из БД: {e}")
-            return {}
-    
     def get_vacancy_data(self):
         """
-        Получает данные о вакансиях для системы подбора объектов
-        Парсит должности из CSV с разделением по гражданству (РФ и СНГ)
-        
-        Ожидаемая структура столбцов:
-        - A: Объект
-        - B: Должность
-        - C: Мужчины РФ
-        - D: Женщины РФ
-        - E: Семейные РФ
-        - F: Мужчины СНГ
-        - G: Женщины СНГ
-        - H: Семейные СНГ
+        Получает данные о вакансиях из Google Sheets
+        (Используется ТОЛЬКО для миграции, после миграции можно отключить)
         """
         try:
             csv_text = self._get_csv_data(force_refresh=False)
@@ -565,11 +385,6 @@ class GoogleSheetsAPI:
         logger.info(f"Всего строк: {len(rows)}")
         if rows:
             logger.info(f"Заголовки ({len(rows[0])}): {rows[0]}")
-        
-        parsed = self._parse_csv_to_dict(csv_text)
-        logger.info(f"Распаршено объектов: {len(parsed)}")
-        for name, data in list(parsed.items())[:15]:
-            logger.info(f"  {name}: {data}")
         
         vacancy_data = self.get_vacancy_data()
         logger.info(f"Данные вакансий: {len(vacancy_data)} объектов")
