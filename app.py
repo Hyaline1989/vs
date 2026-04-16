@@ -1,15 +1,24 @@
 # app.py - рефакторинг с использованием Blueprint и отдельными страницами
 # -*- coding: utf-8 -*-
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, redirect
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_login import LoginManager, login_required, current_user
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import logging
 import atexit
 import redis
 from apscheduler.schedulers.background import BackgroundScheduler
+
+# Московское время UTC+3 (для Windows)
+MOSCOW_OFFSET = timedelta(hours=3)
+
+def get_moscow_now():
+    return datetime.now(timezone.utc) + MOSCOW_OFFSET
+
+def get_moscow_date():
+    return (datetime.now(timezone.utc) + MOSCOW_OFFSET).strftime('%Y-%m-%d')
 
 from config import *
 from bitrix_api import BitrixAPI
@@ -46,7 +55,8 @@ CORS(app, origins=ALLOWED_ORIGINS, supports_credentials=True)
 # ========== НАСТРОЙКА FLASK-LOGIN ==========
 login_manager = LoginManager()
 login_manager.init_app(app)
-login_manager.login_view = None
+login_manager.login_view = 'index'
+login_manager.login_message = False
 login_manager.session_protection = "strong"
 
 @login_manager.user_loader
@@ -60,6 +70,11 @@ def load_user(user_id):
     except Exception as e:
         logger.error(f"Ошибка загрузки пользователя {user_id}: {e}")
     return None
+
+@login_manager.unauthorized_handler
+def unauthorized():
+    """Перенаправляет неавторизованных пользователей на страницу входа"""
+    return redirect('/')
 
 # ========== НАСТРОЙКА REDIS ДЛЯ RATE LIMITING ==========
 redis_available = False
@@ -95,19 +110,15 @@ def inject_globals():
 # ========== ИНИЦИАЛИЗАЦИЯ API ==========
 bitrix_api = BitrixAPI(BITRIX_WEBHOOK_URL)
 google_api = GoogleSheetsAPI()
-# Comparer теперь не зависит от google_api (план берётся из БД)
 comparer = DataComparer(bitrix_api)
 
-# Инициализируем blueprint'ы с API
 init_dashboard_apis(bitrix_api, google_api, comparer)
-# Для selection_api больше не передаём google_api (используем БД)
 init_selection_apis(None)
 
 # ========== ИНИЦИАЛИЗАЦИЯ БАЗЫ ДАННЫХ ==========
 if init_db():
     logger.info("✅ База данных успешно инициализирована")
     init_objects_settings()
-    # Инициализируем таблицы для вакансий
     if init_vacancy_tables():
         logger.info("✅ Таблицы вакансий успешно инициализированы")
 else:
@@ -125,19 +136,16 @@ app.register_blueprint(requirements_admin_bp)
 # ========== СТРАНИЦЫ ==========
 @app.route('/')
 def index():
-    """Главная страница - страница входа"""
     return render_template('index.html')
 
 @app.route('/welcome')
 @login_required
 def welcome():
-    """Приветственная страница после входа"""
     return render_template('welcome.html')
 
 @app.route('/dashboard')
 @login_required
 def dashboard_page():
-    """Страница дашборда"""
     try:
         if not current_user.can_view_dashboard():
             logger.warning(f"Пользователь {current_user.username} пытается зайти в дашборд без прав")
@@ -154,7 +162,6 @@ def dashboard_page():
 @app.route('/selection')
 @login_required
 def selection_page():
-    """Страница подбора объектов"""
     try:
         if not current_user.can_view_selection():
             logger.warning(f"Пользователь {current_user.username} пытается зайти в подбор объектов без прав")
@@ -171,14 +178,12 @@ def selection_page():
 @app.route('/admin')
 @login_required
 def admin_panel():
-    """Страница управления пользователями и объектами"""
     try:
         if current_user.role not in ['admin', 'manager']:
             logger.warning(f"Пользователь {current_user.username} пытается зайти в админку без прав")
             return render_template('no_access.html', 
                                  message="У вас нет доступа к админ-панели",
                                  return_url="/welcome"), 403
-        
         return render_template('admin_panel.html')
     except Exception as e:
         logger.error(f"Ошибка при загрузке admin_panel: {e}", exc_info=True)
@@ -197,11 +202,11 @@ atexit.register(lambda: scheduler.shutdown())
 @app.route('/api/health')
 def health():
     from database import get_all_vacancy_data
-    today_vacancy = get_all_vacancy_data(datetime.now().strftime('%Y-%m-%d'))
+    today_vacancy = get_all_vacancy_data(get_moscow_date())
     
     return jsonify({
         'status': 'ok',
-        'time': datetime.now().isoformat(),
+        'time': get_moscow_now().isoformat(),
         'database': 'connected',
         'vacancy_objects': len(today_vacancy)
     })
@@ -209,6 +214,7 @@ def health():
 # ========== ЗАПУСК ПРИЛОЖЕНИЯ ==========
 if __name__ == '__main__':
     logger.info("🚀 Запуск объединённого CRM Dashboard...")
+    logger.info(f"🕐 Московское время: {get_moscow_now().strftime('%Y-%m-%d %H:%M:%S')}")
     logger.info("📊 Дашборд использует план из БД (вакансии)")
     debug_mode = FLASK_ENV == 'development'
     app.run(debug=debug_mode, host='0.0.0.0', port=5001)

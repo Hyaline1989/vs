@@ -1,4 +1,4 @@
-// static/common.js - полная версия с поддержкой приветственной страницы
+// static/common.js - полная версия с редиректом при слетевшей авторизации
 
 // ========== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ==========
 let currentUser = null;
@@ -37,12 +37,13 @@ function sanitizeAttribute(value) {
 // ========== ПЕРЕХВАТЧИК FETCH ДЛЯ ОБРАБОТКИ ОШИБОК АВТОРИЗАЦИИ ==========
 const originalFetch = window.fetch;
 window.fetch = function(...args) {
-    return originalFetch.apply(this, args).then(async response => {
+    return originalFetch.apply(this, args).then(response => {
         if (response.status === 401 || response.status === 403) {
             const url = args[0];
             console.warn(`Ошибка авторизации (${response.status}) при запросе: ${url}`);
-            // Не перенаправляем на страницу входа, если это запрос к API авторизации
+            // Не перенаправляем только на запросы к API авторизации и если уже на странице входа
             if (!url.includes('/api/auth') && !url.includes('/api/logout') && window.location.pathname !== '/') {
+                localStorage.removeItem(SESSION_KEY);
                 window.location.href = '/';
             }
         }
@@ -128,7 +129,6 @@ async function checkPassword() {
             currentAccessLevel = data.role;
             startSession(data.role, data.username);
             
-            // Перенаправляем на приветственную страницу
             window.location.href = '/welcome';
         } else {
             if (errorMessage) {
@@ -175,15 +175,14 @@ function startSession(accessLevel, username) {
     
     if (sessionTimer) clearTimeout(sessionTimer);
     sessionTimer = setTimeout(() => {
-        showNotification("Время сессии истекло. Пожалуйста, войдите снова.", 'warning');
-        logout();
+        localStorage.removeItem(SESSION_KEY);
+        window.location.href = '/';
     }, 12 * 60 * 60 * 1000);
 }
 
 function checkSession() {
     const sessionData = localStorage.getItem(SESSION_KEY);
     
-    // На странице входа - пропускаем
     if (window.location.pathname === '/') {
         return true;
     }
@@ -206,8 +205,8 @@ function checkSession() {
         if (sessionTimer) clearTimeout(sessionTimer);
         const remainingTime = session.expires - new Date().getTime();
         sessionTimer = setTimeout(() => {
-            showNotification("Время сессии истекло. Пожалуйста, войдите снова.", 'warning');
-            logout();
+            localStorage.removeItem(SESSION_KEY);
+            window.location.href = '/';
         }, remainingTime);
         
         return true;
@@ -226,7 +225,6 @@ async function verifySession() {
         if (response.ok) {
             const data = await response.json();
             currentUser = { ...currentUser, ...data };
-            // Обновляем сессию в localStorage
             const sessionData = localStorage.getItem(SESSION_KEY);
             if (sessionData) {
                 const session = JSON.parse(sessionData);
@@ -235,11 +233,14 @@ async function verifySession() {
             }
             return true;
         } else {
-            logout();
+            localStorage.removeItem(SESSION_KEY);
+            window.location.href = '/';
             return false;
         }
     } catch (error) {
         console.error('Ошибка проверки сессии:', error);
+        localStorage.removeItem(SESSION_KEY);
+        window.location.href = '/';
         return false;
     }
 }
@@ -279,7 +280,6 @@ async function logout() {
 function startAutoUpdate() {
     if (updateInterval) clearInterval(updateInterval);
     updateInterval = setInterval(async () => {
-        // Проверяем на какой странице мы находимся
         if (window.location.pathname === '/dashboard') {
             if (typeof loadDashboardForDate === 'function') {
                 const date = document.getElementById('date-picker')?.value || getTodayDate();
@@ -398,24 +398,20 @@ async function initPage() {
     
     console.log('Инициализация страницы:', path);
     
-    // На странице входа - не проверяем сессию (она уже проверяется в index.html)
     if (path === '/') {
         return;
     }
     
-    // Проверяем сессию
     const hasSession = checkSession();
     if (!hasSession) {
         return;
     }
     
-    // Проверяем сессию на сервере
     const isValid = await verifySession();
     if (!isValid) {
         return;
     }
     
-    // Отображаем информацию о пользователе
     const userInfo = document.getElementById('userInfo');
     if (userInfo && currentUser) {
         let roleClass = 'viewer';
@@ -445,7 +441,6 @@ async function initPage() {
         `;
     }
     
-    // Запускаем автообновление только на страницах с данными
     if (path === '/dashboard' || path === '/selection') {
         startAutoUpdate();
     }
@@ -466,5 +461,4 @@ window.formatDate = formatDate;
 window.formatDateTime = formatDateTime;
 window.getRoleColor = getRoleColor;
 
-// Запускаем инициализацию после загрузки DOM
 document.addEventListener('DOMContentLoaded', initPage);

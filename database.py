@@ -6,9 +6,15 @@ import logging
 import json
 import re
 
+# Для Windows убираем time.tzset()
+# Просто используем datetime.now() без изменения часового пояса
+# Часовой пояс будет определяться на уровне приложения через передачу даты с фронтенда
+
 logger = logging.getLogger(__name__)
 
 DB_NAME = 'requirements.db'
+
+# ... остальной код database.py без изменений ...
 
 # ========== ФУНКЦИЯ САНИТАРИИ НАЗВАНИЙ ==========
 def sanitize_object_name(name):
@@ -1135,7 +1141,8 @@ def get_all_vacancy_data(date=None):
             obj_data = {
                 'rf': {'men': 0, 'women': 0, 'family': 0},
                 'cis': {'men': 0, 'women': 0, 'family': 0},
-                'positions': []
+                'positions': [],
+                'is_high': False
             }
             
             for pos_id, pos_name in positions:
@@ -1161,6 +1168,10 @@ def get_all_vacancy_data(date=None):
                     obj_data['cis']['men'] += req[3]
                     obj_data['cis']['women'] += req[4]
                     obj_data['cis']['family'] += req[5]
+                    
+                    # Если хоть одна должность имеет is_high, то и объект имеет приоритет
+                    if bool(req[6]):
+                        obj_data['is_high'] = True
                 else:
                     pos_data = {
                         'name': pos_name,
@@ -1174,6 +1185,12 @@ def get_all_vacancy_data(date=None):
             result[obj_name] = obj_data
         
         conn.close()
+        
+        # Отладочный вывод
+        for obj_name, obj_data in result.items():
+            if obj_data['is_high']:
+                print(f"DEBUG: {obj_name} has is_high=True")
+        
         return result
         
     except Exception as e:
@@ -1342,6 +1359,9 @@ def save_vacancy_requirements_batch(object_name, date, requirements):
     requirements: список словарей с данными должностей
     """
     try:
+        print(f"=== СОХРАНЕНИЕ ДЛЯ {object_name}, ДАТА {date} ===")
+        print(f"is_high в requirements: {[req.get('is_high', False) for req in requirements]}")
+        
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
         
@@ -1349,6 +1369,7 @@ def save_vacancy_requirements_batch(object_name, date, requirements):
         cursor.execute('SELECT id FROM vacancy_objects WHERE name = ?', (object_name,))
         obj = cursor.fetchone()
         if not obj:
+            print(f"❌ Объект {object_name} не найден в vacancy_objects")
             return False
         obj_id = obj[0]
         
@@ -1366,8 +1387,12 @@ def save_vacancy_requirements_batch(object_name, date, requirements):
             ''', (obj_id, position_name))
             pos = cursor.fetchone()
             if not pos:
+                print(f"⚠️ Должность {position_name} не найдена для объекта {object_name}")
                 continue
             pos_id = pos[0]
+            
+            is_high_value = 1 if req.get('is_high', False) else 0
+            print(f"  Должность: {position_name}, is_high={is_high_value}")
             
             # Сохраняем данные
             cursor.execute('''
@@ -1391,15 +1416,16 @@ def save_vacancy_requirements_batch(object_name, date, requirements):
                 req.get('cis', {}).get('men', 0),
                 req.get('cis', {}).get('women', 0),
                 req.get('cis', {}).get('family', 0),
-                1 if req.get('is_high', False) else 0
+                is_high_value
             ))
             saved_count += 1
         
         conn.commit()
         conn.close()
-        logger.info(f"✅ Сохранено {saved_count} должностей для объекта {object_name}")
+        print(f"✅ Сохранено {saved_count} должностей для объекта {object_name}")
         return True
     except Exception as e:
+        print(f"❌ Ошибка при сохранении потребностей: {e}")
         logger.error(f"Ошибка при сохранении потребностей: {e}")
         return False
 

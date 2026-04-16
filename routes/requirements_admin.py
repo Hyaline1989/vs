@@ -163,8 +163,10 @@ def save_all_requirements():
     saved_count = 0
     
     for obj_name, obj_data in objects_data.items():
-        # Добавляем флаг is_high из приоритета объекта
+        # Получаем is_high из данных объекта
         is_high = obj_data.get('is_high', False)
+        
+        # Добавляем is_high к каждой должности
         for pos in obj_data.get('positions', []):
             pos['is_high'] = is_high
         
@@ -195,32 +197,4 @@ def migrate_from_sheets():
         return jsonify({'success': success})
     except Exception as e:
         logger.error(f"Ошибка миграции: {e}", exc_info=True)
-        return jsonify({'error': str(e)}), 500
-
-
-@requirements_admin_bp.route('/ensure-data', methods=['POST'])
-@login_required
-def ensure_data_exists():
-    """Автоматически копирует данные с предыдущего дня, если за текущий нет"""
-    if not current_user.is_authenticated:
-        return jsonify({'error': 'Unauthorized'}), 401
-    
-    if current_user.role not in ['admin', 'manager']:
-        return jsonify({'error': 'Forbidden'}), 403
-    
-    data = request.get_json()
-    date = data.get('date', datetime.now().strftime('%Y-%m-%d'))
-    
-    try:
-        from database import copy_requirements_from_previous_day
-        copied_count = copy_requirements_from_previous_day(date)
-        
-        return jsonify({
-            'success': True,
-            'copied': copied_count,
-            'date': date,
-            'message': f'Скопировано {copied_count} записей' if copied_count > 0 else 'Нет данных для копирования'
-        })
-    except Exception as e:
-        logger.error(f"Ошибка автопереноса: {e}", exc_info=True)
         return jsonify({'error': str(e)}), 500

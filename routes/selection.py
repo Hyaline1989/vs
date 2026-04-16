@@ -3,24 +3,22 @@
 from flask import Blueprint, request, jsonify
 from flask_login import current_user, login_required
 import logging
+import sqlite3
 
 from database import (
     get_objects_settings, update_object_settings, get_global_order, save_global_order,
-    get_user_module_permissions, get_user_object_permissions, get_all_max_requirements,
-    get_objects_settings_extended  # ДОБАВЛЕНО: для получения полных данных из БД
+    get_user_module_permissions, get_user_object_permissions, get_objects_settings_extended,
+    get_plan_requirements_for_date, DB_NAME
 )
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
-# Создаём blueprint для подбора объектов
 selection_bp = Blueprint('selection', __name__, url_prefix='/api/selection')
 
-# Google Sheets API (будет переопределено в app.py)
 google_api = None
 
 def init_selection_apis(google):
-    """Инициализирует API для selection blueprint"""
     global google_api
     google_api = google
 
@@ -29,53 +27,37 @@ def init_selection_apis(google):
 @login_required
 def selection_settings():
     """Получение настроек для подбора объектов"""
-    if not current_user.is_authenticated:
-        return jsonify({'error': 'Unauthorized'}), 401
-    
     try:
-        # ЗАГРУЖАЕМ ОБЪЕКТЫ ИЗ БАЗЫ ДАННЫХ (вместо OBJECTS_BASE)
-        db_objects = get_objects_settings_extended()
+        # Получаем дату из запроса (если есть)
+        date_param = request.args.get('date')
+        if date_param:
+            target_date = date_param
+            logger.info(f"📅 Загрузка приоритетов за указанную дату: {target_date}")
+        else:
+            # Если дата не передана, используем сегодняшнюю
+            target_date = datetime.now().strftime('%Y-%m-%d')
+            logger.info(f"📅 Загрузка приоритетов за сегодня: {target_date}")
         
-        # Оставляем только видимые объекты
+        db_objects = get_objects_settings_extended()
         db_objects = [obj for obj in db_objects if obj.get('visible', True)]
         
         objects_settings = get_objects_settings()
         global_order = get_global_order()
         
-        # Если нет сохранённого порядка, создаём из ID объектов в БД
         if not global_order:
             global_order = [obj['id'] for obj in db_objects]
             save_global_order(global_order)
         
-        # Получаем приоритеты и потребности из базы данных за сегодня
-        today = datetime.now()
-        today_requirements = get_all_max_requirements(today)
-        
-        # Создаём словарь для быстрого поиска потребностей по нормализованным названиям
-        from normalizer import ObjectNameNormalizer
-        normalizer = ObjectNameNormalizer()
-        
-        req_by_normalized = {}
-        for req_name, req_data in today_requirements.items():
-            normalized = normalizer.normalize(req_name)
-            req_by_normalized[normalized] = req_data
+        # Получаем потребности за указанную дату
+        requirements = get_plan_requirements_for_date(target_date)
         
         objects = []
         for db_obj in db_objects:
             setting = next((s for s in objects_settings if s['id'] == db_obj['id']), None)
             
-            # Нормализуем название объекта
-            normalized_obj_name = normalizer.normalize(db_obj['name'])
+            req_data = requirements.get(db_obj['name'], {})
+            priority_from_req = req_data.get('is_high', False)
             
-            # Получаем потребность из БД
-            req_data = req_by_normalized.get(normalized_obj_name, {})
-            requirement_count = req_data.get('count', 0)
-            db_priority = req_data.get('is_high', False)
-            
-            if requirement_count > 0:
-                logger.debug(f"Объект {db_obj['name']}: потребность={requirement_count}, приоритет={db_priority}")
-            
-            # Используем данные из БД
             objects.append({
                 'id': db_obj['id'],
                 'name': db_obj['name'],
@@ -86,25 +68,19 @@ def selection_settings():
                 'allowsConviction': db_obj.get('allowsConviction', False),
                 'link': db_obj.get('link', ''),
                 'visible': setting['visible'] if setting else True,
-                'priority': db_priority,  # Приоритет из БД потребностей
-                'requirement': requirement_count  # Добавляем текущую потребность
+                'priority': priority_from_req,
+                'requirement': req_data.get('count', 0)
             })
         
-        logger.info(f"Загружено {len(objects)} объектов из БД, из них приоритетных: {sum(1 for o in objects if o['priority'])}, с потребностями: {sum(1 for o in objects if o['requirement'] > 0)}")
-        
-        # Фильтрация по правам для подбора объектов
         if current_user.role != 'admin':
             object_perms = get_user_object_permissions(current_user.id)
             visible_object_ids = [obj_id for obj_id, perms in object_perms.items() if perms.get('selection', False)]
             objects = [obj for obj in objects if obj['id'] in visible_object_ids]
-            logger.info(f"Пользователь {current_user.username} видит {len(objects)} объектов в подборе")
-        
-        vacancy_data = google_api.get_vacancy_data() if google_api else {}
         
         return jsonify({
             'objects': objects,
             'globalOrder': global_order,
-            'vacancyData': vacancy_data
+            'vacancyData': {}
         })
     except Exception as e:
         logger.error(f"Ошибка загрузки настроек подбора: {e}", exc_info=True)
@@ -115,8 +91,6 @@ def selection_settings():
 @login_required
 def selection_order():
     """Сохранение порядка объектов"""
-    if not current_user.is_authenticated:
-        return jsonify({'error': 'Unauthorized'}), 401
     if current_user.role != 'admin':
         return jsonify({'error': 'Forbidden'}), 403
     
@@ -141,8 +115,6 @@ def selection_order():
 @login_required
 def selection_object(object_id):
     """Обновление настроек объекта (видимость, приоритет)"""
-    if not current_user.is_authenticated:
-        return jsonify({'error': 'Unauthorized'}), 401
     if current_user.role != 'admin':
         return jsonify({'error': 'Forbidden'}), 403
     
@@ -168,28 +140,34 @@ def selection_object(object_id):
 @login_required
 def debug_priority():
     """Диагностический эндпоинт для проверки приоритетов"""
-    if not current_user.is_authenticated or not current_user.is_admin():
+    if not current_user.is_admin():
         return jsonify({'error': 'Unauthorized'}), 401
     
     try:
-        today = datetime.now()
-        today_requirements = get_all_max_requirements(today)
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT DISTINCT vr.date, vo.name, vr.is_high
+            FROM vacancy_requirements vr
+            JOIN vacancy_positions vp ON vp.id = vr.position_id
+            JOIN vacancy_objects vo ON vo.id = vp.object_id
+            WHERE vr.is_high = 1
+            ORDER BY vr.date DESC
+        ''')
+        rows = cursor.fetchall()
+        conn.close()
         
-        result = {
-            'date': today.strftime('%Y-%m-%d'),
-            'requirements_count': len(today_requirements),
-            'priority_objects': []
-        }
+        priority_dates = {}
+        for row in rows:
+            date = row[0]
+            name = row[1]
+            if date not in priority_dates:
+                priority_dates[date] = []
+            priority_dates[date].append(name)
         
-        for name, data in today_requirements.items():
-            if data.get('is_high', False):
-                result['priority_objects'].append({
-                    'name': name,
-                    'count': data['count'],
-                    'is_high': data['is_high']
-                })
-        
-        return jsonify(result)
+        return jsonify({
+            'priority_by_date': priority_dates
+        })
     except Exception as e:
         logger.error(f"Ошибка диагностики приоритетов: {e}", exc_info=True)
         return jsonify({'error': str(e)}), 500

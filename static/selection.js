@@ -1,4 +1,4 @@
-// static/selection.js - НОВАЯ ВЕРСИЯ (без Google Sheets)
+// static/selection.js - ВЕРСИЯ БЕЗ АВТОКОПИРОВАНИЯ
 // ========== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ==========
 let objects = [];
 let vacancyData = {};
@@ -8,9 +8,8 @@ let hasUnsavedChanges = false;
 let currentUserRole = null;
 let currentVacancyDate = new Date().toISOString().split('T')[0];
 
-// ========== СИСТЕМА УВЕДОМЛЕНИЙ (всплывающие сообщения) ==========
+// ========== СИСТЕМА УВЕДОМЛЕНИЙ ==========
 function showToast(message, type = 'info') {
-    // Удаляем старые уведомления
     const oldToast = document.getElementById('selectionToast');
     if (oldToast) oldToast.remove();
     
@@ -29,37 +28,12 @@ function showToast(message, type = 'info') {
         box-shadow: 0 4px 12px rgba(0,0,0,0.15);
     `;
     
-    const colors = {
-        success: '#27ae60',
-        error: '#e74c3c',
-        info: '#3498db',
-        warning: '#f39c12'
-    };
-    
+    const colors = { success: '#27ae60', error: '#e74c3c', info: '#3498db', warning: '#f39c12' };
     toast.style.background = colors[type] || colors.info;
     toast.textContent = message;
-    
     document.body.appendChild(toast);
-    
-    setTimeout(() => {
-        toast.style.animation = 'slideOut 0.3s ease';
-        setTimeout(() => toast.remove(), 300);
-    }, 3000);
+    setTimeout(() => { toast.style.animation = 'slideOut 0.3s ease'; setTimeout(() => toast.remove(), 300); }, 3000);
 }
-
-// Добавляем стили для анимации
-const style = document.createElement('style');
-style.textContent = `
-    @keyframes slideIn {
-        from { transform: translateX(100%); opacity: 0; }
-        to { transform: translateX(0); opacity: 1; }
-    }
-    @keyframes slideOut {
-        from { transform: translateX(0); opacity: 1; }
-        to { transform: translateX(100%); opacity: 0; }
-    }
-`;
-document.head.appendChild(style);
 
 // ========== ЗАГРУЗКА ДАННЫХ ==========
 async function loadSelectionData() {
@@ -75,23 +49,29 @@ async function loadSelectionData() {
         }
         
         const resultsContainer = document.getElementById('results');
-        if (resultsContainer) {
-            resultsContainer.innerHTML = '<div class="loading">Загрузка объектов...</div>';
-        }
+        if (resultsContainer) resultsContainer.innerHTML = '<div class="loading">Загрузка объектов...</div>';
         
-        const response = await fetch('/api/selection/settings', { credentials: 'include' });
+        // Передаём текущую дату на сервер
+        const today = getTodayDate();
+        console.log(`📅 Загрузка приоритетов за дату: ${today}`);
+        
+        const response = await fetch(`/api/selection/settings?date=${today}`, { credentials: 'include' });
         const data = await response.json();
         
-        if (data.error) {
-            showToast('Ошибка загрузки данных: ' + escapeHtml(data.error), 'error');
-            return;
-        }
+        if (data.error) { showToast('Ошибка загрузки данных: ' + escapeHtml(data.error), 'error'); return; }
         
         objects = data.objects || [];
         globalOrder = data.globalOrder || [];
         
-        // Загружаем данные вакансий из БД
         await loadVacancyData();
+        
+        // Синхронизируем приоритеты из vacancyData в objects
+        for (const obj of objects) {
+            if (vacancyData[obj.name] && vacancyData[obj.name].is_high === true) {
+                obj.priority = true;
+                console.log(`✅ Установлен приоритет для ${obj.name} из vacancyData`);
+            }
+        }
         
         if (window.isAdmin) {
             const adminControls = document.getElementById('adminControls');
@@ -109,21 +89,7 @@ async function loadSelectionData() {
 
 async function loadVacancyData() {
     try {
-        // Автоматически копируем данные с предыдущего дня
-        const ensureResponse = await fetch('/api/requirements/ensure-data', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ date: currentVacancyDate })
-        });
-        
-        const ensureResult = await ensureResponse.json();
-        if (ensureResult.copied > 0) {
-            console.log(`✅ Автоматически скопировано ${ensureResult.copied} записей`);
-            showToast(`✅ Автоматически скопированы данные с предыдущего дня (${ensureResult.copied} записей)`, 'success');
-        }
-        
-        // Загружаем данные
+        // Просто загружаем данные без автокопирования
         const response = await fetch(`/api/requirements/vacancy?date=${currentVacancyDate}`, { 
             credentials: 'include' 
         });
@@ -131,6 +97,15 @@ async function loadVacancyData() {
         
         if (!data.error) {
             vacancyData = data.data || {};
+            
+            // Синхронизируем приоритеты из vacancyData с objects
+            for (const objName in vacancyData) {
+                const obj = objects.find(o => o.name === objName);
+                if (obj && vacancyData[objName]) {
+                    obj.priority = vacancyData[objName].is_high || false;
+                }
+            }
+            
             console.log(`📊 Загружены данные за ${currentVacancyDate}: ${Object.keys(vacancyData).length} объектов`);
         }
     } catch (error) {
@@ -146,20 +121,14 @@ function filterAndDisplayObjects() {
     
     const filtered = objects.filter(obj => {
         if (!obj.visible) return false;
-        
         const ageMatch = age >= obj.ageMin && age <= obj.ageMax;
         if (!ageMatch) return false;
         
         let nationalityMatch = false;
-        if (nationality === 'РФ') {
-            nationalityMatch = obj.allowedNationalities?.includes('РФ');
-        } else if (nationality === 'СНГ') {
-            nationalityMatch = obj.allowedNationalities?.includes('СНГ');
-        } else if (nationality === 'РБ') {
-            nationalityMatch = obj.allowedNationalities?.includes('РБ');
-        } else {
-            nationalityMatch = true;
-        }
+        if (nationality === 'РФ') nationalityMatch = obj.allowedNationalities?.includes('РФ');
+        else if (nationality === 'СНГ') nationalityMatch = obj.allowedNationalities?.includes('СНГ');
+        else if (nationality === 'РБ') nationalityMatch = obj.allowedNationalities?.includes('РБ');
+        else nationalityMatch = true;
         if (!nationalityMatch) return false;
         
         const convictionMatch = hasConviction ? obj.allowsConviction : true;
@@ -203,9 +172,7 @@ function displayResults(objectsToDisplay) {
     });
     
     const priorityCount = sorted.filter(obj => obj.priority).length;
-    if (countDisplay) {
-        countDisplay.textContent = `Найдено объектов: ${sorted.length} (${priorityCount} в приоритете)`;
-    }
+    if (countDisplay) countDisplay.textContent = `Найдено объектов: ${sorted.length} (${priorityCount} в приоритете)`;
     
     container.innerHTML = '';
     if (sorted.length === 0) {
@@ -225,24 +192,20 @@ function displayResults(objectsToDisplay) {
         
         const orderNumber = window.isAdmin ? `<span class="order-badge">${idx + 1}</span>` : '';
         const dragHandle = window.isAdmin ? '<div class="drag-handle-main">⋮⋮</div>' : '';
-        const safeLink = escapeUrl(obj.link);
+        const safeLink = obj.link && (obj.link.startsWith('http://') || obj.link.startsWith('https://')) ? obj.link : '#';
         
         let nationalityText = '';
         if (obj.allowedNationalities?.length > 0) {
-            if (obj.allowedNationalities.includes('РФ') && obj.allowedNationalities.includes('СНГ')) {
-                nationalityText = 'РФ + СНГ';
-            } else if (obj.allowedNationalities.includes('РФ') && obj.allowedNationalities.includes('РБ')) {
-                nationalityText = 'РФ + РБ';
-            } else {
-                nationalityText = obj.allowedNationalities.join(', ');
-            }
+            if (obj.allowedNationalities.includes('РФ') && obj.allowedNationalities.includes('СНГ')) nationalityText = 'РФ + СНГ';
+            else if (obj.allowedNationalities.includes('РФ') && obj.allowedNationalities.includes('РБ')) nationalityText = 'РФ + РБ';
+            else nationalityText = obj.allowedNationalities.join(', ');
         }
         
         card.innerHTML = `
             <div class="flip-card-inner">
                 <div class="flip-card-front">
                     ${dragHandle}
-                    <h3>${orderNumber}<a href="${safeLink}" target="_blank">${escapeHtml(obj.name)}</a>${obj.priority ? ' 🔴' : ''}</h3>
+                    <h3>${orderNumber}<a href="${safeLink}" target="_blank">${escapeHtml(obj.name)}</a>${obj.priority ? ' 🔥' : ''}</h3>
                     <div class="vacancy-stats">
                         <div class="vacancy-stat"><div class="vacancy-value vacancy-men">${totalMen}</div><div class="vacancy-label">Мужчины</div></div>
                         <div class="vacancy-stat"><div class="vacancy-value vacancy-women">${totalWomen}</div><div class="vacancy-label">Женщины</div></div>
@@ -257,28 +220,19 @@ function displayResults(objectsToDisplay) {
                     <h3>${orderNumber}${escapeHtml(obj.name)} - Должности</h3>
                     <div class="positions-list">
                         ${stats.positions?.length > 0 ? stats.positions.filter(p => {
-                            // Проверяем, есть ли хоть какая-то потребность
-                            const total = (p.rf?.men || 0) + (p.rf?.women || 0) + (p.rf?.family || 0) + 
-                                        (p.cis?.men || 0) + (p.cis?.women || 0) + (p.cis?.family || 0);
+                            const total = (p.rf?.men || 0) + (p.rf?.women || 0) + (p.rf?.family || 0) + (p.cis?.men || 0) + (p.cis?.women || 0) + (p.cis?.family || 0);
                             return total > 0;
-                        }).map(p => {
-                            return `<div class="position-item">
-                                <strong>${escapeHtml(p.name)}</strong>
-                                <div class="position-stats">
-                                    <span>🇷🇺 РФ: ${p.rf?.men || 0}м ${p.rf?.women || 0}ж ${p.rf?.family || 0}с</span>
-                                    <span>🌍 СНГ: ${p.cis?.men || 0}м ${p.cis?.women || 0}ж ${p.cis?.family || 0}с</span>
-                                </div>
-                            </div>`;
-                        }).join('') : '<div>Нет должностей</div>'}
+                        }).map(p => `<div class="position-item"><strong>${escapeHtml(p.name)}</strong><div class="position-stats"><span>🇷🇺 РФ: ${p.rf?.men || 0}м ${p.rf?.women || 0}ж ${p.rf?.family || 0}с</span><span>🌍 СНГ: ${p.cis?.men || 0}м ${p.cis?.women || 0}ж ${p.cis?.family || 0}с</span></div></div>`).join('') : '<div>Нет должностей</div>'}
                     </div>
                     <button class="flip-btn" onclick="flipCard(this)">Назад</button>
                 </div>
+            </div>
         `;
         container.appendChild(card);
     });
 }
 
-// ========== ГЛАВНОЕ МОДАЛЬНОЕ ОКНО С ТАБЛИЦЕЙ ==========
+// ========== ГЛАВНОЕ МОДАЛЬНОЕ ОКНО ==========
 async function openRequirementsModal() {
     if (!window.isAdmin) {
         showToast('Только администратор может управлять потребностями', 'error');
@@ -335,7 +289,6 @@ function renderRequirementsTable() {
         const positions = objData?.positions || [];
         const rowCount = positions.length + 1;
         
-        // Вычисляем итоги
         let totals = { rfMen: 0, rfWomen: 0, rfFamily: 0, cisMen: 0, cisWomen: 0, cisFamily: 0 };
         for (const pos of positions) {
             totals.rfMen += pos.rf?.men || 0;
@@ -348,11 +301,9 @@ function renderRequirementsTable() {
         const totalAll = totals.rfMen + totals.rfWomen + totals.rfFamily + totals.cisMen + totals.cisWomen + totals.cisFamily;
         grandTotal += totalAll;
         
-        // Получаем приоритет из БД потребностей
-        const objFromList = objects.find(o => o.name === objName);
-        const isPriority = objFromList?.priority || false;
+        // Получаем приоритет из vacancyData
+        const isPriority = objData?.is_high || false;
         
-        // Строки должностей
         for (let i = 0; i < positions.length; i++) {
             const pos = positions[i];
             const rowTotal = (pos.rf?.men||0) + (pos.rf?.women||0) + (pos.rf?.family||0) + 
@@ -398,7 +349,7 @@ function renderRequirementsTable() {
     
     tableHtml += `
                         </tbody>
-                        <tfoot><tr style="background:#2c3e50; color:white;"><td colspan="8" style="text-align:right;"><strong>ОБЩИЙ ИТОГ:</strong></td><td style="text-align:center;"><strong>${grandTotal}</strong></td><td></td></tr></tfoot>
+                        <tfoot><tr style="background:#2c3e50; color:white;"><td colspan="8" style="text-align:right;"><strong>ОБЩИЙ ИТОГ:</strong></td><td style="text-align:center;"><strong>${grandTotal}</strong></td><td style="background:#2c3e50;"></td></tr></tfoot>
                     </table>
                 </div>
                 <div class="requirements-modal-footer">
@@ -411,7 +362,6 @@ function renderRequirementsTable() {
     
     document.body.appendChild(createElementFromHtml(tableHtml));
     
-    // Обработчики для автоматического пересчёта
     document.querySelectorAll('.editable').forEach(field => {
         field.addEventListener('input', function() { 
             updateRowTotals(this.getAttribute('data-obj')); 
@@ -419,15 +369,16 @@ function renderRequirementsTable() {
     });
 }
 
-async function changeVacancyDate() {
+function changeVacancyDate() {
     const dateInput = document.getElementById('vacancyDateFilter');
     if (dateInput) {
         const newDate = dateInput.value;
         if (newDate !== currentVacancyDate) {
             currentVacancyDate = newDate;
             showToast(`Загрузка данных за ${newDate}...`, 'info');
-            await loadVacancyData();
-            renderRequirementsTable();
+            loadVacancyData().then(() => {
+                renderRequirementsTable();
+            });
         }
     }
 }
@@ -456,21 +407,20 @@ function updateRowTotals(objectName) {
         if (totalCell) totalCell.textContent = total;
     }
     
-    // Обновляем итоговую строку объекта - ищем по классу, а не по сложному селектору
+    // Обновляем итоговую строку объекта
     const tbody = rows[0]?.closest('tbody');
-    const totalRows = tbody?.querySelectorAll('tr');
-    if (totalRows) {
-        for (const row of totalRows) {
-            // Ищем строку, которая содержит "ВСЕГО:" в первой ячейке
+    if (tbody) {
+        const allRows = tbody.querySelectorAll('tr');
+        for (const row of allRows) {
             const firstCell = row.cells[0];
             if (firstCell && firstCell.textContent.includes('ВСЕГО:')) {
                 const cells = row.cells;
-                if (cells[1]) cells[1].querySelector('input').value = totals.rfMen;
-                if (cells[2]) cells[2].querySelector('input').value = totals.rfWomen;
-                if (cells[3]) cells[3].querySelector('input').value = totals.rfFamily;
-                if (cells[4]) cells[4].querySelector('input').value = totals.cisMen;
-                if (cells[5]) cells[5].querySelector('input').value = totals.cisWomen;
-                if (cells[6]) cells[6].querySelector('input').value = totals.cisFamily;
+                if (cells[1]) { let input = cells[1].querySelector('input'); if (input) input.value = totals.rfMen; }
+                if (cells[2]) { let input = cells[2].querySelector('input'); if (input) input.value = totals.rfWomen; }
+                if (cells[3]) { let input = cells[3].querySelector('input'); if (input) input.value = totals.rfFamily; }
+                if (cells[4]) { let input = cells[4].querySelector('input'); if (input) input.value = totals.cisMen; }
+                if (cells[5]) { let input = cells[5].querySelector('input'); if (input) input.value = totals.cisWomen; }
+                if (cells[6]) { let input = cells[6].querySelector('input'); if (input) input.value = totals.cisFamily; }
                 const totalAll = totals.rfMen + totals.rfWomen + totals.rfFamily + totals.cisMen + totals.cisWomen + totals.cisFamily;
                 if (cells[7]) cells[7].textContent = totalAll;
                 break;
@@ -478,266 +428,30 @@ function updateRowTotals(objectName) {
         }
     }
     
-    // Обновляем общий итог
     updateGrandTotal();
 }
 
 function updateGrandTotal() {
     let grandTotal = 0;
-    document.querySelectorAll('tr[style*="background:#f0f0f0"] td:last-child').forEach(cell => {
-        const val = parseInt(cell.textContent) || 0;
-        grandTotal += val;
-    });
+    const allTotalRows = document.querySelectorAll('tr');
+    for (const row of allTotalRows) {
+        const firstCell = row.cells[0];
+        if (firstCell && firstCell.textContent.includes('ВСЕГО:')) {
+            const lastCell = row.cells[row.cells.length - 1];
+            if (lastCell) {
+                const val = parseInt(lastCell.textContent) || 0;
+                grandTotal += val;
+            }
+        }
+    }
     const footerCell = document.querySelector('tfoot td:last-child');
     if (footerCell) footerCell.textContent = grandTotal;
 }
 
-// ========== МОДАЛЬНОЕ ОКНО ДОБАВЛЕНИЯ ОБЪЕКТА ==========
-function showAddObjectModal() {
-    let modal = document.getElementById('addObjectModal');
-    if (modal) modal.remove();
-    
-    modal = document.createElement('div');
-    modal.id = 'addObjectModal';
-    modal.style.cssText = 'position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:white; padding:25px; border-radius:12px; box-shadow:0 4px 20px rgba(0,0,0,0.3); z-index:1002; min-width:350px;';
-    modal.innerHTML = `
-        <h3 style="margin-top:0;">➕ Добавить объект</h3>
-        <div style="margin-bottom:15px;">
-            <label>Название объекта:</label>
-            <input type="text" id="newObjName" style="width:100%; padding:8px; margin-top:5px; border:1px solid #ddd; border-radius:4px;">
-        </div>
-        <div style="margin-bottom:15px;">
-            <label>Должности:</label>
-            <div id="positionsContainer">
-                <div style="display:flex; gap:8px; margin-bottom:8px;">
-                    <input type="text" class="position-input" placeholder="Название должности" style="flex:1; padding:6px; border:1px solid #ddd; border-radius:4px;">
-                    <button type="button" class="remove-pos-btn" style="display:none;">✕</button>
-                </div>
-            </div>
-            <button type="button" onclick="addPositionFieldModal()" style="margin-top:8px; background:#3498db; color:white; border:none; padding:5px 12px; border-radius:4px; cursor:pointer;">+ Добавить должность</button>
-        </div>
-        <div style="text-align:right;">
-            <button onclick="closeAddObjectModal()" style="background:#6c757d; color:white; border:none; padding:8px 20px; border-radius:4px; margin-right:10px;">Отмена</button>
-            <button onclick="createNewObject()" style="background:#27ae60; color:white; border:none; padding:8px 20px; border-radius:4px;">Создать</button>
-        </div>
-    `;
-    document.body.appendChild(modal);
-}
-
-function addPositionFieldModal() {
-    const container = document.getElementById('positionsContainer');
-    const div = document.createElement('div');
-    div.style.cssText = 'display:flex; gap:8px; margin-bottom:8px;';
-    div.innerHTML = `
-        <input type="text" class="position-input" placeholder="Название должности" style="flex:1; padding:6px; border:1px solid #ddd; border-radius:4px;">
-        <button type="button" class="remove-pos-btn" onclick="this.parentElement.remove()" style="background:#e74c3c; color:white; border:none; padding:4px 10px; border-radius:4px; cursor:pointer;">✕</button>
-    `;
-    container.appendChild(div);
-}
-
-function closeAddObjectModal() {
-    const modal = document.getElementById('addObjectModal');
-    if (modal) modal.remove();
-}
-
-async function createNewObject() {
-    const name = document.getElementById('newObjName')?.value.trim();
-    if (!name) {
-        showToast('Введите название объекта', 'error');
-        return;
-    }
-    
-    const positionInputs = document.querySelectorAll('#positionsContainer .position-input');
-    const positions = [];
-    for (let input of positionInputs) {
-        const posName = input.value.trim();
-        if (posName) positions.push(posName);
-    }
-    
-    if (positions.length === 0) {
-        showToast('Добавьте хотя бы одну должность', 'error');
-        return;
-    }
-    
-    try {
-        // Создаём объект в БД
-        const response = await fetch('/api/requirements/object', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ name })
-        });
-        
-        if (!response.ok) {
-            const err = await response.json();
-            showToast('Ошибка: ' + (err.error || 'Не удалось создать объект'), 'error');
-            return;
-        }
-        
-        // Добавляем должности
-        for (const posName of positions) {
-            await fetch('/api/requirements/position', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({ object_name: name, position_name: posName })
-            });
-        }
-        
-        // Обновляем vacancyData
-        vacancyData[name] = {
-            rf: { men: 0, women: 0, family: 0 },
-            cis: { men: 0, women: 0, family: 0 },
-            positions: positions.map(p => ({ 
-                name: p, 
-                rf: { men:0, women:0, family:0 }, 
-                cis: { men:0, women:0, family:0 } 
-            }))
-        };
-        
-        showToast(`Объект "${name}" создан`, 'success');
-        closeAddObjectModal();
-        renderRequirementsTable();
-    } catch (error) {
-        console.error('Ошибка:', error);
-        showToast('Ошибка создания объекта', 'error');
-    }
-}
-
-// ========== МОДАЛЬНОЕ ОКНО ДОБАВЛЕНИЯ ДОЛЖНОСТИ ==========
-function showAddPositionModal(objectName) {
-    let modal = document.getElementById('addPositionModal');
-    if (modal) modal.remove();
-    
-    modal = document.createElement('div');
-    modal.id = 'addPositionModal';
-    modal.style.cssText = 'position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:white; padding:25px; border-radius:12px; box-shadow:0 4px 20px rgba(0,0,0,0.3); z-index:1002; min-width:300px;';
-    modal.innerHTML = `
-        <h3 style="margin-top:0;">➕ Добавить должность</h3>
-        <div style="margin-bottom:15px;">
-            <label>Объект: <strong>${escapeHtml(objectName)}</strong></label>
-        </div>
-        <div style="margin-bottom:15px;">
-            <label>Название должности:</label>
-            <input type="text" id="newPositionName" style="width:100%; padding:8px; margin-top:5px; border:1px solid #ddd; border-radius:4px;">
-        </div>
-        <div style="text-align:right;">
-            <button onclick="closeAddPositionModal()" style="background:#6c757d; color:white; border:none; padding:8px 20px; border-radius:4px; margin-right:10px;">Отмена</button>
-            <button onclick="createNewPosition('${escapeHtml(objectName)}')" style="background:#27ae60; color:white; border:none; padding:8px 20px; border-radius:4px;">Создать</button>
-        </div>
-    `;
-    document.body.appendChild(modal);
-}
-
-function closeAddPositionModal() {
-    const modal = document.getElementById('addPositionModal');
-    if (modal) modal.remove();
-}
-
-async function createNewPosition(objectName) {
-    const positionName = document.getElementById('newPositionName')?.value.trim();
-    if (!positionName) {
-        showToast('Введите название должности', 'error');
-        return;
-    }
-    
-    try {
-        const response = await fetch('/api/requirements/position', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ object_name: objectName, position_name: positionName })
-        });
-        
-        if (!response.ok) {
-            const err = await response.json();
-            showToast('Ошибка: ' + (err.error || 'Не удалось добавить должность'), 'error');
-            return;
-        }
-        
-        if (!vacancyData[objectName]) {
-            vacancyData[objectName] = { rf: { men:0, women:0, family:0 }, cis: { men:0, women:0, family:0 }, positions: [] };
-        }
-        
-        vacancyData[objectName].positions.push({
-            name: positionName,
-            rf: { men: 0, women: 0, family: 0 },
-            cis: { men: 0, women: 0, family: 0 }
-        });
-        
-        showToast(`Должность "${positionName}" добавлена`, 'success');
-        closeAddPositionModal();
-        renderRequirementsTable();
-    } catch (error) {
-        console.error('Ошибка:', error);
-        showToast('Ошибка добавления должности', 'error');
-    }
-}
-
-// ========== УДАЛЕНИЕ ==========
-async function deleteObject(objectName) {
-    // ТОЛЬКО ЗДЕСЬ ОСТАВЛЯЕМ CONFIRM для защиты от случайного удаления
-    if (!confirm(`Удалить объект "${objectName}" и все его должности?`)) return;
-    
-    try {
-        const response = await fetch(`/api/requirements/object/${encodeURIComponent(objectName)}`, {
-            method: 'DELETE',
-            credentials: 'include'
-        });
-        
-        if (response.ok) {
-            delete vacancyData[objectName];
-            showToast(`Объект "${objectName}" удалён`, 'success');
-            renderRequirementsTable();
-        } else {
-            const err = await response.json();
-            showToast('Ошибка: ' + (err.error || 'Не удалось удалить'), 'error');
-        }
-    } catch (error) {
-        console.error('Ошибка:', error);
-        showToast('Ошибка удаления', 'error');
-    }
-}
-
-async function deletePosition(objectName, positionName) {
-    // ТОЛЬКО ЗДЕСЬ ОСТАВЛЯЕМ CONFIRM для защиты от случайного удаления
-    if (!confirm(`Удалить должность "${positionName}"?`)) return;
-    
-    try {
-        const response = await fetch('/api/requirements/position', {
-            method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ object_name: objectName, position_name: positionName })
-        });
-        
-        if (response.ok) {
-            const obj = vacancyData[objectName];
-            if (obj) {
-                const index = obj.positions.findIndex(p => p.name === positionName);
-                if (index !== -1) obj.positions.splice(index, 1);
-            }
-            showToast(`Должность "${positionName}" удалена`, 'success');
-            renderRequirementsTable();
-        } else {
-            const err = await response.json();
-            showToast('Ошибка: ' + (err.error || 'Не удалось удалить'), 'error');
-        }
-    } catch (error) {
-        console.error('Ошибка:', error);
-        showToast('Ошибка удаления', 'error');
-    }
-}
-
 // ========== СОХРАНЕНИЕ ВСЕХ ДАННЫХ ==========
 async function saveAllData() {
-    // НИКАКИХ CONFIRM - сразу сохраняем
     try {
-        // Собираем все данные из таблицы
         const objectsData = {};
-        
-        // Сохраняем значения из editable полей
-        const processedObjects = new Set();
         const editableFields = document.querySelectorAll('.editable');
         
         for (const field of editableFields) {
@@ -746,10 +460,8 @@ async function saveAllData() {
             
             if (!objectsData[objName]) {
                 objectsData[objName] = { positions: [] };
-                processedObjects.add(objName);
             }
             
-            // Ищем или создаём должность
             let pos = objectsData[objName].positions.find(p => p.name === posName);
             if (!pos) {
                 pos = { name: posName, rf: {}, cis: {} };
@@ -767,7 +479,6 @@ async function saveAllData() {
             else if (className.includes('cis-family')) pos.cis.family = value;
         }
         
-        // Добавляем приоритеты
         const priorityChecks = document.querySelectorAll('.priority-checkbox');
         for (const chk of priorityChecks) {
             const objName = chk.getAttribute('data-obj');
@@ -776,7 +487,6 @@ async function saveAllData() {
             }
         }
         
-        // Отправляем на сервер
         const response = await fetch('/api/requirements/save-all', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -788,21 +498,16 @@ async function saveAllData() {
         });
         
         if (response.ok) {
-            // Обновляем приоритеты в objects
+            // Обновляем приоритеты в objects и vacancyData
             for (const chk of priorityChecks) {
                 const objName = chk.getAttribute('data-obj');
                 const obj = objects.find(o => o.name === objName);
                 if (obj) obj.priority = chk.checked;
+                if (vacancyData[objName]) vacancyData[objName].is_high = chk.checked;
             }
             
             showToast('✅ Все данные сохранены', 'success');
-            
-            // Обновляем vacancyData из БД
-            await loadVacancyData();
-            
-            // Обновляем отображение карточек
             filterAndDisplayObjects();
-            
             setTimeout(() => closeRequirementsModal(), 500);
         } else {
             const err = await response.json();
@@ -898,6 +603,239 @@ function escapeHtml(str) {
 function escapeUrl(str) { 
     if(!str) return '#'; 
     return str; 
+}
+
+// ========== ДОБАВЛЕНИЕ ОБЪЕКТА ==========
+function showAddObjectModal() {
+    let modal = document.getElementById('addObjectModal');
+    if (modal) modal.remove();
+    
+    modal = document.createElement('div');
+    modal.id = 'addObjectModal';
+    modal.style.cssText = 'position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:white; padding:25px; border-radius:12px; box-shadow:0 4px 20px rgba(0,0,0,0.3); z-index:1002; min-width:350px;';
+    modal.innerHTML = `
+        <h3 style="margin-top:0;">➕ Добавить объект</h3>
+        <div style="margin-bottom:15px;">
+            <label>Название объекта:</label>
+            <input type="text" id="newObjName" style="width:100%; padding:8px; margin-top:5px; border:1px solid #ddd; border-radius:4px;">
+        </div>
+        <div style="margin-bottom:15px;">
+            <label>Должности:</label>
+            <div id="positionsContainer">
+                <div style="display:flex; gap:8px; margin-bottom:8px;">
+                    <input type="text" class="position-input" placeholder="Название должности" style="flex:1; padding:6px; border:1px solid #ddd; border-radius:4px;">
+                    <button type="button" class="remove-pos-btn" style="display:none;">✕</button>
+                </div>
+            </div>
+            <button type="button" onclick="addPositionFieldModal()" style="margin-top:8px; background:#3498db; color:white; border:none; padding:5px 12px; border-radius:4px; cursor:pointer;">+ Добавить должность</button>
+        </div>
+        <div style="text-align:right;">
+            <button onclick="closeAddObjectModal()" style="background:#6c757d; color:white; border:none; padding:8px 20px; border-radius:4px; margin-right:10px;">Отмена</button>
+            <button onclick="createNewObject()" style="background:#27ae60; color:white; border:none; padding:8px 20px; border-radius:4px;">Создать</button>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+function addPositionFieldModal() {
+    const container = document.getElementById('positionsContainer');
+    const div = document.createElement('div');
+    div.style.cssText = 'display:flex; gap:8px; margin-bottom:8px;';
+    div.innerHTML = `
+        <input type="text" class="position-input" placeholder="Название должности" style="flex:1; padding:6px; border:1px solid #ddd; border-radius:4px;">
+        <button type="button" class="remove-pos-btn" onclick="this.parentElement.remove()" style="background:#e74c3c; color:white; border:none; padding:4px 10px; border-radius:4px; cursor:pointer;">✕</button>
+    `;
+    container.appendChild(div);
+}
+
+function closeAddObjectModal() {
+    const modal = document.getElementById('addObjectModal');
+    if (modal) modal.remove();
+}
+
+async function createNewObject() {
+    const name = document.getElementById('newObjName')?.value.trim();
+    if (!name) {
+        showToast('Введите название объекта', 'error');
+        return;
+    }
+    
+    const positionInputs = document.querySelectorAll('#positionsContainer .position-input');
+    const positions = [];
+    for (let input of positionInputs) {
+        const posName = input.value.trim();
+        if (posName) positions.push(posName);
+    }
+    
+    if (positions.length === 0) {
+        showToast('Добавьте хотя бы одну должность', 'error');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/requirements/object', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ name })
+        });
+        
+        if (!response.ok) {
+            const err = await response.json();
+            showToast('Ошибка: ' + (err.error || 'Не удалось создать объект'), 'error');
+            return;
+        }
+        
+        for (const posName of positions) {
+            await fetch('/api/requirements/position', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ object_name: name, position_name: posName })
+            });
+        }
+        
+        vacancyData[name] = {
+            rf: { men: 0, women: 0, family: 0 },
+            cis: { men: 0, women: 0, family: 0 },
+            positions: positions.map(p => ({ 
+                name: p, 
+                rf: { men:0, women:0, family:0 }, 
+                cis: { men:0, women:0, family:0 },
+                is_high: false
+            })),
+            is_high: false
+        };
+        
+        showToast(`Объект "${name}" создан`, 'success');
+        closeAddObjectModal();
+        renderRequirementsTable();
+    } catch (error) {
+        console.error('Ошибка:', error);
+        showToast('Ошибка создания объекта', 'error');
+    }
+}
+
+function showAddPositionModal(objectName) {
+    let modal = document.getElementById('addPositionModal');
+    if (modal) modal.remove();
+    
+    modal = document.createElement('div');
+    modal.id = 'addPositionModal';
+    modal.style.cssText = 'position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:white; padding:25px; border-radius:12px; box-shadow:0 4px 20px rgba(0,0,0,0.3); z-index:1002; min-width:300px;';
+    modal.innerHTML = `
+        <h3 style="margin-top:0;">➕ Добавить должность</h3>
+        <div style="margin-bottom:15px;">
+            <label>Объект: <strong>${escapeHtml(objectName)}</strong></label>
+        </div>
+        <div style="margin-bottom:15px;">
+            <label>Название должности:</label>
+            <input type="text" id="newPositionName" style="width:100%; padding:8px; margin-top:5px; border:1px solid #ddd; border-radius:4px;">
+        </div>
+        <div style="text-align:right;">
+            <button onclick="closeAddPositionModal()" style="background:#6c757d; color:white; border:none; padding:8px 20px; border-radius:4px; margin-right:10px;">Отмена</button>
+            <button onclick="createNewPosition('${escapeHtml(objectName)}')" style="background:#27ae60; color:white; border:none; padding:8px 20px; border-radius:4px;">Создать</button>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+function closeAddPositionModal() {
+    const modal = document.getElementById('addPositionModal');
+    if (modal) modal.remove();
+}
+
+async function createNewPosition(objectName) {
+    const positionName = document.getElementById('newPositionName')?.value.trim();
+    if (!positionName) {
+        showToast('Введите название должности', 'error');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/requirements/position', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ object_name: objectName, position_name: positionName })
+        });
+        
+        if (!response.ok) {
+            const err = await response.json();
+            showToast('Ошибка: ' + (err.error || 'Не удалось добавить должность'), 'error');
+            return;
+        }
+        
+        if (!vacancyData[objectName]) {
+            vacancyData[objectName] = { rf: { men:0, women:0, family:0 }, cis: { men:0, women:0, family:0 }, positions: [], is_high: false };
+        }
+        
+        vacancyData[objectName].positions.push({
+            name: positionName,
+            rf: { men: 0, women: 0, family: 0 },
+            cis: { men: 0, women: 0, family: 0 },
+            is_high: false
+        });
+        
+        showToast(`Должность "${positionName}" добавлена`, 'success');
+        closeAddPositionModal();
+        renderRequirementsTable();
+    } catch (error) {
+        console.error('Ошибка:', error);
+        showToast('Ошибка добавления должности', 'error');
+    }
+}
+
+async function deleteObject(objectName) {
+    if (!confirm(`Удалить объект "${objectName}" и все его должности?`)) return;
+    
+    try {
+        const response = await fetch(`/api/requirements/object/${encodeURIComponent(objectName)}`, {
+            method: 'DELETE',
+            credentials: 'include'
+        });
+        
+        if (response.ok) {
+            delete vacancyData[objectName];
+            showToast(`Объект "${objectName}" удалён`, 'success');
+            renderRequirementsTable();
+        } else {
+            const err = await response.json();
+            showToast('Ошибка: ' + (err.error || 'Не удалось удалить'), 'error');
+        }
+    } catch (error) {
+        console.error('Ошибка:', error);
+        showToast('Ошибка удаления', 'error');
+    }
+}
+
+async function deletePosition(objectName, positionName) {
+    if (!confirm(`Удалить должность "${positionName}"?`)) return;
+    
+    try {
+        const response = await fetch('/api/requirements/position', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ object_name: objectName, position_name: positionName })
+        });
+        
+        if (response.ok) {
+            const obj = vacancyData[objectName];
+            if (obj) {
+                const index = obj.positions.findIndex(p => p.name === positionName);
+                if (index !== -1) obj.positions.splice(index, 1);
+            }
+            showToast(`Должность "${positionName}" удалена`, 'success');
+            renderRequirementsTable();
+        } else {
+            const err = await response.json();
+            showToast('Ошибка: ' + (err.error || 'Не удалось удалить'), 'error');
+        }
+    } catch (error) {
+        console.error('Ошибка:', error);
+        showToast('Ошибка удаления', 'error');
+    }
 }
 
 // Глобальные функции
