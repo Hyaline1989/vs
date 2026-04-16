@@ -196,3 +196,31 @@ def migrate_from_sheets():
     except Exception as e:
         logger.error(f"Ошибка миграции: {e}", exc_info=True)
         return jsonify({'error': str(e)}), 500
+
+
+@requirements_admin_bp.route('/ensure-data', methods=['POST'])
+@login_required
+def ensure_data_exists():
+    """Автоматически копирует данные с предыдущего дня, если за текущий нет"""
+    if not current_user.is_authenticated:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    if current_user.role not in ['admin', 'manager']:
+        return jsonify({'error': 'Forbidden'}), 403
+    
+    data = request.get_json()
+    date = data.get('date', datetime.now().strftime('%Y-%m-%d'))
+    
+    try:
+        from database import copy_requirements_from_previous_day
+        copied_count = copy_requirements_from_previous_day(date)
+        
+        return jsonify({
+            'success': True,
+            'copied': copied_count,
+            'date': date,
+            'message': f'Скопировано {copied_count} записей' if copied_count > 0 else 'Нет данных для копирования'
+        })
+    except Exception as e:
+        logger.error(f"Ошибка автопереноса: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500

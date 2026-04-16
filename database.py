@@ -1231,18 +1231,26 @@ def get_plan_requirements_for_date(target_date):
 def save_vacancy_object(name):
     """Создаёт новый объект вакансии"""
     try:
-        conn = sqlite3.connect(DB_NAME)
+        conn = sqlite3.connect(DB_NAME, timeout=30)
         cursor = conn.cursor()
-        cursor.execute('''
-            INSERT INTO vacancy_objects (name) VALUES (?)
-        ''', (name,))
+        
+        # Сначала проверяем, существует ли уже такой объект
+        cursor.execute('SELECT id FROM vacancy_objects WHERE name = ?', (name,))
+        existing = cursor.fetchone()
+        if existing:
+            logger.warning(f"Объект {name} уже существует (ID: {existing[0]})")
+            conn.close()
+            return None  # Возвращаем None если объект уже есть
+        
+        # Если нет - создаём
+        cursor.execute('INSERT INTO vacancy_objects (name) VALUES (?)', (name,))
         obj_id = cursor.lastrowid
         conn.commit()
         conn.close()
         logger.info(f"✅ Создан объект вакансии: {name} (ID: {obj_id})")
         return obj_id
     except sqlite3.IntegrityError:
-        logger.warning(f"Объект {name} уже существует")
+        logger.warning(f"Объект {name} уже существует (IntegrityError)")
         return None
     except Exception as e:
         logger.error(f"Ошибка при создании объекта: {e}")
@@ -1269,16 +1277,25 @@ def delete_vacancy_object(object_name):
 def save_vacancy_position(object_name, position_name):
     """Добавляет должность к объекту"""
     try:
-        conn = sqlite3.connect(DB_NAME)
+        conn = sqlite3.connect(DB_NAME, timeout=30)
         cursor = conn.cursor()
         
         # Получаем ID объекта
         cursor.execute('SELECT id FROM vacancy_objects WHERE name = ?', (object_name,))
         obj = cursor.fetchone()
         if not obj:
+            conn.close()
             return None
         
         obj_id = obj[0]
+        
+        # Проверяем, существует ли уже такая должность
+        cursor.execute('SELECT id FROM vacancy_positions WHERE object_id = ? AND name = ?', (obj_id, position_name))
+        existing = cursor.fetchone()
+        if existing:
+            logger.warning(f"Должность {position_name} уже существует (ID: {existing[0]})")
+            conn.close()
+            return None
         
         # Добавляем должность
         cursor.execute('''
@@ -1290,7 +1307,7 @@ def save_vacancy_position(object_name, position_name):
         logger.info(f"✅ Добавлена должность: {position_name} к объекту {object_name}")
         return pos_id
     except sqlite3.IntegrityError:
-        logger.warning(f"Должность {position_name} уже существует")
+        logger.warning(f"Должность {position_name} уже существует (IntegrityError)")
         return None
     except Exception as e:
         logger.error(f"Ошибка при добавлении должности: {e}")
@@ -1434,3 +1451,81 @@ def migrate_from_google_sheets():
     except Exception as e:
         logger.error(f"Ошибка при миграции: {e}")
         return False
+
+
+# ========== АВТОМАТИЧЕСКИЙ ПЕРЕНОС ПОТРЕБНОСТЕЙ ==========
+
+def copy_requirements_from_previous_day(target_date):
+    """
+    Копирует потребности с предыдущего дня на указанную дату,
+    если за указанную дату нет данных.
+    
+    Args:
+        target_date: строка в формате 'YYYY-MM-DD' или datetime
+    
+    Returns:
+        int: количество скопированных записей
+    """
+    from datetime import datetime, timedelta
+    
+    if isinstance(target_date, str):
+        target_date_str = target_date
+        target_date_obj = datetime.strptime(target_date, '%Y-%m-%d')
+    else:
+        target_date_str = target_date.strftime('%Y-%m-%d')
+        target_date_obj = target_date
+    
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        
+        # Проверяем, есть ли уже данные за эту дату
+        cursor.execute('SELECT COUNT(*) FROM vacancy_requirements WHERE date = ?', (target_date_str,))
+        existing_count = cursor.fetchone()[0]
+        
+        if existing_count > 0:
+            logger.info(f"📋 Данные за {target_date_str} уже существуют ({existing_count} записей)")
+            conn.close()
+            return 0
+        
+        # Ищем предыдущий день с данными
+        previous_date = target_date_obj - timedelta(days=1)
+        copied_count = 0
+        max_days_back = 30  # Ищем максимум за 30 дней назад
+        
+        for days_back in range(1, max_days_back + 1):
+            prev_date_str = previous_date.strftime('%Y-%m-%d')
+            
+            cursor.execute('SELECT COUNT(*) FROM vacancy_requirements WHERE date = ?', (prev_date_str,))
+            has_data = cursor.fetchone()[0] > 0
+            
+            if has_data:
+                logger.info(f"📋 Найден предыдущий день с данными: {prev_date_str}")
+                
+                # Копируем все записи с предыдущего дня
+                cursor.execute('''
+                    INSERT INTO vacancy_requirements 
+                    (position_id, date, rf_men, rf_women, rf_family, cis_men, cis_women, cis_family, is_high)
+                    SELECT position_id, ?, rf_men, rf_women, rf_family, cis_men, cis_women, cis_family, is_high
+                    FROM vacancy_requirements
+                    WHERE date = ?
+                ''', (target_date_str, prev_date_str))
+                
+                copied_count = cursor.rowcount
+                conn.commit()
+                
+                logger.info(f"✅ Скопировано {copied_count} записей потребностей с {prev_date_str} на {target_date_str}")
+                break
+            
+            previous_date -= timedelta(days=1)
+        
+        conn.close()
+        
+        if copied_count == 0:
+            logger.info(f"⚠️ Не найдено предыдущих дней с данными для копирования на {target_date_str}")
+        
+        return copied_count
+        
+    except Exception as e:
+        logger.error(f"Ошибка при копировании потребностей: {e}", exc_info=True)
+        return 0

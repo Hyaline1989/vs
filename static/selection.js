@@ -109,6 +109,21 @@ async function loadSelectionData() {
 
 async function loadVacancyData() {
     try {
+        // Автоматически копируем данные с предыдущего дня
+        const ensureResponse = await fetch('/api/requirements/ensure-data', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ date: currentVacancyDate })
+        });
+        
+        const ensureResult = await ensureResponse.json();
+        if (ensureResult.copied > 0) {
+            console.log(`✅ Автоматически скопировано ${ensureResult.copied} записей`);
+            showToast(`✅ Автоматически скопированы данные с предыдущего дня (${ensureResult.copied} записей)`, 'success');
+        }
+        
+        // Загружаем данные
         const response = await fetch(`/api/requirements/vacancy?date=${currentVacancyDate}`, { 
             credentials: 'include' 
         });
@@ -116,6 +131,7 @@ async function loadVacancyData() {
         
         if (!data.error) {
             vacancyData = data.data || {};
+            console.log(`📊 Загружены данные за ${currentVacancyDate}: ${Object.keys(vacancyData).length} объектов`);
         }
     } catch (error) {
         console.error('Ошибка загрузки вакансий:', error);
@@ -240,11 +256,23 @@ function displayResults(objectsToDisplay) {
                 <div class="flip-card-back">
                     <h3>${orderNumber}${escapeHtml(obj.name)} - Должности</h3>
                     <div class="positions-list">
-                        ${stats.positions?.map(p => `<div class="position-item"><strong>${escapeHtml(p.name)}</strong></div>`).join('') || '<div>Нет должностей</div>'}
+                        ${stats.positions?.length > 0 ? stats.positions.filter(p => {
+                            // Проверяем, есть ли хоть какая-то потребность
+                            const total = (p.rf?.men || 0) + (p.rf?.women || 0) + (p.rf?.family || 0) + 
+                                        (p.cis?.men || 0) + (p.cis?.women || 0) + (p.cis?.family || 0);
+                            return total > 0;
+                        }).map(p => {
+                            return `<div class="position-item">
+                                <strong>${escapeHtml(p.name)}</strong>
+                                <div class="position-stats">
+                                    <span>🇷🇺 РФ: ${p.rf?.men || 0}м ${p.rf?.women || 0}ж ${p.rf?.family || 0}с</span>
+                                    <span>🌍 СНГ: ${p.cis?.men || 0}м ${p.cis?.women || 0}ж ${p.cis?.family || 0}с</span>
+                                </div>
+                            </div>`;
+                        }).join('') : '<div>Нет должностей</div>'}
                     </div>
                     <button class="flip-btn" onclick="flipCard(this)">Назад</button>
                 </div>
-            </div>
         `;
         container.appendChild(card);
     });
@@ -263,7 +291,6 @@ async function openRequirementsModal() {
     showToast('Загрузка...', 'info');
     
     try {
-        // Загружаем актуальные данные из БД
         await loadVacancyData();
         renderRequirementsTable();
     } catch (error) {
@@ -392,13 +419,16 @@ function renderRequirementsTable() {
     });
 }
 
-function changeVacancyDate() {
+async function changeVacancyDate() {
     const dateInput = document.getElementById('vacancyDateFilter');
     if (dateInput) {
-        currentVacancyDate = dateInput.value;
-        loadVacancyData().then(() => {
+        const newDate = dateInput.value;
+        if (newDate !== currentVacancyDate) {
+            currentVacancyDate = newDate;
+            showToast(`Загрузка данных за ${newDate}...`, 'info');
+            await loadVacancyData();
             renderRequirementsTable();
-        });
+        }
     }
 }
 
@@ -426,19 +456,26 @@ function updateRowTotals(objectName) {
         if (totalCell) totalCell.textContent = total;
     }
     
-    // Обновляем итоговую строку объекта
+    // Обновляем итоговую строку объекта - ищем по классу, а не по сложному селектору
     const tbody = rows[0]?.closest('tbody');
-    const totalRow = tbody?.querySelector(`tr:has(td:first-child:contains("📊 ВСЕГО:"))`);
-    if (totalRow) {
-        const cells = totalRow.cells;
-        cells[1].querySelector('input').value = totals.rfMen;
-        cells[2].querySelector('input').value = totals.rfWomen;
-        cells[3].querySelector('input').value = totals.rfFamily;
-        cells[4].querySelector('input').value = totals.cisMen;
-        cells[5].querySelector('input').value = totals.cisWomen;
-        cells[6].querySelector('input').value = totals.cisFamily;
-        const totalAll = totals.rfMen + totals.rfWomen + totals.rfFamily + totals.cisMen + totals.cisWomen + totals.cisFamily;
-        cells[7].textContent = totalAll;
+    const totalRows = tbody?.querySelectorAll('tr');
+    if (totalRows) {
+        for (const row of totalRows) {
+            // Ищем строку, которая содержит "ВСЕГО:" в первой ячейке
+            const firstCell = row.cells[0];
+            if (firstCell && firstCell.textContent.includes('ВСЕГО:')) {
+                const cells = row.cells;
+                if (cells[1]) cells[1].querySelector('input').value = totals.rfMen;
+                if (cells[2]) cells[2].querySelector('input').value = totals.rfWomen;
+                if (cells[3]) cells[3].querySelector('input').value = totals.rfFamily;
+                if (cells[4]) cells[4].querySelector('input').value = totals.cisMen;
+                if (cells[5]) cells[5].querySelector('input').value = totals.cisWomen;
+                if (cells[6]) cells[6].querySelector('input').value = totals.cisFamily;
+                const totalAll = totals.rfMen + totals.rfWomen + totals.rfFamily + totals.cisMen + totals.cisWomen + totals.cisFamily;
+                if (cells[7]) cells[7].textContent = totalAll;
+                break;
+            }
+        }
     }
     
     // Обновляем общий итог
