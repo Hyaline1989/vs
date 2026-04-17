@@ -216,11 +216,19 @@ def update_user_module_perms(user_id):
             return jsonify({'error': 'User not found'}), 404
         if target_user['role'] != 'viewer':
             return jsonify({'error': 'Руководитель может управлять правами только менеджеров'}), 403
+        
+        # Получаем модули, к которым сам имеет доступ руководитель
+        my_module_perms = get_user_module_permissions(current_user.id)
     
     data = request.get_json()
     
     for module, can_view in data.items():
         if module in ['dashboard', 'selection']:
+            # Для manager: проверяем, что он не выдаёт доступ к модулю, к которому сам не имеет доступа
+            if current_user.role == 'manager':
+                if not my_module_perms.get(module, False):
+                    logger.warning(f"Manager {current_user.id} пытается выдать доступ к модулю {module}, к которому не имеет доступа")
+                    continue  # Пропускаем этот модуль
             set_user_module_permission(user_id, module, can_view)
     
     log_user_action(current_user.id, 'update_module_perms', f"Обновлены права модулей для пользователя {user_id}", request.remote_addr)

@@ -433,6 +433,26 @@ async function editPermissions(userId) {
         const objectsData = await objectsDataRes.json();
         const objectPerms = await objectPermsRes.json();
         
+        // Получаем модули, доступные текущему пользователю (для manager)
+        let availableModules = ['dashboard', 'selection'];
+        let moduleLabels = {
+            'dashboard': '📊 Дашборд План/Факт',
+            'selection': '🎯 Подбор объектов'
+        };
+        
+        if (window.currentUser?.role === 'manager') {
+            // Получаем модули, которые сам видит manager
+            try {
+                const myModulesRes = await fetch(`/api/admin/permissions/modules/${window.currentUser.id}`, { credentials: 'include' });
+                if (myModulesRes.ok) {
+                    const myModules = await myModulesRes.json();
+                    availableModules = availableModules.filter(module => myModules[module] === true);
+                }
+            } catch(e) {
+                console.error('Ошибка получения прав текущего пользователя на модули:', e);
+            }
+        }
+        
         // Получаем объекты, доступные текущему пользователю (для manager)
         let availableObjects = objectsData.objects || [];
         if (window.currentUser?.role === 'manager') {
@@ -453,14 +473,20 @@ async function editPermissions(userId) {
             <div class="permissions-section">
                 <h4>📱 Доступ к модулям</h4>
                 <div class="modules-perms">
-                    <label class="perm-checkbox">
-                        <input type="checkbox" id="perm_dashboard" ${modulePerms.dashboard ? 'checked' : ''}>
-                        <span>📊 Дашборд План/Факт</span>
-                    </label>
-                    <label class="perm-checkbox">
-                        <input type="checkbox" id="perm_selection" ${modulePerms.selection ? 'checked' : ''}>
-                        <span>🎯 Подбор объектов</span>
-                    </label>
+        `;
+        
+        // Добавляем только доступные модули
+        for (const module of availableModules) {
+            const isChecked = modulePerms[module] === true;
+            html += `
+                <label class="perm-checkbox">
+                    <input type="checkbox" id="perm_${module}" ${isChecked ? 'checked' : ''}>
+                    <span>${moduleLabels[module]}</span>
+                </label>
+            `;
+        }
+        
+        html += `
                 </div>
             </div>
             <div class="permissions-section">
@@ -501,10 +527,12 @@ async function editPermissions(userId) {
 async function savePermissions() {
     const userId = window.currentPermsUserId;
     
-    const modulePerms = {
-        dashboard: document.getElementById('perm_dashboard')?.checked || false,
-        selection: document.getElementById('perm_selection')?.checked || false
-    };
+    const modulePerms = {};
+    // Собираем только те модули, которые есть на странице
+    const permDashboard = document.getElementById('perm_dashboard');
+    const permSelection = document.getElementById('perm_selection');
+    if (permDashboard) modulePerms.dashboard = permDashboard.checked;
+    if (permSelection) modulePerms.selection = permSelection.checked;
     
     const objectPerms = {};
     document.querySelectorAll('.object-perm-item').forEach(item => {
@@ -515,20 +543,31 @@ async function savePermissions() {
     });
     
     try {
-        await Promise.all([
-            fetch(`/api/admin/permissions/modules/${userId}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify(modulePerms)
-            }),
+        const promises = [];
+        
+        // Отправляем права на модули только если есть что отправлять
+        if (Object.keys(modulePerms).length > 0) {
+            promises.push(
+                fetch(`/api/admin/permissions/modules/${userId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify(modulePerms)
+                })
+            );
+        }
+        
+        // Отправляем права на объекты
+        promises.push(
             fetch(`/api/admin/permissions/objects/${userId}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
                 body: JSON.stringify(objectPerms)
             })
-        ]);
+        );
+        
+        await Promise.all(promises);
         
         showNotification('✅ Права сохранены', 'success');
         closePermissionsModal();
