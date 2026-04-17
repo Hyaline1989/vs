@@ -28,6 +28,18 @@ def init_selection_apis(google):
 def selection_settings():
     """Получение настроек для подбора объектов"""
     try:
+        # Получаем параметр for_permissions - если он есть, значит запрос из админки для редактирования прав
+        for_permissions = request.args.get('for_permissions') == 'true'
+        
+        # Для запросов из админки (редактирование прав) даём доступ manager
+        if for_permissions:
+            if current_user.role not in ['admin', 'manager']:
+                return jsonify({'error': 'Forbidden'}), 403
+        else:
+            # Обычный запрос - проверяем доступ к модулю
+            if not current_user.can_view_selection():
+                return jsonify({'error': 'Forbidden', 'message': 'У вас нет доступа к подбору объектов'}), 403
+        
         # Получаем дату из запроса (если есть)
         date_param = request.args.get('date')
         if date_param:
@@ -72,7 +84,8 @@ def selection_settings():
                 'requirement': req_data.get('count', 0)
             })
         
-        if current_user.role != 'admin':
+        # Фильтрация по правам (кроме случая, когда запрос из админки для редактирования прав)
+        if not for_permissions and current_user.role != 'admin':
             object_perms = get_user_object_permissions(current_user.id)
             visible_object_ids = [obj_id for obj_id, perms in object_perms.items() if perms.get('selection', False)]
             objects = [obj for obj in objects if obj['id'] in visible_object_ids]

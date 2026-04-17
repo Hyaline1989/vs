@@ -209,7 +209,9 @@
             <h3><i class="fas fa-crown"></i> Управление объектами</h3>
             <div class="admin-buttons">
                 <button class="admin-btn save" onclick="saveGlobalOrder()">Сохранить порядок</button>
+                {% if current_user.role == 'admin' %}
                 <button class="admin-btn manage-req" onclick="openRequirementsModal()" style="background: #6c757d;">📊 Управление потребностью</button>
+                {% endif %}
             </div>
         </div>
 
@@ -281,6 +283,9 @@
                 if (response.ok) {
                     const user = await response.json();
                     if (user.role === 'admin' || user.is_system_admin) {
+                        const adminBtn = document.getElementById('adminPanelBtn');
+                        if (adminBtn) adminBtn.style.display = 'flex';
+                    } else if (user.role === 'manager') {
                         const adminBtn = document.getElementById('adminPanelBtn');
                         if (adminBtn) adminBtn.style.display = 'flex';
                     }

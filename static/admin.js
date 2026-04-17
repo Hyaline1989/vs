@@ -1,4 +1,4 @@
-// static/admin.js - полная версия с мобильной адаптацией
+// static/admin.js - полная версия с мобильной адаптацией и правами для руководителя
 
 // ========== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ==========
 let usersList = [];
@@ -378,16 +378,76 @@ async function deleteUser(userId) {
 
 // ========== РЕДАКТИРОВАНИЕ ПРАВ ==========
 async function editPermissions(userId) {
+    // Проверка: manager может управлять только viewer
+    if (window.currentUser?.role === 'manager') {
+        const targetUser = usersList.find(u => u.id === userId);
+        if (targetUser && targetUser.role !== 'viewer') {
+            showNotification('Руководитель может управлять правами только менеджеров', 'error');
+            return;
+        }
+    }
+    
     try {
-        const [moduleRes, objectsDataRes, objectPermsRes] = await Promise.all([
-            fetch(`/api/admin/permissions/modules/${userId}`, { credentials: 'include' }),
-            fetch(`/api/selection/settings?for_permissions=true`, { credentials: 'include' }),
-            fetch(`/api/admin/permissions/objects/${userId}`, { credentials: 'include' })
-        ]);
+        const moduleRes = await fetch(`/api/admin/permissions/modules/${userId}`, { credentials: 'include' });
+        const objectsDataRes = await fetch(`/api/selection/settings?for_permissions=true`, { credentials: 'include' });
+        const objectPermsRes = await fetch(`/api/admin/permissions/objects/${userId}`, { credentials: 'include' });
+        
+        // Проверяем ответы
+        if (!moduleRes.ok) {
+            if (moduleRes.status === 403) {
+                showNotification('У вас нет прав для просмотра прав этого пользователя', 'error');
+            } else if (moduleRes.status === 401) {
+                showNotification('Сессия истекла, войдите заново', 'error');
+                setTimeout(() => { window.location.href = '/'; }, 1500);
+            } else {
+                showNotification('Ошибка загрузки прав', 'error');
+            }
+            return;
+        }
+        
+        if (!objectsDataRes.ok) {
+            if (objectsDataRes.status === 403) {
+                showNotification('У вас нет доступа к списку объектов', 'error');
+            } else if (objectsDataRes.status === 401) {
+                showNotification('Сессия истекла, войдите заново', 'error');
+                setTimeout(() => { window.location.href = '/'; }, 1500);
+            } else {
+                showNotification('Ошибка загрузки объектов', 'error');
+            }
+            return;
+        }
+        
+        if (!objectPermsRes.ok) {
+            if (objectPermsRes.status === 403) {
+                showNotification('У вас нет прав для просмотра прав на объекты', 'error');
+            } else if (objectPermsRes.status === 401) {
+                showNotification('Сессия истекла, войдите заново', 'error');
+                setTimeout(() => { window.location.href = '/'; }, 1500);
+            } else {
+                showNotification('Ошибка загрузки прав на объекты', 'error');
+            }
+            return;
+        }
         
         const modulePerms = await moduleRes.json();
         const objectsData = await objectsDataRes.json();
         const objectPerms = await objectPermsRes.json();
+        
+        // Получаем объекты, доступные текущему пользователю (для manager)
+        let availableObjects = objectsData.objects || [];
+        if (window.currentUser?.role === 'manager') {
+            // Получаем объекты, которые сам видит manager
+            try {
+                const myPermsRes = await fetch(`/api/admin/permissions/objects/${window.currentUser.id}`, { credentials: 'include' });
+                if (myPermsRes.ok) {
+                    const myPerms = await myPermsRes.json();
+                    const visibleObjectIds = Object.keys(myPerms).filter(objId => myPerms[objId]?.selection === true).map(Number);
+                    availableObjects = availableObjects.filter(obj => visibleObjectIds.includes(obj.id));
+                }
+            } catch(e) {
+                console.error('Ошибка получения прав текущего пользователя:', e);
+            }
+        }
         
         let html = `
             <div class="permissions-section">
@@ -412,7 +472,7 @@ async function editPermissions(userId) {
                 <div class="objects-perms-list" id="objectsPermsList">
         `;
         
-        for (const obj of objectsData.objects || []) {
+        for (const obj of availableObjects) {
             const perms = objectPerms[obj.id] || { selection: false };
             html += `
                 <div class="object-perm-item" data-object-id="${obj.id}">
@@ -432,7 +492,7 @@ async function editPermissions(userId) {
         document.getElementById('permissionsModal').style.display = 'flex';
         window.currentPermsUserId = userId;
     } catch (error) {
-        console.error(error);
+        console.error('Ошибка в editPermissions:', error);
         showNotification('❌ Ошибка загрузки прав', 'error');
     }
 }

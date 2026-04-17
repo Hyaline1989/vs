@@ -1,4 +1,4 @@
-// static/selection.js - ВЕРСИЯ БЕЗ АВТОКОПИРОВАНИЯ
+// static/selection.js - ВЕРСИЯ БЕЗ АВТОКОПИРОВАНИЯ, с правами для руководителя
 // ========== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ==========
 let objects = [];
 let vacancyData = {};
@@ -73,10 +73,12 @@ async function loadSelectionData() {
             }
         }
         
+        // Только админ видит блок управления объектами
         if (window.isAdmin) {
             const adminControls = document.getElementById('adminControls');
             if (adminControls) adminControls.style.display = 'block';
         }
+        // Руководитель (manager) не видит блок управления объектами
         
         filterAndDisplayObjects();
         initDragAndDrop();
@@ -349,7 +351,7 @@ function renderRequirementsTable() {
     
     tableHtml += `
                         </tbody>
-                        <tfoot><tr style="background:#2c3e50; color:white;"><td colspan="8" style="text-align:right;"><strong>ОБЩИЙ ИТОГ:</strong></td><td style="text-align:center;"><strong>${grandTotal}</strong></td><td style="background:#2c3e50;"></td></tr></tfoot>
+                        <tfoot><tr style="background:#2c3e50; color:white;"><td colspan="8" style="text-align:right;"><strong>ОБЩИЙ ИТОГ:</strong></td><td style="text-align:center;"><strong>${grandTotal}</strong></td><td style="background:#2c3e50;"></td></tfoot>
                     </table>
                 </div>
                 <div class="requirements-modal-footer">

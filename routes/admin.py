@@ -180,10 +180,19 @@ def get_user_module_perms(user_id):
     if current_user.role not in ['admin', 'manager']:
         return jsonify({'error': 'Forbidden'}), 403
     
+    # Разрешаем пользователю просматривать свои собственные права
+    if user_id == current_user.id:
+        perms = get_user_module_permissions(user_id)
+        return jsonify(perms)
+    
+    # Для manager: проверяем, что он запрашивает права только для viewer
     if current_user.role == 'manager':
         target_user = get_user_by_id(user_id)
-        if target_user and target_user['role'] != 'viewer':
-            return jsonify({'error': 'Forbidden'}), 403
+        if not target_user:
+            return jsonify({'error': 'User not found'}), 404
+        if target_user['role'] != 'viewer':
+            logger.warning(f"Manager {current_user.id} пытается получить права модулей пользователя {user_id} с ролью {target_user['role']}")
+            return jsonify({'error': 'Руководитель может управлять правами только менеджеров'}), 403
     
     perms = get_user_module_permissions(user_id)
     return jsonify(perms)
@@ -197,10 +206,16 @@ def update_user_module_perms(user_id):
     if current_user.role not in ['admin', 'manager']:
         return jsonify({'error': 'Forbidden'}), 403
     
+    # Нельзя менять свои собственные права через этот эндпоинт
+    if user_id == current_user.id:
+        return jsonify({'error': 'Нельзя изменять свои собственные права'}), 403
+    
     if current_user.role == 'manager':
         target_user = get_user_by_id(user_id)
-        if target_user and target_user['role'] != 'viewer':
-            return jsonify({'error': 'Forbidden'}), 403
+        if not target_user:
+            return jsonify({'error': 'User not found'}), 404
+        if target_user['role'] != 'viewer':
+            return jsonify({'error': 'Руководитель может управлять правами только менеджеров'}), 403
     
     data = request.get_json()
     
@@ -220,12 +235,28 @@ def get_user_object_perms(user_id):
     if current_user.role not in ['admin', 'manager']:
         return jsonify({'error': 'Forbidden'}), 403
     
+    # Разрешаем пользователю просматривать свои собственные права
+    if user_id == current_user.id:
+        perms = get_user_object_permissions(user_id)
+        return jsonify(perms)
+    
+    # Для manager: проверяем, что он запрашивает права только для viewer
     if current_user.role == 'manager':
         target_user = get_user_by_id(user_id)
-        if target_user and target_user['role'] != 'viewer':
-            return jsonify({'error': 'Forbidden'}), 403
+        if not target_user:
+            return jsonify({'error': 'User not found'}), 404
+        if target_user['role'] != 'viewer':
+            logger.warning(f"Manager {current_user.id} пытается получить права объектов пользователя {user_id} с ролью {target_user['role']}")
+            return jsonify({'error': 'Руководитель может управлять правами только менеджеров'}), 403
     
     perms = get_user_object_permissions(user_id)
+    
+    # Если текущий пользователь manager, фильтруем объекты, которые он сам видит
+    if current_user.role == 'manager':
+        my_perms = get_user_object_permissions(current_user.id)
+        visible_objects = [obj_id for obj_id, p in my_perms.items() if p.get('selection', False)]
+        perms = {obj_id: p for obj_id, p in perms.items() if obj_id in visible_objects}
+    
     return jsonify(perms)
 
 
@@ -237,17 +268,35 @@ def update_user_object_perms(user_id):
     if current_user.role not in ['admin', 'manager']:
         return jsonify({'error': 'Forbidden'}), 403
     
+    # Нельзя менять свои собственные права через этот эндпоинт
+    if user_id == current_user.id:
+        return jsonify({'error': 'Нельзя изменять свои собственные права'}), 403
+    
     if current_user.role == 'manager':
         target_user = get_user_by_id(user_id)
-        if target_user and target_user['role'] != 'viewer':
-            return jsonify({'error': 'Forbidden'}), 403
+        if not target_user:
+            return jsonify({'error': 'User not found'}), 404
+        if target_user['role'] != 'viewer':
+            return jsonify({'error': 'Руководитель может управлять правами только менеджеров'}), 403
+        
+        # Получаем объекты, которые сам видит руководитель
+        my_perms = get_user_object_permissions(current_user.id)
+        visible_objects_for_me = [obj_id for obj_id, perms in my_perms.items() if perms.get('selection', False)]
     
     data = request.get_json()
     
-    for obj_id, perms in data.items():
+    for obj_id_str, perms in data.items():
+        obj_id = int(obj_id_str)
+        
+        # Для manager: проверяем, что он не выдаёт доступ к объекту, который сам не видит
+        if current_user.role == 'manager':
+            if obj_id not in visible_objects_for_me:
+                logger.warning(f"Manager {current_user.id} пытается выдать права на объект {obj_id}, к которому не имеет доступа")
+                continue  # Пропускаем этот объект
+        
         # Для дашборда всегда даём True (не ограничиваем)
         set_user_object_permission(
-            user_id, int(obj_id),
+            user_id, obj_id,
             True,  # dashboard всегда доступен
             perms.get('selection', False)
         )

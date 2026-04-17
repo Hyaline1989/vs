@@ -49,12 +49,12 @@ def get_vacancy():
 @requirements_admin_bp.route('/object', methods=['POST'])
 @login_required
 def create_object():
-    """Создание нового объекта вакансии"""
+    """Создание нового объекта вакансии (только админ)"""
     if not current_user.is_authenticated:
         return jsonify({'error': 'Unauthorized'}), 401
     
-    if current_user.role not in ['admin', 'manager']:
-        return jsonify({'error': 'Forbidden'}), 403
+    if current_user.role != 'admin':
+        return jsonify({'error': 'Только администратор может создавать объекты'}), 403
     
     data = request.get_json()
     name = data.get('name', '').strip()
@@ -75,12 +75,12 @@ def create_object():
 @requirements_admin_bp.route('/object/<string:name>', methods=['DELETE'])
 @login_required
 def delete_object(name):
-    """Удаление объекта вакансии"""
+    """Удаление объекта вакансии (только админ)"""
     if not current_user.is_authenticated:
         return jsonify({'error': 'Unauthorized'}), 401
     
-    if current_user.role not in ['admin', 'manager']:
-        return jsonify({'error': 'Forbidden'}), 403
+    if current_user.role != 'admin':
+        return jsonify({'error': 'Только администратор может удалять объекты'}), 403
     
     if delete_vacancy_object(name):
         from database import log_user_action
@@ -93,12 +93,12 @@ def delete_object(name):
 @requirements_admin_bp.route('/position', methods=['POST'])
 @login_required
 def create_position():
-    """Добавление должности к объекту"""
+    """Добавление должности к объекту (только админ)"""
     if not current_user.is_authenticated:
         return jsonify({'error': 'Unauthorized'}), 401
     
-    if current_user.role not in ['admin', 'manager']:
-        return jsonify({'error': 'Forbidden'}), 403
+    if current_user.role != 'admin':
+        return jsonify({'error': 'Только администратор может добавлять должности'}), 403
     
     data = request.get_json()
     object_name = data.get('object_name', '').strip()
@@ -122,12 +122,12 @@ def create_position():
 @requirements_admin_bp.route('/position', methods=['DELETE'])
 @login_required
 def delete_position():
-    """Удаление должности"""
+    """Удаление должности (только админ)"""
     if not current_user.is_authenticated:
         return jsonify({'error': 'Unauthorized'}), 401
     
-    if current_user.role not in ['admin', 'manager']:
-        return jsonify({'error': 'Forbidden'}), 403
+    if current_user.role != 'admin':
+        return jsonify({'error': 'Только администратор может удалять должности'}), 403
     
     data = request.get_json()
     object_name = data.get('object_name', '').strip()
@@ -149,12 +149,12 @@ def delete_position():
 @requirements_admin_bp.route('/save-all', methods=['POST'])
 @login_required
 def save_all_requirements():
-    """Сохранение всех данных о вакансиях"""
+    """Сохранение всех данных о вакансиях (только админ)"""
     if not current_user.is_authenticated:
         return jsonify({'error': 'Unauthorized'}), 401
     
-    if current_user.role not in ['admin', 'manager']:
-        return jsonify({'error': 'Forbidden'}), 403
+    if current_user.role != 'admin':
+        return jsonify({'error': 'Только администратор может редактировать потребности'}), 403
     
     data = request.get_json()
     date = data.get('date', datetime.now().strftime('%Y-%m-%d'))
@@ -187,7 +187,7 @@ def save_all_requirements():
 @requirements_admin_bp.route('/migrate', methods=['POST'])
 @login_required
 def migrate_from_sheets():
-    """Миграция данных из Google Sheets (одноразовая)"""
+    """Миграция данных из Google Sheets (одноразовая, только админ)"""
     if not current_user.is_authenticated or current_user.role != 'admin':
         return jsonify({'error': 'Forbidden'}), 403
     

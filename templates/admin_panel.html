@@ -943,9 +943,11 @@
             <button class="admin-tab active" data-tab="users">
                 <i class="fas fa-users"></i> Пользователи
             </button>
+            {% if current_user.role == 'admin' %}
             <button class="admin-tab" data-tab="objects">
                 <i class="fas fa-building"></i> Объекты
             </button>
+            {% endif %}
         </div>
 
         <!-- Вкладка: Управление пользователями -->
@@ -988,7 +990,8 @@
             </div>
         </div>
 
-        <!-- Вкладка: Управление объектами -->
+        <!-- Вкладка: Управление объектами (только для админа) -->
+        {% if current_user.role == 'admin' %}
         <div class="admin-tab-content" id="tab-objects">
             <div class="admin-page">
                 <div class="objects-header">
@@ -1019,6 +1022,7 @@
                 </div>
             </div>
         </div>
+        {% endif %}
     </div>
 
     <!-- Модальное окно для управления пользователями -->
@@ -1101,7 +1105,8 @@
         </div>
     </div>
 
-    <!-- Модальное окно для управления объектами -->
+    <!-- Модальное окно для управления объектами (только для админа) -->
+    {% if current_user.role == 'admin' %}
     <div class="modal modal-large" id="objectModal" style="display: none;">
         <div class="modal-content">
             <div class="modal-header">
@@ -1165,10 +1170,13 @@
             </div>
         </div>
     </div>
+    {% endif %}
 
     <script src="{{ url_for('static', filename='common.js') }}"></script>
     <script src="{{ url_for('static', filename='admin.js') }}"></script>
+    {% if current_user.role == 'admin' %}
     <script src="{{ url_for('static', filename='objects_admin.js') }}"></script>
+    {% endif %}
     <script>
         // Переключение вкладок
         document.querySelectorAll('.admin-tab').forEach(tab => {
