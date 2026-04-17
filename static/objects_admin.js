@@ -1,5 +1,40 @@
 // static/objects_admin.js
 // Управление объектами в админ-панели
+// static/objects_admin.js - добавьте в самое начало
+
+// ========== ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ ДЛЯ БЕЗОПАСНОГО HTML ==========
+function escapeHtml(unsafe) {
+    if (!unsafe) return '';
+    return unsafe
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+function showNotification(message, type) {
+    const notification = document.createElement('div');
+    notification.className = `notification notification-${type}`;
+    notification.textContent = message;
+    notification.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background: white;
+        padding: 12px 20px;
+        border-radius: 30px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        z-index: 10001;
+        border-left: 4px solid ${type === 'success' ? '#27ae60' : type === 'error' ? '#e74c3c' : '#A42C30'};
+        animation: slideIn 0.3s ease;
+    `;
+    document.body.appendChild(notification);
+    setTimeout(() => {
+        notification.style.opacity = '0';
+        setTimeout(() => notification.remove(), 300);
+    }, 3000);
+}
 
 let objectsList = [];
 let isEditingObject = false;

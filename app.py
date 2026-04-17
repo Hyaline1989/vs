@@ -24,7 +24,7 @@ from config import *
 from bitrix_api import BitrixAPI
 from google_sheets import GoogleSheetsAPI
 from comparer import DataComparer
-from database import init_db, cleanup_old_records, init_objects_settings, init_vacancy_tables
+from database import init_db, cleanup_old_records, init_objects_settings, init_vacancy_tables, cleanup_old_unused_avatars
 from models import User
 
 # Импортируем blueprint'ы и их инициализаторы
@@ -33,6 +33,7 @@ from routes import (
     init_dashboard_apis, init_selection_apis
 )
 from routes.requirements_admin import requirements_admin_bp
+from routes.profile import profile_bp
 
 # Настройка логирования
 logging.basicConfig(
@@ -132,6 +133,7 @@ app.register_blueprint(selection_bp)
 app.register_blueprint(admin_pages_bp)
 app.register_blueprint(objects_admin_bp)
 app.register_blueprint(requirements_admin_bp)
+app.register_blueprint(profile_bp)
 
 # ========== СТРАНИЦЫ ==========
 @app.route('/')
@@ -191,10 +193,17 @@ def admin_panel():
                              message="Произошла ошибка при загрузке страницы",
                              return_url="/welcome"), 500
 
+@app.route('/profile')
+@login_required
+def profile_page():
+    return render_template('profile.html')
+
 # ========== ФОНОВЫЕ ЗАДАЧИ ==========
 scheduler = BackgroundScheduler()
 scheduler.add_job(func=cleanup_old_records, trigger="cron", hour=3, minute=0, args=[30], 
                   id='cleanup_database')
+scheduler.add_job(func=cleanup_old_unused_avatars, trigger="cron", hour=3, minute=30, 
+                  id='cleanup_avatars')
 scheduler.start()
 atexit.register(lambda: scheduler.shutdown())
 

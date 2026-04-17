@@ -6,15 +6,9 @@ import logging
 import json
 import re
 
-# Для Windows убираем time.tzset()
-# Просто используем datetime.now() без изменения часового пояса
-# Часовой пояс будет определяться на уровне приложения через передачу даты с фронтенда
-
 logger = logging.getLogger(__name__)
 
 DB_NAME = 'requirements.db'
-
-# ... остальной код database.py без изменений ...
 
 # ========== ФУНКЦИЯ САНИТАРИИ НАЗВАНИЙ ==========
 def sanitize_object_name(name):
@@ -64,7 +58,6 @@ def init_db():
             )
         ''')
         
-        # Проверяем существование новых колонок и добавляем их, если их нет
         cursor.execute("PRAGMA table_info(objects_settings)")
         columns = [column[1] for column in cursor.fetchall()]
         
@@ -148,6 +141,16 @@ def init_db():
             )
         ''')
         
+        # Таблица для аватаров пользователей
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS user_avatars (
+                user_id INTEGER PRIMARY KEY,
+                avatar_filename TEXT,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        ''')
+        
         # Индексы
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_date ON requirement_history (date)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_objects_visible ON objects_settings (visible)')
@@ -176,13 +179,11 @@ def init_db():
             
             admin_id = 1
             
-            # Даем полный доступ ко всем модулям
             cursor.execute('''
                 INSERT INTO user_module_permissions (user_id, module_name, can_view)
                 VALUES (?, 'dashboard', 1), (?, 'selection', 1)
             ''', (admin_id, admin_id))
             
-            # Даем доступ ко всем объектам
             cursor.execute('SELECT id FROM objects_settings')
             all_objects = cursor.fetchall()
             for obj in all_objects:
@@ -736,16 +737,13 @@ def init_objects_settings():
         cursor = conn.cursor()
         
         for obj in OBJECTS_BASE:
-            # Безопасно получаем значения с дефолтными
             obj_id = obj.get('id', 0)
             obj_name = obj.get('name', '')
             
-            # Проверяем, существует ли уже объект
             cursor.execute('SELECT id FROM objects_settings WHERE id = ?', (obj_id,))
             if cursor.fetchone():
-                continue  # Пропускаем, если уже есть
+                continue
             
-            # Безопасно получаем остальные поля
             age_min = obj.get('ageMin', 18)
             age_max = obj.get('ageMax', 55)
             
@@ -812,7 +810,6 @@ def get_objects_settings_extended():
         
         objects = []
         for row in rows:
-            # Разбиваем строки обратно в списки
             genders_str = row[6] or 'мужчина,женщина'
             nationalities_str = row[7] or 'РФ'
             
@@ -857,16 +854,13 @@ def create_object_extended(name, age_min, age_max, allowed_genders, allowed_nati
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
         
-        # Получаем следующий ID
         cursor.execute('SELECT MAX(id) FROM objects_settings')
         max_id = cursor.fetchone()[0]
         new_id = (max_id or 0) + 1
         
-        # Преобразуем списки в строки
         genders_str = ','.join(allowed_genders) if isinstance(allowed_genders, list) else allowed_genders
         nationalities_str = ','.join(allowed_nationalities) if isinstance(allowed_nationalities, list) else allowed_nationalities
         
-        # Добавляем в objects_settings
         cursor.execute('''
             INSERT INTO objects_settings (id, name, visible, priority, age_min, age_max, 
                                          allowed_genders, allowed_nationalities, allows_conviction, link)
@@ -893,7 +887,6 @@ def update_object_settings_full(object_id, updates):
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
         
-        # Формируем SQL запрос динамически
         fields = []
         params = []
         
@@ -974,8 +967,6 @@ def save_global_order(order_list):
     except Exception as e:
         logger.error(f"Ошибка при сохранении глобального порядка: {e}")
         return False
-    
-# ========== ФУНКЦИИ ДЛЯ УПРАВЛЕНИЯ ОБЪЕКТАМИ (CRUD) ==========
 
 def get_object_by_id(object_id):
     """Получает объект по ID с расширенными полями"""
@@ -1031,9 +1022,7 @@ def delete_object(object_id):
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
         
-        # Удаляем права доступа к объекту
         cursor.execute('DELETE FROM user_object_permissions WHERE object_id = ?', (object_id,))
-        # Удаляем настройки объекта
         cursor.execute('DELETE FROM objects_settings WHERE id = ?', (object_id,))
         
         conn.commit()
@@ -1047,7 +1036,7 @@ def delete_object(object_id):
         logger.error(f"Ошибка при удалении объекта: {e}")
         return False
 
-# ========== ФУНКЦИИ ДЛЯ УПРАВЛЕНИЯ ВАКАНСИЯМИ (НОВАЯ СИСТЕМА) ==========
+# ========== ФУНКЦИИ ДЛЯ УПРАВЛЕНИЯ ВАКАНСИЯМИ ==========
 
 def init_vacancy_tables():
     """Создаёт таблицы для хранения вакансий"""
@@ -1055,7 +1044,6 @@ def init_vacancy_tables():
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
         
-        # Таблица объектов вакансий
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS vacancy_objects (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1065,7 +1053,6 @@ def init_vacancy_tables():
             )
         ''')
         
-        # Таблица должностей
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS vacancy_positions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1078,7 +1065,6 @@ def init_vacancy_tables():
             )
         ''')
         
-        # Таблица с количествами по должностям
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS vacancy_requirements (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1098,7 +1084,6 @@ def init_vacancy_tables():
             )
         ''')
         
-        # Индексы
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_vacancy_date ON vacancy_requirements (date)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_vacancy_position ON vacancy_requirements (position_id)')
         
@@ -1110,12 +1095,8 @@ def init_vacancy_tables():
         logger.error(f"Ошибка при создании таблиц вакансий: {e}")
         return False
 
-
 def get_all_vacancy_data(date=None):
-    """
-    Получает все данные о вакансиях за указанную дату
-    Возвращает структуру, аналогичную старой из Google Sheets
-    """
+    """Получает все данные о вакансиях за указанную дату"""
     if date is None:
         date = datetime.now().strftime('%Y-%m-%d')
     
@@ -1123,14 +1104,12 @@ def get_all_vacancy_data(date=None):
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
         
-        # Получаем все объекты
         cursor.execute('SELECT id, name FROM vacancy_objects ORDER BY name')
         objects = cursor.fetchall()
         
         result = {}
         
         for obj_id, obj_name in objects:
-            # Получаем все должности объекта
             cursor.execute('''
                 SELECT id, name FROM vacancy_positions 
                 WHERE object_id = ? 
@@ -1146,7 +1125,6 @@ def get_all_vacancy_data(date=None):
             }
             
             for pos_id, pos_name in positions:
-                # Получаем данные за указанную дату
                 cursor.execute('''
                     SELECT rf_men, rf_women, rf_family, cis_men, cis_women, cis_family, is_high
                     FROM vacancy_requirements
@@ -1161,7 +1139,6 @@ def get_all_vacancy_data(date=None):
                         'cis': {'men': req[3], 'women': req[4], 'family': req[5]},
                         'is_high': bool(req[6])
                     }
-                    # Суммируем в общие итоги
                     obj_data['rf']['men'] += req[0]
                     obj_data['rf']['women'] += req[1]
                     obj_data['rf']['family'] += req[2]
@@ -1169,7 +1146,6 @@ def get_all_vacancy_data(date=None):
                     obj_data['cis']['women'] += req[4]
                     obj_data['cis']['family'] += req[5]
                     
-                    # Если хоть одна должность имеет is_high, то и объект имеет приоритет
                     if bool(req[6]):
                         obj_data['is_high'] = True
                 else:
@@ -1185,25 +1161,14 @@ def get_all_vacancy_data(date=None):
             result[obj_name] = obj_data
         
         conn.close()
-        
-        # Отладочный вывод
-        for obj_name, obj_data in result.items():
-            if obj_data['is_high']:
-                print(f"DEBUG: {obj_name} has is_high=True")
-        
         return result
         
     except Exception as e:
         logger.error(f"Ошибка при получении данных вакансий: {e}")
         return {}
 
-
 def get_plan_requirements_for_date(target_date):
-    """
-    Получает суммарный план (потребность) по всем объектам за указанную дату
-    из таблиц vacancy_requirements
-    Возвращает словарь: {объект: {'count': сумма, 'is_high': приоритет}}
-    """
+    """Получает суммарный план (потребность) по всем объектам за указанную дату"""
     if isinstance(target_date, str):
         date_str = target_date
     else:
@@ -1213,7 +1178,6 @@ def get_plan_requirements_for_date(target_date):
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
         
-        # Получаем суммарные потребности по объектам
         cursor.execute('''
             SELECT vo.name, 
                    SUM(vr.rf_men + vr.rf_women + vr.rf_family + 
@@ -1244,22 +1208,19 @@ def get_plan_requirements_for_date(target_date):
         logger.error(f"Ошибка при получении плана из БД: {e}")
         return {}
 
-
 def save_vacancy_object(name):
     """Создаёт новый объект вакансии"""
     try:
         conn = sqlite3.connect(DB_NAME, timeout=30)
         cursor = conn.cursor()
         
-        # Сначала проверяем, существует ли уже такой объект
         cursor.execute('SELECT id FROM vacancy_objects WHERE name = ?', (name,))
         existing = cursor.fetchone()
         if existing:
             logger.warning(f"Объект {name} уже существует (ID: {existing[0]})")
             conn.close()
-            return None  # Возвращаем None если объект уже есть
+            return None
         
-        # Если нет - создаём
         cursor.execute('INSERT INTO vacancy_objects (name) VALUES (?)', (name,))
         obj_id = cursor.lastrowid
         conn.commit()
@@ -1272,7 +1233,6 @@ def save_vacancy_object(name):
     except Exception as e:
         logger.error(f"Ошибка при создании объекта: {e}")
         return None
-
 
 def delete_vacancy_object(object_name):
     """Удаляет объект вакансии и все связанные данные"""
@@ -1290,14 +1250,12 @@ def delete_vacancy_object(object_name):
         logger.error(f"Ошибка при удалении объекта: {e}")
         return False
 
-
 def save_vacancy_position(object_name, position_name):
     """Добавляет должность к объекту"""
     try:
         conn = sqlite3.connect(DB_NAME, timeout=30)
         cursor = conn.cursor()
         
-        # Получаем ID объекта
         cursor.execute('SELECT id FROM vacancy_objects WHERE name = ?', (object_name,))
         obj = cursor.fetchone()
         if not obj:
@@ -1306,7 +1264,6 @@ def save_vacancy_position(object_name, position_name):
         
         obj_id = obj[0]
         
-        # Проверяем, существует ли уже такая должность
         cursor.execute('SELECT id FROM vacancy_positions WHERE object_id = ? AND name = ?', (obj_id, position_name))
         existing = cursor.fetchone()
         if existing:
@@ -1314,7 +1271,6 @@ def save_vacancy_position(object_name, position_name):
             conn.close()
             return None
         
-        # Добавляем должность
         cursor.execute('''
             INSERT INTO vacancy_positions (object_id, name) VALUES (?, ?)
         ''', (obj_id, position_name))
@@ -1329,7 +1285,6 @@ def save_vacancy_position(object_name, position_name):
     except Exception as e:
         logger.error(f"Ошибка при добавлении должности: {e}")
         return None
-
 
 def delete_vacancy_position(object_name, position_name):
     """Удаляет должность"""
@@ -1352,20 +1307,12 @@ def delete_vacancy_position(object_name, position_name):
         logger.error(f"Ошибка при удалении должности: {e}")
         return False
 
-
 def save_vacancy_requirements_batch(object_name, date, requirements):
-    """
-    Сохраняет все потребности для объекта за дату
-    requirements: список словарей с данными должностей
-    """
+    """Сохраняет все потребности для объекта за дату"""
     try:
-        print(f"=== СОХРАНЕНИЕ ДЛЯ {object_name}, ДАТА {date} ===")
-        print(f"is_high в requirements: {[req.get('is_high', False) for req in requirements]}")
-        
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
         
-        # Получаем ID объекта
         cursor.execute('SELECT id FROM vacancy_objects WHERE name = ?', (object_name,))
         obj = cursor.fetchone()
         if not obj:
@@ -1380,21 +1327,17 @@ def save_vacancy_requirements_batch(object_name, date, requirements):
             if not position_name:
                 continue
             
-            # Получаем ID должности
             cursor.execute('''
                 SELECT id FROM vacancy_positions 
                 WHERE object_id = ? AND name = ?
             ''', (obj_id, position_name))
             pos = cursor.fetchone()
             if not pos:
-                print(f"⚠️ Должность {position_name} не найдена для объекта {object_name}")
                 continue
             pos_id = pos[0]
             
             is_high_value = 1 if req.get('is_high', False) else 0
-            print(f"  Должность: {position_name}, is_high={is_high_value}")
             
-            # Сохраняем данные
             cursor.execute('''
                 INSERT INTO vacancy_requirements 
                 (position_id, date, rf_men, rf_women, rf_family, cis_men, cis_women, cis_family, is_high)
@@ -1422,23 +1365,16 @@ def save_vacancy_requirements_batch(object_name, date, requirements):
         
         conn.commit()
         conn.close()
-        print(f"✅ Сохранено {saved_count} должностей для объекта {object_name}")
         return True
     except Exception as e:
-        print(f"❌ Ошибка при сохранении потребностей: {e}")
         logger.error(f"Ошибка при сохранении потребностей: {e}")
         return False
 
-
 def migrate_from_google_sheets():
-    """
-    Миграция: переносит данные из Google Sheets в БД (одноразово)
-    """
+    """Миграция: переносит данные из Google Sheets в БД (одноразово)"""
     try:
-        # Инициализируем таблицы
         init_vacancy_tables()
         
-        # Получаем данные из Google Sheets
         from google_sheets import GoogleSheetsAPI
         google_api = GoogleSheetsAPI()
         vacancy_data = google_api.get_vacancy_data()
@@ -1446,17 +1382,14 @@ def migrate_from_google_sheets():
         today = datetime.now().strftime('%Y-%m-%d')
         
         for obj_name, obj_data in vacancy_data.items():
-            # Создаём объект
             obj_id = save_vacancy_object(obj_name)
             if not obj_id:
                 continue
             
-            # Создаём должности и сохраняем данные
             for pos in obj_data.get('positions', []):
                 pos_id = save_vacancy_position(obj_name, pos['name'])
                 
                 if pos_id:
-                    # Сохраняем данные за сегодня
                     conn = sqlite3.connect(DB_NAME)
                     cursor = conn.cursor()
                     cursor.execute('''
@@ -1478,80 +1411,129 @@ def migrate_from_google_sheets():
         logger.error(f"Ошибка при миграции: {e}")
         return False
 
+# ========== ФУНКЦИИ ДЛЯ ЛИЧНОГО КАБИНЕТА ==========
 
-# ========== АВТОМАТИЧЕСКИЙ ПЕРЕНОС ПОТРЕБНОСТЕЙ ==========
-
-def copy_requirements_from_previous_day(target_date):
-    """
-    Копирует потребности с предыдущего дня на указанную дату,
-    если за указанную дату нет данных.
-    
-    Args:
-        target_date: строка в формате 'YYYY-MM-DD' или datetime
-    
-    Returns:
-        int: количество скопированных записей
-    """
-    from datetime import datetime, timedelta
-    
-    if isinstance(target_date, str):
-        target_date_str = target_date
-        target_date_obj = datetime.strptime(target_date, '%Y-%m-%d')
-    else:
-        target_date_str = target_date.strftime('%Y-%m-%d')
-        target_date_obj = target_date
-    
+def update_user_profile(user_id, full_name=None, email=None):
+    """Обновляет профиль пользователя (ФИО, email)"""
     try:
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
         
-        # Проверяем, есть ли уже данные за эту дату
-        cursor.execute('SELECT COUNT(*) FROM vacancy_requirements WHERE date = ?', (target_date_str,))
-        existing_count = cursor.fetchone()[0]
+        updates = []
+        params = []
         
-        if existing_count > 0:
-            logger.info(f"📋 Данные за {target_date_str} уже существуют ({existing_count} записей)")
-            conn.close()
-            return 0
+        if full_name is not None:
+            updates.append('full_name = ?')
+            params.append(full_name)
+        if email is not None:
+            updates.append('email = ?')
+            params.append(email)
         
-        # Ищем предыдущий день с данными
-        previous_date = target_date_obj - timedelta(days=1)
-        copied_count = 0
-        max_days_back = 30  # Ищем максимум за 30 дней назад
-        
-        for days_back in range(1, max_days_back + 1):
-            prev_date_str = previous_date.strftime('%Y-%m-%d')
-            
-            cursor.execute('SELECT COUNT(*) FROM vacancy_requirements WHERE date = ?', (prev_date_str,))
-            has_data = cursor.fetchone()[0] > 0
-            
-            if has_data:
-                logger.info(f"📋 Найден предыдущий день с данными: {prev_date_str}")
-                
-                # Копируем все записи с предыдущего дня
-                cursor.execute('''
-                    INSERT INTO vacancy_requirements 
-                    (position_id, date, rf_men, rf_women, rf_family, cis_men, cis_women, cis_family, is_high)
-                    SELECT position_id, ?, rf_men, rf_women, rf_family, cis_men, cis_women, cis_family, is_high
-                    FROM vacancy_requirements
-                    WHERE date = ?
-                ''', (target_date_str, prev_date_str))
-                
-                copied_count = cursor.rowcount
-                conn.commit()
-                
-                logger.info(f"✅ Скопировано {copied_count} записей потребностей с {prev_date_str} на {target_date_str}")
-                break
-            
-            previous_date -= timedelta(days=1)
+        if updates:
+            params.append(user_id)
+            cursor.execute(f'UPDATE users SET {", ".join(updates)} WHERE id = ?', params)
+            conn.commit()
+            logger.info(f"Обновлён профиль пользователя {user_id}")
         
         conn.close()
-        
-        if copied_count == 0:
-            logger.info(f"⚠️ Не найдено предыдущих дней с данными для копирования на {target_date_str}")
-        
-        return copied_count
-        
+        return True
     except Exception as e:
-        logger.error(f"Ошибка при копировании потребностей: {e}", exc_info=True)
+        logger.error(f"Ошибка при обновлении профиля: {e}")
+        return False
+
+def change_user_password(user_id, new_password_hash):
+    """Изменяет пароль пользователя"""
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        cursor.execute('UPDATE users SET password_hash = ? WHERE id = ?', (new_password_hash, user_id))
+        conn.commit()
+        conn.close()
+        logger.info(f"Изменён пароль пользователя {user_id}")
+        return True
+    except Exception as e:
+        logger.error(f"Ошибка при изменении пароля: {e}")
+        return False
+
+def get_user_avatar(user_id):
+    """Получает имя файла аватара пользователя"""
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        cursor.execute('SELECT avatar_filename FROM user_avatars WHERE user_id = ?', (user_id,))
+        row = cursor.fetchone()
+        conn.close()
+        return row[0] if row else None
+    except Exception as e:
+        logger.error(f"Ошибка при получении аватара: {e}")
+        return None
+
+def save_user_avatar(user_id, filename):
+    """Сохраняет или обновляет аватар пользователя"""
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO user_avatars (user_id, avatar_filename, updated_at)
+            VALUES (?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(user_id) DO UPDATE SET
+                avatar_filename = excluded.avatar_filename,
+                updated_at = CURRENT_TIMESTAMP
+        ''', (user_id, filename))
+        conn.commit()
+        conn.close()
+        logger.info(f"Сохранён аватар для пользователя {user_id}")
+        return True
+    except Exception as e:
+        logger.error(f"Ошибка при сохранении аватара: {e}")
+        return False
+
+def delete_user_avatar(user_id):
+    """Удаляет аватар пользователя"""
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        cursor.execute('DELETE FROM user_avatars WHERE user_id = ?', (user_id,))
+        deleted = cursor.rowcount
+        conn.commit()
+        conn.close()
+        if deleted:
+            logger.info(f"Удалён аватар пользователя {user_id}")
+        return deleted > 0
+    except Exception as e:
+        logger.error(f"Ошибка при удалении аватара: {e}")
+        return False
+
+def cleanup_old_unused_avatars():
+    """Очищает неиспользуемые аватары из файловой системы"""
+    try:
+        import os
+        from flask import current_app
+        
+        upload_dir = os.path.join(current_app.root_path, 'static', 'uploads', 'avatars')
+        if not os.path.exists(upload_dir):
+            return 0
+        
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        cursor.execute('SELECT avatar_filename FROM user_avatars')
+        used_avatars = set(row[0] for row in cursor.fetchall())
+        conn.close()
+        
+        deleted_count = 0
+        for filename in os.listdir(upload_dir):
+            if filename not in used_avatars:
+                file_path = os.path.join(upload_dir, filename)
+                try:
+                    os.remove(file_path)
+                    deleted_count += 1
+                except Exception:
+                    pass
+        
+        if deleted_count > 0:
+            logger.info(f"Очищено {deleted_count} неиспользуемых аватаров")
+        
+        return deleted_count
+    except Exception as e:
+        logger.error(f"Ошибка очистки аватаров: {e}")
         return 0

@@ -430,10 +430,12 @@ async function initPage() {
         
         userInfo.innerHTML = `
             <div class="user-info-container">
-                <div class="user-badge ${roleClass}">
-                    ${roleIcon} ${escapeHtml(currentUser.full_name || currentUser.username)}
-                    <span class="user-role">${escapeHtml(currentUser.role_display)}</span>
-                </div>
+                <a href="/profile" class="user-badge-link" style="text-decoration: none;">
+                    <div class="user-badge ${roleClass}">
+                        ${roleIcon} ${escapeHtml(currentUser.full_name || currentUser.username)}
+                        <span class="user-role">${escapeHtml(currentUser.role_display)}</span>
+                    </div>
+                </a>
                 <button class="logout-button" onclick="logout()">
                     <i class="fas fa-sign-out-alt"></i> Выйти
                 </button>
