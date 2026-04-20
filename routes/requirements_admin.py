@@ -1,4 +1,4 @@
-# routes/requirements_admin.py
+# routes/requirements_admin.py - ФИНАЛЬНАЯ ВЕРСИЯ
 # -*- coding: utf-8 -*-
 from flask import Blueprint, request, jsonify
 from flask_login import login_required, current_user
@@ -30,7 +30,7 @@ init_vacancy_tables()
 @requirements_admin_bp.route('/vacancy', methods=['GET'])
 @login_required
 def get_vacancy():
-    """Получение ТЕКУЩИХ потребностей (без даты)"""
+    """Получение ТЕКУЩИХ потребностей (без даты) - БЕЗ АВТОСОЗДАНИЯ"""
     if not current_user.is_authenticated:
         return jsonify({'error': 'Unauthorized'}), 401
     
@@ -39,48 +39,8 @@ def get_vacancy():
             return jsonify({'error': 'Forbidden'}), 403
     
     try:
+        # Просто возвращаем то, что есть в current_requirements
         data = get_current_requirements()
-        
-        # Если current_requirements пустая, но есть vacancy_objects - создаём базовые записи
-        if not data or len(data) == 0:
-            conn = sqlite3.connect(DB_NAME)
-            cursor = conn.cursor()
-            
-            # Получаем все объекты и их должности
-            cursor.execute('''
-                SELECT vo.name, vp.name 
-                FROM vacancy_objects vo
-                JOIN vacancy_positions vp ON vp.object_id = vo.id
-            ''')
-            rows = cursor.fetchall()
-            conn.close()
-            
-            if rows:
-                # Создаём структуру для current_requirements
-                new_data = {}
-                for obj_name, pos_name in rows:
-                    if obj_name not in new_data:
-                        new_data[obj_name] = {
-                            'rf': {'men': 0, 'women': 0, 'family': 0},
-                            'cis': {'men': 0, 'women': 0, 'family': 0},
-                            'positions': [],
-                            'is_high': False
-                        }
-                    
-                    # Добавляем должность, если её нет
-                    existing_positions = [p['name'] for p in new_data[obj_name]['positions']]
-                    if pos_name not in existing_positions:
-                        new_data[obj_name]['positions'].append({
-                            'name': pos_name,
-                            'rf': {'men': 0, 'women': 0, 'family': 0},
-                            'cis': {'men': 0, 'women': 0, 'family': 0}
-                        })
-                
-                # Сохраняем в current_requirements
-                if new_data:
-                    save_current_requirements(new_data)
-                    data = new_data
-                    logger.info(f"✅ Автоматически созданы записи в current_requirements для {len(new_data)} объектов")
         
         return jsonify({
             'date': 'current',
@@ -107,7 +67,7 @@ def create_object():
     if not name:
         return jsonify({'error': 'Название объекта обязательно'}), 400
     
-    # Проверяем, существует ли уже такой объект
+    # Проверяем, существует ли уже такой объект в vacancy_objects
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute('SELECT id FROM vacancy_objects WHERE name = ?', (name,))
@@ -117,7 +77,7 @@ def create_object():
     if existing:
         return jsonify({'error': f'Объект "{name}" уже существует'}), 400
     
-    # Создаём объект
+    # Создаём объект в vacancy_objects
     obj_id = save_vacancy_object(name)
     
     if not obj_id:
@@ -125,7 +85,7 @@ def create_object():
     
     # Добавляем должность по умолчанию
     default_position = "Основная потребность"
-    pos_id = save_vacancy_position(name, default_position)
+    save_vacancy_position(name, default_position)
     
     # Добавляем объект в current_requirements
     try:
@@ -155,20 +115,22 @@ def create_object():
 @requirements_admin_bp.route('/object/<string:name>', methods=['DELETE'])
 @login_required
 def delete_object(name):
-    """Удаление объекта вакансии (только админ)"""
+    """Удаление объекта вакансии (только админ) - удаляет из обеих таблиц"""
     if not current_user.is_authenticated:
         return jsonify({'error': 'Unauthorized'}), 401
     
     if current_user.role != 'admin':
         return jsonify({'error': 'Только администратор может удалять объекты'}), 403
     
-    # Декодируем название (если было закодировано)
+    # Декодируем название
     decoded_name = urllib.parse.unquote(name)
     
     logger.info(f"Попытка удаления объекта: '{decoded_name}'")
     
-    # Удаляем из current_requirements (всегда, даже если нет в vacancy_objects)
     deleted_from_current = False
+    deleted_from_vacancy = False
+    
+    # 1. Удаляем из current_requirements
     try:
         current_data = get_current_requirements()
         if decoded_name in current_data:
@@ -177,33 +139,26 @@ def delete_object(name):
             deleted_from_current = True
             logger.info(f"✅ Объект {decoded_name} удалён из current_requirements")
     except Exception as e:
-        logger.error(f"Ошибка при удалении объекта из current_requirements: {e}")
+        logger.error(f"Ошибка при удалении из current_requirements: {e}")
     
-    # Проверяем, существует ли объект в vacancy_objects
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute('SELECT id FROM vacancy_objects WHERE name = ?', (decoded_name,))
-    existing = cursor.fetchone()
-    conn.close()
-    
-    if existing:
-        # Удаляем из vacancy_objects (каскадно удалит и vacancy_positions, и vacancy_requirements)
+    # 2. Удаляем из vacancy_objects (каскадно удалит всё связанное)
+    try:
         if delete_vacancy_object(decoded_name):
-            from database import log_user_action
-            log_user_action(current_user.id, 'delete_vacancy_object', f"Удалён объект вакансии: {decoded_name}", request.remote_addr)
-            return jsonify({'success': True, 'message': f'Объект "{decoded_name}" удалён из всех таблиц'})
-        else:
-            if deleted_from_current:
-                return jsonify({'success': True, 'message': f'Объект "{decoded_name}" удалён только из current_requirements'})
-            else:
-                return jsonify({'error': 'Ошибка при удалении объекта'}), 500
+            deleted_from_vacancy = True
+            logger.info(f"✅ Объект {decoded_name} удалён из vacancy_objects")
+    except Exception as e:
+        logger.error(f"Ошибка при удалении из vacancy_objects: {e}")
+    
+    # 3. Результат
+    if deleted_from_current or deleted_from_vacancy:
+        from database import log_user_action
+        log_user_action(current_user.id, 'delete_vacancy_object', 
+                       f"Удалён объект: {decoded_name} (current:{deleted_from_current}, vacancy:{deleted_from_vacancy})", 
+                       request.remote_addr)
+        return jsonify({'success': True, 'message': f'Объект "{decoded_name}" удалён'})
     else:
-        # Объекта нет в vacancy_objects, но могли удалить из current_requirements
-        if deleted_from_current:
-            return jsonify({'success': True, 'message': f'Объект "{decoded_name}" удалён из current_requirements'})
-        else:
-            logger.warning(f"Объект '{decoded_name}' не найден ни в одной таблице")
-            return jsonify({'error': f'Объект "{decoded_name}" не найден'}), 404
+        logger.warning(f"Объект '{decoded_name}' не найден ни в одной таблице")
+        return jsonify({'error': f'Объект "{decoded_name}" не найден'}), 404
 
 
 @requirements_admin_bp.route('/position', methods=['POST'])

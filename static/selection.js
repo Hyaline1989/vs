@@ -790,18 +790,21 @@ async function deleteObject(objectName) {
             delete vacancyData[objectName];
             showToast(result.message || `Объект "${objectName}" удалён`, 'success');
             
-            // Принудительно перерисовываем таблицу
-            renderRequirementsTable();
+            // Закрываем текущее модальное окно
+            closeRequirementsModal();
             
-            // Обновляем основные данные для подбора объектов
-            await loadSelectionData();
+            // Принудительно перезагружаем данные с сервера
+            await loadVacancyData();
+            
+            // Открываем модальное окно заново с обновлёнными данными
+            openRequirementsModal();
         } else {
-            // Если сервер вернул 404, но объект есть в vacancyData - всё равно удаляем его из UI
             if (response.status === 404 && vacancyData[objectName]) {
                 delete vacancyData[objectName];
                 showToast(`Объект "${objectName}" удалён из интерфейса`, 'warning');
-                renderRequirementsTable();
-                await loadSelectionData();
+                closeRequirementsModal();
+                await loadVacancyData();
+                openRequirementsModal();
             } else {
                 showToast('Ошибка: ' + (result.error || 'Не удалось удалить'), 'error');
             }
