@@ -13,10 +13,9 @@ from config import BITRIX_WEBHOOK_URL
 
 logger = logging.getLogger(__name__)
 
-# Создаём blueprint для дашборда
 dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/api')
 
-# Инициализируем API (будет переопределено в app.py)
+# Инициализируем API
 bitrix_api = None
 comparer = None
 
@@ -26,7 +25,6 @@ _cache_timestamps = {}
 CACHE_DURATION = 60
 
 def get_cached_data(cache_key, fetch_func, *args, **kwargs):
-    """Получает данные из кэша или загружает их"""
     now = datetime.now()
     if cache_key in _data_cache and cache_key in _cache_timestamps:
         if (now - _cache_timestamps[cache_key]).seconds < CACHE_DURATION:
@@ -38,13 +36,12 @@ def get_cached_data(cache_key, fetch_func, *args, **kwargs):
     return data
 
 def clear_cache():
-    """Очищает кэш данных"""
     global _data_cache, _cache_timestamps
     _data_cache = {}
     _cache_timestamps = {}
     logger.info("Кэш данных очищен")
 
-def init_dashboard_apis(bitrix, google, comp):
+def init_dashboard_apis(bitrix, comp):
     """Инициализирует API для dashboard blueprint"""
     global bitrix_api, comparer
     bitrix_api = bitrix
@@ -53,7 +50,6 @@ def init_dashboard_apis(bitrix, google, comp):
 
 @dashboard_bp.route('/dashboard')
 def dashboard():
-    """Получение данных дашборда за дату"""
     if not current_user.is_authenticated:
         return jsonify({'error': 'Unauthorized'}), 401
     
@@ -71,11 +67,9 @@ def dashboard():
         
         target_date = datetime.strptime(date_str, '%Y-%m-%d')
         
-        # Используем кэш для данных Bitrix
         cache_key = f"dashboard_{date_str}"
         offices_stats = get_cached_data(cache_key, bitrix_api.get_all_offices_stats, target_date)
         
-        # Сравнение всегда загружаем свежее из БД
         comparison = comparer.compare_by_date(target_date)
         
         response = {
@@ -100,7 +94,6 @@ def dashboard():
 
 @dashboard_bp.route('/dashboard/today')
 def dashboard_today():
-    """Получение данных дашборда за сегодня"""
     if not current_user.is_authenticated:
         return jsonify({'error': 'Unauthorized'}), 401
     
@@ -114,7 +107,6 @@ def dashboard_today():
 
 @dashboard_bp.route('/update-requirements', methods=['POST'])
 def update_requirements():
-    """Ручное обновление потребностей (очистка кэша)"""
     if not current_user.is_authenticated:
         return jsonify({'error': 'Unauthorized'}), 401
     
@@ -132,7 +124,6 @@ def update_requirements():
 
 @dashboard_bp.route('/report')
 def report():
-    """Формирование отчёта за период"""
     if not current_user.is_authenticated:
         return jsonify({'error': 'Unauthorized'}), 401
     

@@ -11,7 +11,7 @@ import atexit
 import redis
 from apscheduler.schedulers.background import BackgroundScheduler
 
-# Московское время UTC+3 (для Windows)
+# Московское время UTC+3
 MOSCOW_OFFSET = timedelta(hours=3)
 
 def get_moscow_now():
@@ -22,15 +22,14 @@ def get_moscow_date():
 
 from config import *
 from bitrix_api import BitrixAPI
-from google_sheets import GoogleSheetsAPI
 from comparer import DataComparer
-from database import init_db, cleanup_old_records, init_objects_settings, init_vacancy_tables, cleanup_old_unused_avatars
+from database import init_db, cleanup_old_records, init_objects_settings, init_vacancy_tables, cleanup_old_unused_avatars, init_current_requirements_table
 from models import User
 
-# Импортируем blueprint'ы и их инициализаторы
+# Импортируем blueprint'ы
 from routes import (
     auth_bp, admin_bp, dashboard_bp, selection_bp, admin_pages_bp, objects_admin_bp,
-    init_dashboard_apis, init_selection_apis
+    init_dashboard_apis
 )
 from routes.requirements_admin import requirements_admin_bp
 from routes.profile import profile_bp
@@ -62,7 +61,6 @@ login_manager.session_protection = "strong"
 
 @login_manager.user_loader
 def load_user(user_id):
-    """Загружает пользователя по ID для Flask-Login"""
     from database import get_user_by_id
     try:
         user_data = get_user_by_id(user_id)
@@ -74,7 +72,6 @@ def load_user(user_id):
 
 @login_manager.unauthorized_handler
 def unauthorized():
-    """Перенаправляет неавторизованных пользователей на страницу входа"""
     return redirect('/')
 
 # ========== НАСТРОЙКА REDIS ДЛЯ RATE LIMITING ==========
@@ -110,11 +107,9 @@ def inject_globals():
 
 # ========== ИНИЦИАЛИЗАЦИЯ API ==========
 bitrix_api = BitrixAPI(BITRIX_WEBHOOK_URL)
-google_api = GoogleSheetsAPI()
 comparer = DataComparer(bitrix_api)
 
-init_dashboard_apis(bitrix_api, google_api, comparer)
-init_selection_apis(None)
+init_dashboard_apis(bitrix_api, comparer)
 
 # ========== ИНИЦИАЛИЗАЦИЯ БАЗЫ ДАННЫХ ==========
 if init_db():
@@ -122,6 +117,8 @@ if init_db():
     init_objects_settings()
     if init_vacancy_tables():
         logger.info("✅ Таблицы вакансий успешно инициализированы")
+    init_current_requirements_table()
+    logger.info("✅ Таблица текущих потребностей инициализирована")
 else:
     logger.error("❌ Ошибка при инициализации базы данных")
 
@@ -150,7 +147,6 @@ def welcome():
 def dashboard_page():
     try:
         if not current_user.can_view_dashboard():
-            logger.warning(f"Пользователь {current_user.username} пытается зайти в дашборд без прав")
             return render_template('no_access.html', 
                                  message="У вас нет доступа к дашборду",
                                  return_url="/welcome"), 403
@@ -166,7 +162,6 @@ def dashboard_page():
 def selection_page():
     try:
         if not current_user.can_view_selection():
-            logger.warning(f"Пользователь {current_user.username} пытается зайти в подбор объектов без прав")
             return render_template('no_access.html', 
                                  message="У вас нет доступа к подбору объектов",
                                  return_url="/welcome"), 403
@@ -182,7 +177,6 @@ def selection_page():
 def admin_panel():
     try:
         if current_user.role not in ['admin', 'manager']:
-            logger.warning(f"Пользователь {current_user.username} пытается зайти в админку без прав")
             return render_template('no_access.html', 
                                  message="У вас нет доступа к админ-панели",
                                  return_url="/welcome"), 403
@@ -225,5 +219,6 @@ if __name__ == '__main__':
     logger.info("🚀 Запуск объединённого CRM Dashboard...")
     logger.info(f"🕐 Московское время: {get_moscow_now().strftime('%Y-%m-%d %H:%M:%S')}")
     logger.info("📊 Дашборд использует план из БД (вакансии)")
+    logger.info("🎯 Подбор объектов использует текущие потребности (без привязки к дате)")
     debug_mode = FLASK_ENV == 'development'
     app.run(debug=debug_mode, host='0.0.0.0', port=5001)

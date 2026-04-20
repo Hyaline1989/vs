@@ -8,7 +8,7 @@ import sqlite3
 from database import (
     get_objects_settings, update_object_settings, get_global_order, save_global_order,
     get_user_module_permissions, get_user_object_permissions, get_objects_settings_extended,
-    get_plan_requirements_for_date, DB_NAME
+    get_current_requirements, DB_NAME
 )
 from datetime import datetime
 
@@ -26,29 +26,16 @@ def init_selection_apis(google):
 @selection_bp.route('/settings')
 @login_required
 def selection_settings():
-    """Получение настроек для подбора объектов"""
+    """Получение настроек для подбора объектов (с текущими потребностями)"""
     try:
-        # Получаем параметр for_permissions - если он есть, значит запрос из админки для редактирования прав
         for_permissions = request.args.get('for_permissions') == 'true'
         
-        # Для запросов из админки (редактирование прав) даём доступ manager
         if for_permissions:
             if current_user.role not in ['admin', 'manager']:
                 return jsonify({'error': 'Forbidden'}), 403
         else:
-            # Обычный запрос - проверяем доступ к модулю
             if not current_user.can_view_selection():
                 return jsonify({'error': 'Forbidden', 'message': 'У вас нет доступа к подбору объектов'}), 403
-        
-        # Получаем дату из запроса (если есть)
-        date_param = request.args.get('date')
-        if date_param:
-            target_date = date_param
-            logger.info(f"📅 Загрузка приоритетов за указанную дату: {target_date}")
-        else:
-            # Если дата не передана, используем сегодняшнюю
-            target_date = datetime.now().strftime('%Y-%m-%d')
-            logger.info(f"📅 Загрузка приоритетов за сегодня: {target_date}")
         
         db_objects = get_objects_settings_extended()
         db_objects = [obj for obj in db_objects if obj.get('visible', True)]
@@ -60,14 +47,22 @@ def selection_settings():
             global_order = [obj['id'] for obj in db_objects]
             save_global_order(global_order)
         
-        # Получаем потребности за указанную дату
-        requirements = get_plan_requirements_for_date(target_date)
+        # Получаем ТЕКУЩИЕ потребности (без привязки к дате)
+        current_req = get_current_requirements()
         
         objects = []
         for db_obj in db_objects:
             setting = next((s for s in objects_settings if s['id'] == db_obj['id']), None)
             
-            req_data = requirements.get(db_obj['name'], {})
+            # Берём потребности из текущих (без даты)
+            req_data = current_req.get(db_obj['name'], {})
+            total_count = (req_data.get('rf', {}).get('men', 0) + 
+                          req_data.get('rf', {}).get('women', 0) + 
+                          req_data.get('rf', {}).get('family', 0) +
+                          req_data.get('cis', {}).get('men', 0) + 
+                          req_data.get('cis', {}).get('women', 0) + 
+                          req_data.get('cis', {}).get('family', 0))
+            
             priority_from_req = req_data.get('is_high', False)
             
             objects.append({
@@ -81,10 +76,9 @@ def selection_settings():
                 'link': db_obj.get('link', ''),
                 'visible': setting['visible'] if setting else True,
                 'priority': priority_from_req,
-                'requirement': req_data.get('count', 0)
+                'requirement': total_count
             })
         
-        # Фильтрация по правам (кроме случая, когда запрос из админки для редактирования прав)
         if not for_permissions and current_user.role != 'admin':
             object_perms = get_user_object_permissions(current_user.id)
             visible_object_ids = [obj_id for obj_id, perms in object_perms.items() if perms.get('selection', False)]
@@ -93,7 +87,7 @@ def selection_settings():
         return jsonify({
             'objects': objects,
             'globalOrder': global_order,
-            'vacancyData': {}
+            'vacancyData': current_req
         })
     except Exception as e:
         logger.error(f"Ошибка загрузки настроек подбора: {e}", exc_info=True)
@@ -121,31 +115,6 @@ def selection_order():
         return jsonify({'error': 'Некорректный порядок'}), 400
     except Exception as e:
         logger.error(f"Ошибка сохранения порядка: {e}", exc_info=True)
-        return jsonify({'error': str(e)}), 500
-
-
-@selection_bp.route('/object/<int:object_id>', methods=['POST'])
-@login_required
-def selection_object(object_id):
-    """Обновление настроек объекта (видимость, приоритет)"""
-    if current_user.role != 'admin':
-        return jsonify({'error': 'Forbidden'}), 403
-    
-    module_perms = get_user_module_permissions(current_user.id)
-    if not module_perms.get('selection', False):
-        return jsonify({'error': 'Forbidden'}), 403
-    
-    try:
-        data = request.get_json()
-        visible = data.get('visible')
-        priority = data.get('priority')
-        
-        if visible is not None and priority is not None:
-            update_object_settings(object_id, visible, priority)
-            return jsonify({'success': True})
-        return jsonify({'error': 'Не указаны параметры'}), 400
-    except Exception as e:
-        logger.error(f"Ошибка обновления объекта: {e}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
 

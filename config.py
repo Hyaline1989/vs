@@ -16,7 +16,9 @@ if not SECRET_KEY:
     raise ValueError("SECRET_KEY не установлен в переменных окружения!")
 
 # ========== ПРОЕКТ 1: Bitrix24 API ==========
-BITRIX_WEBHOOK_URL = "https://crm.complect.org/rest/5019/td142o8pbp9ugswz/"
+BITRIX_WEBHOOK_URL = os.environ.get('BITRIX_WEBHOOK_URL')
+if not BITRIX_WEBHOOK_URL:
+    raise ValueError("BITRIX_WEBHOOK_URL не установлен в переменных окружения!")
 
 # Поля Bitrix24
 FIELD_DATE_DIRECTED = "UF_CRM_1684488775220"  # Дата направлен на объект
@@ -41,31 +43,27 @@ ALL_OFFICES = [
 # Исключаемые источники
 EXCLUDED_SOURCES = [SOURCE_PEREVAHTOVKA, SOURCE_REFERRAL]
 
-# ========== ПРОЕКТ 1: Google Sheets ==========
+# ========== ПРОЕКТ 1: Google Sheets (только для справки, не используется) ==========
 GOOGLE_SHEET_ID = "1M2uFFMmSHcbQHSqRW3D2oBjayfdyHuRIBC68Y64uQhI"
 GOOGLE_SHEET_GID = "1372231628"
 GOOGLE_SHEET_CSV_URL = f"https://docs.google.com/spreadsheets/d/{GOOGLE_SHEET_ID}/export?format=csv&gid={GOOGLE_SHEET_GID}"
 
 # ========== ОПТИМИЗИРОВАННЫЕ НАСТРОЙКИ RATE LIMITING ==========
-# Увеличены лимиты для предотвращения перегрузки
-RATE_LIMIT_AUTH = "10 per minute"               # 10 попыток входа в минуту
-RATE_LIMIT_DEFAULT = "1000 per day;200 per hour"  # Общий лимит
-RATE_LIMIT_DASHBOARD = "300 per minute"         # Запросы к дашборду
-RATE_LIMIT_REPORT = "30 per minute"             # Формирование отчетов
-RATE_LIMIT_SELECTION = "150 per minute"         # Подбор объектов
-RATE_LIMIT_ADMIN = "50 per minute"              # Админ-эндпоинты
+RATE_LIMIT_AUTH = "10 per minute"
+RATE_LIMIT_DEFAULT = "1000 per day;200 per hour"
+RATE_LIMIT_DASHBOARD = "300 per minute"
+RATE_LIMIT_REPORT = "30 per minute"
+RATE_LIMIT_SELECTION = "150 per minute"
+RATE_LIMIT_ADMIN = "50 per minute"
 
 # ========== ВРЕМЯ ОБНОВЛЕНИЯ ==========
-# Увеличено до 15 минут (900 секунд) для снижения нагрузки
 GOOGLE_SHEETS_UPDATE_INTERVAL_MINUTES = 15
 GOOGLE_SHEETS_UPDATE_INTERVAL_SECONDS = 900
 
 # ========== АВТОРИЗАЦИЯ ==========
-# Настройки сессии (в часах)
 SESSION_DURATION_HOURS = 12
 
 # ========== ПРАВИЛА СОПОСТАВЛЕНИЯ ==========
-# Правила для сопоставления названий объектов из Google Sheets
 OBJECT_MATCHING_RULES = {
     'Спортмастер': ['спортмастер', 'спортмастер (москва)', 'спортмастер москва'],
     'Спортмастер СПБ': ['спортмастер спб', 'спортмастер санкт-петербург', 'спортмастер питер'],
@@ -84,7 +82,6 @@ REDIS_SOCKET_TIMEOUT = 5
 REDIS_SOCKET_CONNECT_TIMEOUT = 5
 
 # ========== БЕЗОПАСНОСТЬ ==========
-# Определяем окружение - development для вывода логов
 FLASK_ENV = os.environ.get('FLASK_ENV', 'development')
 
 # Разрешённые origin для CORS

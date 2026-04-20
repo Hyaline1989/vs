@@ -10,7 +10,7 @@ from database import (
     get_object_by_id, 
     create_object_extended, 
     delete_object,
-    get_objects_base, 
+    get_objects_settings,  # изменено: get_objects_base -> get_objects_settings
     get_global_order, 
     save_global_order
 )

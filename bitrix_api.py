@@ -1,22 +1,20 @@
 # bitrix_api.py
 # -*- coding: utf-8 -*-
 import requests
+import re
 from datetime import datetime
 from config import *
 import logging
-import re
+from normalizer import ObjectNameNormalizer
 
 logger = logging.getLogger(__name__)
 
 class BitrixAPI:
     def __init__(self, webhook_url):
         self.webhook_url = webhook_url
+        self.normalizer = ObjectNameNormalizer()
     
     def get_directed_deals_by_date(self, target_date):
-        """
-        Получить все сделки направленные на объекты за конкретную дату
-        Исключает Перевахтовку и Приведи друга
-        """
         if isinstance(target_date, str):
             date_str = target_date
         else:
@@ -35,7 +33,6 @@ class BitrixAPI:
         return self._process_deals_data(filtered_deals)
     
     def get_deals_by_office(self, target_date, office_source=None):
-        """Получить сделки по конкретному офису за дату"""
         if isinstance(target_date, str):
             date_str = target_date
         else:
@@ -59,7 +56,6 @@ class BitrixAPI:
         return self._process_deals_data(filtered_deals)
     
     def get_all_offices_stats(self, target_date):
-        """Получить статистику по всем офисам за дату"""
         if isinstance(target_date, str):
             date_str = target_date
         else:
@@ -67,35 +63,30 @@ class BitrixAPI:
         
         result = {}
         
-        # Агент
         agent_deals = self.get_deals_by_office(target_date, SOURCE_AGENT)
         result['agent'] = {
             'count': sum(agent_deals.values()) if agent_deals else 0,
             'objects': agent_deals if agent_deals else {}
         }
         
-        # Поток
         potok_deals = self.get_deals_by_office(target_date, SOURCE_POTOK)
         result['potok'] = {
             'count': sum(potok_deals.values()) if potok_deals else 0,
             'objects': potok_deals if potok_deals else {}
         }
         
-        # Горький52
         gorkiy_deals = self.get_deals_by_office(target_date, SOURCE_GORKIY52)
         result['gorkiy52'] = {
             'count': sum(gorkiy_deals.values()) if gorkiy_deals else 0,
             'objects': gorkiy_deals if gorkiy_deals else {}
         }
         
-        # Бишкек
         bishkek_deals = self.get_deals_by_office(target_date, SOURCE_BISHKEK)
         result['bishkek'] = {
             'count': sum(bishkek_deals.values()) if bishkek_deals else 0,
             'objects': bishkek_deals if bishkek_deals else {}
         }
         
-        # Комплект (все остальные, кроме исключенных)
         all_raw = self._get_all_deals_raw({FIELD_DATE_DIRECTED: date_str})
         complect_deals_raw = []
         known_sources = [SOURCE_AGENT, SOURCE_POTOK, SOURCE_GORKIY52, SOURCE_BISHKEK]
@@ -114,7 +105,6 @@ class BitrixAPI:
         return result
     
     def _get_all_deals_raw(self, filter_params):
-        """Получить сырые данные сделок для фильтрации"""
         all_deals = []
         start = 0
         limit = 50
@@ -150,7 +140,6 @@ class BitrixAPI:
         return all_deals
     
     def _process_deals_data(self, deals):
-        """Обработать данные сделок и сгруппировать по компаниям (без эмодзи)"""
         if not deals:
             return {}
         
@@ -167,15 +156,16 @@ class BitrixAPI:
             company_id = deal.get(FIELD_COMPANY)
             if company_id:
                 company_name = companies_info.get(company_id, 'Неизвестная компания')
-                company_name = self._remove_emoji(company_name)
+                # Удаляем только эмодзи, НЕ приводим к нижнему регистру!
+                company_name = self._remove_emoji_only(company_name)
                 if company_name not in grouped_data:
                     grouped_data[company_name] = 0
                 grouped_data[company_name] += 1
         
         return grouped_data
     
-    def _remove_emoji(self, text):
-        """Удаляет эмодзи из текста"""
+    def _remove_emoji_only(self, text):
+        """Удаляет только эмодзи, сохраняя оригинальный регистр"""
         if not text:
             return text
         emoji_pattern = re.compile("["
@@ -191,10 +181,12 @@ class BitrixAPI:
             u"\U0001F004-\U0001F0CF"
             u"\U0001F18E-\U0001F1FF"
             "]+", flags=re.UNICODE)
-        return emoji_pattern.sub('', text).strip()
+        result = emoji_pattern.sub('', text).strip()
+        # Восстанавливаем пробелы, которые могли пропасть
+        result = ' '.join(result.split())
+        return result
     
     def _get_companies_info(self, company_ids):
-        """Получить информацию о компаниях по их ID"""
         if not company_ids:
             return {}
         
@@ -210,7 +202,7 @@ class BitrixAPI:
                 
                 if 'result' in result:
                     company_name = result['result'].get('TITLE', 'Неизвестная компания')
-                    companies_info[company_id] = self._remove_emoji(company_name)
+                    companies_info[company_id] = company_name
                 else:
                     companies_info[company_id] = 'Неизвестная компания'
             except Exception as e:

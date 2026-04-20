@@ -1,4 +1,4 @@
-// static/selection.js - ВЕРСИЯ БЕЗ АВТОКОПИРОВАНИЯ, с правами для руководителя
+// static/selection.js - ВЕРСИЯ БЕЗ ПРИВЯЗКИ К ДАТЕ
 // ========== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ==========
 let objects = [];
 let vacancyData = {};
@@ -6,7 +6,6 @@ let globalOrder = [];
 let debugMode = false;
 let hasUnsavedChanges = false;
 let currentUserRole = null;
-let currentVacancyDate = new Date().toISOString().split('T')[0];
 
 // ========== СИСТЕМА УВЕДОМЛЕНИЙ ==========
 function showToast(message, type = 'info') {
@@ -51,11 +50,7 @@ async function loadSelectionData() {
         const resultsContainer = document.getElementById('results');
         if (resultsContainer) resultsContainer.innerHTML = '<div class="loading">Загрузка объектов...</div>';
         
-        // Передаём текущую дату на сервер
-        const today = getTodayDate();
-        console.log(`📅 Загрузка приоритетов за дату: ${today}`);
-        
-        const response = await fetch(`/api/selection/settings?date=${today}`, { credentials: 'include' });
+        const response = await fetch(`/api/selection/settings`, { credentials: 'include' });
         const data = await response.json();
         
         if (data.error) { showToast('Ошибка загрузки данных: ' + escapeHtml(data.error), 'error'); return; }
@@ -78,7 +73,6 @@ async function loadSelectionData() {
             const adminControls = document.getElementById('adminControls');
             if (adminControls) adminControls.style.display = 'block';
         }
-        // Руководитель (manager) не видит блок управления объектами
         
         filterAndDisplayObjects();
         initDragAndDrop();
@@ -91,8 +85,7 @@ async function loadSelectionData() {
 
 async function loadVacancyData() {
     try {
-        // Просто загружаем данные без автокопирования
-        const response = await fetch(`/api/requirements/vacancy?date=${currentVacancyDate}`, { 
+        const response = await fetch(`/api/requirements/vacancy`, { 
             credentials: 'include' 
         });
         const data = await response.json();
@@ -108,10 +101,10 @@ async function loadVacancyData() {
                 }
             }
             
-            console.log(`📊 Загружены данные за ${currentVacancyDate}: ${Object.keys(vacancyData).length} объектов`);
+            console.log(`📊 Загружены текущие потребности: ${Object.keys(vacancyData).length} объектов`);
         }
     } catch (error) {
-        console.error('Ошибка загрузки вакансий:', error);
+        console.error('Ошибка загрузки потребностей:', error);
     }
 }
 
@@ -262,10 +255,11 @@ function renderRequirementsTable() {
         <div id="requirementsModal" class="requirements-modal">
             <div class="requirements-modal-content" style="max-width: 95%; width: 1400px;">
                 <div class="requirements-modal-header">
-                    <h3>📊 Управление потребностями в персонале</h3>
+                    <h3>📊 Управление текущими потребностями в персонале</h3>
                     <div>
-                        <input type="date" id="vacancyDateFilter" value="${currentVacancyDate}" 
-                               onchange="changeVacancyDate()" style="padding:6px; border-radius:4px; border:none; margin-right:10px;">
+                        <span style="padding:6px 12px; background: rgba(255,255,255,0.2); border-radius:4px; margin-right:10px;">
+                            📅 Текущие потребности (постоянные)
+                        </span>
                         <button class="btn-add-object" onclick="showAddObjectModal()" style="background: #27ae60; color: white; border: none; padding: 6px 12px; border-radius: 4px; margin-right: 10px; cursor: pointer;">
                             + Добавить объект
                         </button>
@@ -303,21 +297,25 @@ function renderRequirementsTable() {
         const totalAll = totals.rfMen + totals.rfWomen + totals.rfFamily + totals.cisMen + totals.cisWomen + totals.cisFamily;
         grandTotal += totalAll;
         
-        // Получаем приоритет из vacancyData
         const isPriority = objData?.is_high || false;
+        
+        // Экранируем имя объекта для использования в onclick (одинарные кавычки)
+        const safeObjNameForJs = objName.replace(/'/g, "\\'");
         
         for (let i = 0; i < positions.length; i++) {
             const pos = positions[i];
             const rowTotal = (pos.rf?.men||0) + (pos.rf?.women||0) + (pos.rf?.family||0) + 
                            (pos.cis?.men||0) + (pos.cis?.women||0) + (pos.cis?.family||0);
             
+            const safePosName = pos.name.replace(/'/g, "\\'");
+            
             tableHtml += `<tr data-obj="${escapeHtml(objName)}" data-pos="${escapeHtml(pos.name)}">
                 ${i === 0 ? `<td rowspan="${rowCount}" style="vertical-align:middle; background:#f9f9f9;">
                     ${escapeHtml(objName)}
-                    <button onclick="deleteObject('${escapeHtml(objName)}')" style="display:block; margin-top:8px; background:#e74c3c; color:white; border:none; padding:3px 8px; border-radius:3px; font-size:11px; cursor:pointer;">🗑 Удалить объект</button>
-                    <button onclick="showAddPositionModal('${escapeHtml(objName)}')" style="display:block; margin-top:5px; background:#3498db; color:white; border:none; padding:3px 8px; border-radius:3px; font-size:11px; cursor:pointer;">+ Добавить должность</button>
+                    <button onclick="deleteObject('${safeObjNameForJs}')" style="display:block; margin-top:8px; background:#e74c3c; color:white; border:none; padding:3px 8px; border-radius:3px; font-size:11px; cursor:pointer;">🗑 Удалить объект</button>
+                    <button onclick="showAddPositionModal('${safeObjNameForJs}')" style="display:block; margin-top:5px; background:#3498db; color:white; border:none; padding:3px 8px; border-radius:3px; font-size:11px; cursor:pointer;">+ Добавить должность</button>
                 </div>` : ''}
-                <td>${escapeHtml(pos.name)} <button onclick="deletePosition('${escapeHtml(objName)}','${escapeHtml(pos.name)}')" style="margin-left:8px; background:#e74c3c; color:white; border:none; padding:2px 6px; border-radius:3px; font-size:10px; cursor:pointer;">✕</button></td>
+                <td>${escapeHtml(pos.name)} <button onclick="deletePosition('${safeObjNameForJs}','${safePosName}')" style="margin-left:8px; background:#e74c3c; color:white; border:none; padding:2px 6px; border-radius:3px; font-size:10px; cursor:pointer;">✕</button></td>
                 <td><input type="number" class="editable rf-men" data-obj="${escapeHtml(objName)}" data-pos="${escapeHtml(pos.name)}" value="${pos.rf?.men||0}" min="0" style="width:60px; text-align:center;"></td>
                 <td><input type="number" class="editable rf-women" data-obj="${escapeHtml(objName)}" data-pos="${escapeHtml(pos.name)}" value="${pos.rf?.women||0}" min="0" style="width:60px; text-align:center;"></td>
                 <td><input type="number" class="editable rf-family" data-obj="${escapeHtml(objName)}" data-pos="${escapeHtml(pos.name)}" value="${pos.rf?.family||0}" min="0" style="width:60px; text-align:center;"></td>
@@ -369,20 +367,6 @@ function renderRequirementsTable() {
             updateRowTotals(this.getAttribute('data-obj')); 
         });
     });
-}
-
-function changeVacancyDate() {
-    const dateInput = document.getElementById('vacancyDateFilter');
-    if (dateInput) {
-        const newDate = dateInput.value;
-        if (newDate !== currentVacancyDate) {
-            currentVacancyDate = newDate;
-            showToast(`Загрузка данных за ${newDate}...`, 'info');
-            loadVacancyData().then(() => {
-                renderRequirementsTable();
-            });
-        }
-    }
 }
 
 function updateRowTotals(objectName) {
@@ -494,7 +478,6 @@ async function saveAllData() {
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
             body: JSON.stringify({
-                date: currentVacancyDate,
                 objects: objectsData
             })
         });
@@ -578,7 +561,7 @@ function updateDebugInfo() {
     const div = document.getElementById('debugInfo'); 
     if(div) {
         const totalVacancies = Object.keys(vacancyData).length;
-        div.innerHTML = `<strong>Отладка:</strong><br>- Объектов: ${objects.length}<br>- Вакансий в БД: ${totalVacancies}<br>- Дата: ${currentVacancyDate}<br>- Время: ${new Date().toLocaleString()}`; 
+        div.innerHTML = `<strong>Отладка:</strong><br>- Объектов: ${objects.length}<br>- Вакансий (текущие): ${totalVacancies}<br>- Время: ${new Date().toLocaleString()}`; 
     }
 }
 
@@ -792,18 +775,36 @@ async function deleteObject(objectName) {
     if (!confirm(`Удалить объект "${objectName}" и все его должности?`)) return;
     
     try {
-        const response = await fetch(`/api/requirements/object/${encodeURIComponent(objectName)}`, {
+        const encodedName = encodeURIComponent(objectName);
+        console.log(`Удаление объекта: ${objectName} -> ${encodedName}`);
+        
+        const response = await fetch(`/api/requirements/object/${encodedName}`, {
             method: 'DELETE',
             credentials: 'include'
         });
         
+        const result = await response.json();
+        
         if (response.ok) {
+            // Удаляем из локального объекта vacancyData
             delete vacancyData[objectName];
-            showToast(`Объект "${objectName}" удалён`, 'success');
+            showToast(result.message || `Объект "${objectName}" удалён`, 'success');
+            
+            // Принудительно перерисовываем таблицу
             renderRequirementsTable();
+            
+            // Обновляем основные данные для подбора объектов
+            await loadSelectionData();
         } else {
-            const err = await response.json();
-            showToast('Ошибка: ' + (err.error || 'Не удалось удалить'), 'error');
+            // Если сервер вернул 404, но объект есть в vacancyData - всё равно удаляем его из UI
+            if (response.status === 404 && vacancyData[objectName]) {
+                delete vacancyData[objectName];
+                showToast(`Объект "${objectName}" удалён из интерфейса`, 'warning');
+                renderRequirementsTable();
+                await loadSelectionData();
+            } else {
+                showToast('Ошибка: ' + (result.error || 'Не удалось удалить'), 'error');
+            }
         }
     } catch (error) {
         console.error('Ошибка:', error);
@@ -858,4 +859,3 @@ window.closeAddPositionModal = closeAddPositionModal;
 window.createNewPosition = createNewPosition;
 window.deleteObject = deleteObject;
 window.deletePosition = deletePosition;
-window.changeVacancyDate = changeVacancyDate;
