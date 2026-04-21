@@ -1,8 +1,10 @@
 # routes/objects_admin.py
 # -*- coding: utf-8 -*-
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, send_file
 from flask_login import current_user
 import logging
+import os
+from datetime import datetime
 
 from database import (
     get_objects_settings_extended,
@@ -10,9 +12,15 @@ from database import (
     get_object_by_id, 
     create_object_extended, 
     delete_object,
-    get_objects_settings,  # изменено: get_objects_base -> get_objects_settings
+    get_objects_settings,
     get_global_order, 
-    save_global_order
+    save_global_order,
+    get_object_passport,
+    save_object_passport,
+    update_route_sheet,
+    get_route_sheet_filename,
+    delete_route_sheet,
+    log_user_action
 )
 from config import OBJECTS_BASE
 
@@ -29,7 +37,6 @@ def get_objects():
     if current_user.role not in ['admin']:
         return jsonify({'error': 'Forbidden'}), 403
     
-    # Используем расширенную функцию
     objects = get_objects_settings_extended()
     
     return jsonify({
@@ -94,7 +101,6 @@ def create_object_api():
     visible = bool(data.get('visible', True))
     priority = bool(data.get('priority', False))
     
-    # Используем новую функцию
     object_id = create_object_extended(
         name=data['name'],
         age_min=age_min,
@@ -110,7 +116,6 @@ def create_object_api():
     if not object_id:
         return jsonify({'error': 'Ошибка при создании объекта (возможно, такое имя уже существует)'}), 500
     
-    from database import log_user_action
     log_user_action(current_user.id, 'create_object', f"Создан объект {data['name']} (ID: {object_id})", request.remote_addr)
     
     return jsonify({'success': True, 'object_id': object_id})
@@ -180,13 +185,11 @@ def update_object_api(object_id):
         if age_min > age_max:
             return jsonify({'error': 'Минимальный возраст не может быть больше максимального'}), 400
     
-    # Используем новую функцию
     success = update_object_settings_full(object_id, updates)
     
     if not success:
         return jsonify({'error': 'Ошибка при обновлении объекта'}), 500
     
-    from database import log_user_action
     log_user_action(current_user.id, 'update_object', f"Обновлён объект ID {object_id}", request.remote_addr)
     
     return jsonify({'success': True})
@@ -214,7 +217,6 @@ def delete_object_api(object_id):
     if not success:
         return jsonify({'error': 'Ошибка при удалении объекта'}), 500
     
-    from database import log_user_action
     log_user_action(current_user.id, 'delete_object', f"Удалён объект {obj['name']} (ID: {object_id})", request.remote_addr)
     
     return jsonify({'success': True})
@@ -251,7 +253,133 @@ def save_order():
     if not success:
         return jsonify({'error': 'Ошибка при сохранении порядка'}), 500
     
-    from database import log_user_action
     log_user_action(current_user.id, 'save_order', f"Сохранён порядок объектов ({len(order)} объектов)", request.remote_addr)
     
     return jsonify({'success': True})
+
+
+# ========== НОВЫЕ ЭНДПОИНТЫ ДЛЯ ПАСПОРТОВ ==========
+
+@objects_admin_bp.route('/<int:object_id>/passport', methods=['GET'])
+def get_passport(object_id):
+    """Получение паспорта объекта"""
+    if not current_user.is_authenticated:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    # Проверяем права доступа к объекту
+    if current_user.role != 'admin':
+        if not current_user.can_view_object(object_id, 'selection'):
+            return jsonify({'error': 'Forbidden'}), 403
+    
+    passport = get_object_passport(object_id)
+    return jsonify(passport or {})
+
+
+@objects_admin_bp.route('/<int:object_id>/passport', methods=['POST'])
+def save_passport(object_id):
+    """Сохранение паспорта объекта (только админ)"""
+    if not current_user.is_authenticated:
+        return jsonify({'error': 'Unauthorized'}), 401
+    if current_user.role != 'admin':
+        return jsonify({'error': 'Forbidden'}), 403
+    
+    data = request.get_json()
+    success = save_object_passport(object_id, data)
+    
+    if success:
+        log_user_action(current_user.id, 'save_passport', f"Сохранён паспорт объекта ID {object_id}", request.remote_addr)
+        return jsonify({'success': True})
+    else:
+        return jsonify({'error': 'Ошибка при сохранении паспорта'}), 500
+
+
+@objects_admin_bp.route('/<int:object_id>/route-sheet', methods=['POST'])
+def upload_route_sheet(object_id):
+    """Загрузка маршрутного листа (только админ)"""
+    if not current_user.is_authenticated:
+        return jsonify({'error': 'Unauthorized'}), 401
+    if current_user.role != 'admin':
+        return jsonify({'error': 'Forbidden'}), 403
+    
+    if 'route_sheet' not in request.files:
+        return jsonify({'error': 'Файл не выбран'}), 400
+    
+    file = request.files['route_sheet']
+    if file.filename == '':
+        return jsonify({'error': 'Файл не выбран'}), 400
+    
+    # Проверяем расширение
+    if not file.filename.lower().endswith('.pdf'):
+        return jsonify({'error': 'Можно загружать только PDF файлы'}), 400
+    
+    # Проверяем размер файла (30 MB)
+    file.seek(0, os.SEEK_END)
+    file_size = file.tell()
+    file.seek(0)
+    
+    max_size = 30 * 1024 * 1024  # 30 MB
+    if file_size > max_size:
+        return jsonify({'error': f'Файл слишком большой. Максимум 30 MB'}), 400
+    
+    # Создаём директорию для маршрутных листов
+    from flask import current_app
+    route_sheets_dir = os.path.join(current_app.root_path, 'static', 'uploads', 'route_sheets')
+    os.makedirs(route_sheets_dir, exist_ok=True)
+    
+    # Генерируем уникальное имя файла
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    filename = f"route_sheet_{object_id}_{timestamp}.pdf"
+    filepath = os.path.join(route_sheets_dir, filename)
+    
+    file.save(filepath)
+    
+    # Обновляем запись в БД
+    update_route_sheet(object_id, filename)
+    
+    log_user_action(current_user.id, 'upload_route_sheet', f"Загружен маршрутный лист для объекта ID {object_id}", request.remote_addr)
+    
+    return jsonify({'success': True, 'filename': filename})
+
+
+@objects_admin_bp.route('/<int:object_id>/route-sheet', methods=['DELETE'])
+def delete_route_sheet_file(object_id):
+    """Удаление маршрутного листа (только админ)"""
+    if not current_user.is_authenticated:
+        return jsonify({'error': 'Unauthorized'}), 401
+    if current_user.role != 'admin':
+        return jsonify({'error': 'Forbidden'}), 403
+    
+    from flask import current_app
+    filename = get_route_sheet_filename(object_id)
+    if filename:
+        filepath = os.path.join(current_app.root_path, 'static', 'uploads', 'route_sheets', filename)
+        if os.path.exists(filepath):
+            os.remove(filepath)
+        delete_route_sheet(object_id)
+        
+        log_user_action(current_user.id, 'delete_route_sheet', f"Удалён маршрутный лист для объекта ID {object_id}", request.remote_addr)
+    
+    return jsonify({'success': True})
+
+
+@objects_admin_bp.route('/<int:object_id>/route-sheet/download', methods=['GET'])
+def download_route_sheet(object_id):
+    """Скачивание маршрутного листа"""
+    if not current_user.is_authenticated:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    # Проверяем права доступа к объекту
+    if current_user.role != 'admin':
+        if not current_user.can_view_object(object_id, 'selection'):
+            return jsonify({'error': 'Forbidden'}), 403
+    
+    from flask import current_app
+    filename = get_route_sheet_filename(object_id)
+    if not filename:
+        return jsonify({'error': 'Маршрутный лист не найден'}), 404
+    
+    filepath = os.path.join(current_app.root_path, 'static', 'uploads', 'route_sheets', filename)
+    if not os.path.exists(filepath):
+        return jsonify({'error': 'Файл не найден'}), 404
+    
+    return send_file(filepath, as_attachment=True, download_name=f"маршрутный_лист_{object_id}.pdf")

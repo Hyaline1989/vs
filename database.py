@@ -1,10 +1,11 @@
-# database.py - ПОЛНАЯ ВЕРСИЯ С ТАБЛИЦЕЙ ТЕКУЩИХ ПОТРЕБНОСТЕЙ
+# database.py - ПОЛНАЯ ВЕРСИЯ С ТАБЛИЦЕЙ ПАСПОРТОВ
 # -*- coding: utf-8 -*-
 import sqlite3
 from datetime import datetime, timedelta
 import logging
 import json
 import re
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +103,35 @@ def init_db():
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
+        
+        # ========== ТАБЛИЦА ПАСПОРТОВ ОБЪЕКТОВ ==========
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS object_passports (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                object_id INTEGER NOT NULL UNIQUE,
+                address_production TEXT,
+                address_hostel TEXT,
+                operation_rate TEXT,
+                requirements TEXT,
+                functionality TEXT,
+                free_meals TEXT,
+                free_accommodation TEXT,
+                salary_payment TEXT,
+                local_work TEXT,
+                part_time TEXT,
+                deductions TEXT,
+                features TEXT,
+                work_schedule TEXT,
+                documents_required TEXT,
+                contact_person TEXT,
+                route_sheet_filename TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (object_id) REFERENCES objects_settings(id) ON DELETE CASCADE
+            )
+        ''')
+        
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_passports_object_id ON object_passports (object_id)')
         
         # ========== ТАБЛИЦЫ ДЛЯ ПОЛЬЗОВАТЕЛЕЙ ==========
         cursor.execute('''
@@ -218,6 +248,179 @@ def init_db():
         return True
     except Exception as e:
         logger.error(f"Ошибка при инициализации БД: {e}")
+        return False
+
+
+# ========== ФУНКЦИИ ДЛЯ ПАСПОРТОВ ОБЪЕКТОВ ==========
+
+def init_passports_table():
+    """Создаёт таблицу паспортов объектов, если её нет"""
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS object_passports (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                object_id INTEGER NOT NULL UNIQUE,
+                address_production TEXT,
+                address_hostel TEXT,
+                operation_rate TEXT,
+                requirements TEXT,
+                functionality TEXT,
+                free_meals TEXT,
+                free_accommodation TEXT,
+                salary_payment TEXT,
+                local_work TEXT,
+                part_time TEXT,
+                deductions TEXT,
+                features TEXT,
+                work_schedule TEXT,
+                documents_required TEXT,
+                route_sheet_filename TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (object_id) REFERENCES objects_settings(id) ON DELETE CASCADE
+            )
+        ''')
+        
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_passports_object_id ON object_passports (object_id)')
+        
+        conn.commit()
+        conn.close()
+        logger.info("✅ Таблица паспортов объектов создана")
+        return True
+    except Exception as e:
+        logger.error(f"Ошибка при создании таблицы паспортов: {e}")
+        return False
+
+
+def get_object_passport(object_id):
+    """Получает паспорт объекта по его ID"""
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT * FROM object_passports WHERE object_id = ?
+        ''', (object_id,))
+        
+        row = cursor.fetchone()
+        conn.close()
+        
+        if row:
+            return dict(row)
+        return None
+    except Exception as e:
+        logger.error(f"Ошибка при получении паспорта объекта {object_id}: {e}")
+        return None
+
+
+def save_object_passport(object_id, passport_data):
+    """Сохраняет или обновляет паспорт объекта"""
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        
+        # Проверяем, существует ли уже паспорт
+        cursor.execute('SELECT id FROM object_passports WHERE object_id = ?', (object_id,))
+        existing = cursor.fetchone()
+        
+        fields = [
+            'address_production', 'address_hostel', 'operation_rate', 'requirements',
+            'functionality', 'free_meals', 'free_accommodation', 'salary_payment',
+            'local_work', 'part_time', 'deductions', 'features', 'work_schedule',
+            'documents_required', 'contact_person'
+        ]
+        
+        if existing:
+            # Обновляем существующий
+            set_clause = ', '.join([f"{field} = ?" for field in fields])
+            set_clause += ', updated_at = CURRENT_TIMESTAMP'
+            values = [passport_data.get(field, '') for field in fields]
+            values.append(object_id)
+            
+            cursor.execute(f'''
+                UPDATE object_passports 
+                SET {set_clause}
+                WHERE object_id = ?
+            ''', values)
+        else:
+            # Вставляем новый
+            placeholders = ', '.join(['?' for _ in fields])
+            values = [object_id] + [passport_data.get(field, '') for field in fields]
+            
+            cursor.execute(f'''
+                INSERT INTO object_passports (object_id, {', '.join(fields)})
+                VALUES ({', '.join(['?'] + [placeholders])})
+            ''', values)
+        
+        conn.commit()
+        conn.close()
+        logger.info(f"✅ Сохранён паспорт для объекта ID {object_id}")
+        return True
+    except Exception as e:
+        logger.error(f"Ошибка при сохранении паспорта объекта {object_id}: {e}")
+        return False
+
+
+def update_route_sheet(object_id, filename):
+    """Обновляет имя файла маршрутного листа для объекта"""
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        
+        # Сначала проверяем, существует ли запись
+        cursor.execute('SELECT id FROM object_passports WHERE object_id = ?', (object_id,))
+        existing = cursor.fetchone()
+        
+        if existing:
+            cursor.execute('''
+                UPDATE object_passports 
+                SET route_sheet_filename = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE object_id = ?
+            ''', (filename, object_id))
+        else:
+            cursor.execute('''
+                INSERT INTO object_passports (object_id, route_sheet_filename, updated_at)
+                VALUES (?, ?, CURRENT_TIMESTAMP)
+            ''', (object_id, filename))
+        
+        conn.commit()
+        conn.close()
+        logger.info(f"✅ Сохранён маршрутный лист для объекта ID {object_id}: {filename}")
+        return True
+    except Exception as e:
+        logger.error(f"Ошибка при сохранении маршрутного листа: {e}")
+        return False
+
+
+def get_route_sheet_filename(object_id):
+    """Получает имя файла маршрутного листа"""
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        cursor.execute('SELECT route_sheet_filename FROM object_passports WHERE object_id = ?', (object_id,))
+        row = cursor.fetchone()
+        conn.close()
+        return row[0] if row else None
+    except Exception as e:
+        logger.error(f"Ошибка при получении маршрутного листа: {e}")
+        return None
+
+
+def delete_route_sheet(object_id):
+    """Удаляет информацию о маршрутном листе"""
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        cursor.execute('UPDATE object_passports SET route_sheet_filename = NULL WHERE object_id = ?', (object_id,))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        logger.error(f"Ошибка при удалении маршрутного листа: {e}")
         return False
 
 

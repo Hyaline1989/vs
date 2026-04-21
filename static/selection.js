@@ -200,7 +200,7 @@ function displayResults(objectsToDisplay) {
             <div class="flip-card-inner">
                 <div class="flip-card-front">
                     ${dragHandle}
-                    <h3>${orderNumber}<a href="${safeLink}" target="_blank">${escapeHtml(obj.name)}</a>${obj.priority ? ' 🔥' : ''}</h3>
+                    <h3>${orderNumber}<a href="#" onclick="event.preventDefault(); viewPassport(${obj.id}, '${escapeHtml(obj.name)}')" style="cursor: pointer;">${escapeHtml(obj.name)}</a>${obj.priority ? ' 🔥' : ''}</h3>
                     <div class="vacancy-stats">
                         <div class="vacancy-stat"><div class="vacancy-value vacancy-men">${totalMen}</div><div class="vacancy-label">Мужчины</div></div>
                         <div class="vacancy-stat"><div class="vacancy-value vacancy-women">${totalWomen}</div><div class="vacancy-label">Женщины</div></div>

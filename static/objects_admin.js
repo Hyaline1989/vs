@@ -1,6 +1,5 @@
 // static/objects_admin.js
 // Управление объектами в админ-панели
-// static/objects_admin.js - добавьте в самое начало
 
 // ========== ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ ДЛЯ БЕЗОПАСНОГО HTML ==========
 function escapeHtml(unsafe) {
@@ -109,11 +108,13 @@ function renderObjectsTable(objects) {
                         <div><i class="fas fa-venus-mars"></i> Пол: ${obj.allowedGenders?.join(', ') || '-'}</div>
                         <div><i class="fas fa-globe"></i> Гражданство: ${obj.allowedNationalities?.join(', ') || '-'}</div>
                         <div><i class="fas fa-gavel"></i> Судимость: ${obj.allowsConviction ? 'Разрешена' : 'Запрещена'}</div>
-                        ${obj.link ? `<div><i class="fas fa-link"></i> <a href="${escapeHtml(obj.link)}" target="_blank">Ссылка</a></div>` : ''}
                     </div>
                     <div class="object-card-actions">
                         <button class="action-btn edit-btn" onclick="editObject(${obj.id})" title="Редактировать">
                             <i class="fas fa-edit"></i> Редактировать
+                        </button>
+                        <button class="action-btn passport-btn" onclick="editObjectPassport(${obj.id}, '${escapeHtml(obj.name)}')" title="Паспорт объекта">
+                            <i class="fas fa-id-card"></i> Паспорт
                         </button>
                         <button class="action-btn delete-btn" onclick="deleteObject(${obj.id})" title="Удалить">
                             <i class="fas fa-trash"></i> Удалить
@@ -128,7 +129,7 @@ function renderObjectsTable(objects) {
         return;
     }
     
-    // Таблица для десктопа - убран столбец "Приоритет"
+    // Таблица для десктопа
     let html = `
         <table class="objects-table">
             <thead>
@@ -153,7 +154,7 @@ function renderObjectsTable(objects) {
         html += `
             <tr data-object-id="${obj.id}">
                 <td>${obj.id}</td>
-                <td><strong>${escapeHtml(obj.name)}</strong>${obj.link ? `<br><a href="${escapeHtml(obj.link)}" target="_blank" class="object-link"><i class="fas fa-external-link-alt"></i></a>` : ''}</td>
+                <td><strong>${escapeHtml(obj.name)}</strong></td>
                 <td>${obj.ageMin} - ${obj.ageMax}</td>
                 <td>${obj.allowedGenders?.join(', ') || '-'}</td>
                 <td>${obj.allowedNationalities?.join(', ') || '-'}</td>
@@ -161,6 +162,7 @@ function renderObjectsTable(objects) {
                 <td><span class="visibility-badge ${visibleClass}"><i class="fas ${visibleIcon}"></i> ${obj.visible ? 'Видим' : 'Скрыт'}</span></td>
                 <td class="actions-cell">
                     <button class="action-btn edit-btn" onclick="editObject(${obj.id})" title="Редактировать"><i class="fas fa-edit"></i></button>
+                    <button class="action-btn passport-btn" onclick="editObjectPassport(${obj.id}, '${escapeHtml(obj.name)}')" title="Паспорт объекта"><i class="fas fa-id-card"></i></button>
                     <button class="action-btn delete-btn" onclick="deleteObject(${obj.id})" title="Удалить"><i class="fas fa-trash"></i></button>
                 </td>
             </tr>
@@ -207,10 +209,20 @@ async function editObject(objectId) {
     document.getElementById('objAllowedGenders').value = (obj.allowedGenders || []).join(',');
     document.getElementById('objAllowedNationalities').value = (obj.allowedNationalities || []).join(',');
     document.getElementById('objAllowsConviction').checked = obj.allowsConviction || false;
-    document.getElementById('objLink').value = obj.link || '';
     document.getElementById('objVisible').checked = obj.visible !== false;
     
     document.getElementById('objectModal').style.display = 'flex';
+}
+
+// ========== РЕДАКТИРОВАНИЕ ПАСПОРТА ОБЪЕКТА ==========
+function editObjectPassport(objectId, objectName) {
+    // Открываем редактор паспорта (функция из passport_editor.js)
+    if (typeof openPassportEditor === 'function') {
+        openPassportEditor(objectId, objectName);
+    } else {
+        console.error('passport_editor.js не загружен');
+        showNotification('Ошибка: редактор паспорта не загружен', 'error');
+    }
 }
 
 // ========== СОХРАНЕНИЕ ОБЪЕКТА ==========
@@ -222,7 +234,6 @@ async function saveObject() {
     const allowedGendersStr = document.getElementById('objAllowedGenders').value;
     const allowedNationalitiesStr = document.getElementById('objAllowedNationalities').value;
     const allowsConviction = document.getElementById('objAllowsConviction').checked;
-    const link = document.getElementById('objLink').value.trim();
     const visible = document.getElementById('objVisible').checked;
     
     // Валидация
@@ -260,7 +271,6 @@ async function saveObject() {
         allowedGenders,
         allowedNationalities,
         allowsConviction,
-        link,
         visible
     };
     
@@ -321,7 +331,7 @@ async function deleteObject(objectId) {
     }
 }
 
-// ========== ФИЛЬТРАЦИЯ ОБЪЕКТОВ (убрана фильтрация по приоритету) ==========
+// ========== ФИЛЬТРАЦИЯ ОБЪЕКТОВ ==========
 function filterObjects() {
     const searchTerm = document.getElementById('searchObjects')?.value.toLowerCase() || '';
     const visibilityFilter = document.getElementById('filterVisibility')?.value || 'all';
@@ -401,6 +411,7 @@ document.addEventListener('DOMContentLoaded', function() {
 // Делаем функции глобальными
 window.openAddObjectModal = openAddObjectModal;
 window.editObject = editObject;
+window.editObjectPassport = editObjectPassport;
 window.deleteObject = deleteObject;
 window.saveObject = saveObject;
 window.closeObjectModal = closeObjectModal;

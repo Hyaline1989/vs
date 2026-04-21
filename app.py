@@ -23,7 +23,7 @@ def get_moscow_date():
 from config import *
 from bitrix_api import BitrixAPI
 from comparer import DataComparer
-from database import init_db, cleanup_old_records, init_objects_settings, init_vacancy_tables, cleanup_old_unused_avatars, init_current_requirements_table
+from database import init_db, cleanup_old_records, init_objects_settings, init_vacancy_tables, cleanup_old_unused_avatars, init_current_requirements_table, init_passports_table
 from models import User
 
 # Импортируем blueprint'ы
@@ -48,6 +48,10 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['REMEMBER_COOKIE_DURATION'] = timedelta(hours=SESSION_DURATION_HOURS)
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=SESSION_DURATION_HOURS)
+app.config['MAX_CONTENT_LENGTH'] = 30 * 1024 * 1024  # 30 MB для загрузки PDF
+
+# Выводим для отладки
+print(f"✅ MAX_CONTENT_LENGTH = {app.config['MAX_CONTENT_LENGTH']} bytes ({app.config['MAX_CONTENT_LENGTH'] / 1024 / 1024} MB)")
 
 # Настройка CORS
 CORS(app, origins=ALLOWED_ORIGINS, supports_credentials=True)
@@ -93,8 +97,18 @@ else:
 # ========== ЗАЩИТА ОТ БОЛЬШИХ ЗАПРОСОВ ==========
 @app.before_request
 def before_request():
-    if request.content_length and request.content_length > MAX_CONTENT_LENGTH:
-        return jsonify({'error': 'Request too large'}), 413
+    # Пропускаем статические файлы
+    if request.path.startswith('/static/'):
+        return None
+    
+    # Проверяем только POST и PUT запросы с телом
+    if request.method in ['POST', 'PUT'] and request.content_length:
+        max_size = app.config.get('MAX_CONTENT_LENGTH', 30 * 1024 * 1024)
+        print(f"📦 Запрос {request.method} {request.path}: Content-Length = {request.content_length} bytes, лимит = {max_size} bytes")
+        if request.content_length > max_size:
+            print(f"❌ Слишком большой запрос!")
+            return jsonify({'error': f'Request too large. Max size: {max_size / 1024 / 1024} MB'}), 413
+    return None
 
 # ========== КОНТЕКСТНЫЕ ПРОЦЕССОРЫ ДЛЯ ШАБЛОНОВ ==========
 @app.context_processor
@@ -119,6 +133,8 @@ if init_db():
         logger.info("✅ Таблицы вакансий успешно инициализированы")
     init_current_requirements_table()
     logger.info("✅ Таблица текущих потребностей инициализирована")
+    init_passports_table()
+    logger.info("✅ Таблица паспортов объектов инициализирована")
 else:
     logger.error("❌ Ошибка при инициализации базы данных")
 
@@ -192,6 +208,20 @@ def admin_panel():
 def profile_page():
     return render_template('profile.html')
 
+# ========== ДИАГНОСТИЧЕСКИЙ ЭНДПОИНТ ==========
+@app.route('/api/debug/upload-limit', methods=['GET'])
+def debug_upload_limit():
+    import os
+    route_sheets_dir = os.path.join(app.root_path, 'static', 'uploads', 'route_sheets')
+    files = []
+    if os.path.exists(route_sheets_dir):
+        files = os.listdir(route_sheets_dir)
+    return jsonify({
+        'max_content_length': app.config.get('MAX_CONTENT_LENGTH', 'not set'),
+        'max_content_length_mb': app.config.get('MAX_CONTENT_LENGTH', 0) / 1024 / 1024,
+        'route_sheets_files': files
+    })
+
 # ========== ФОНОВЫЕ ЗАДАЧИ ==========
 scheduler = BackgroundScheduler()
 scheduler.add_job(func=cleanup_old_records, trigger="cron", hour=3, minute=0, args=[30], 
@@ -220,5 +250,7 @@ if __name__ == '__main__':
     logger.info(f"🕐 Московское время: {get_moscow_now().strftime('%Y-%m-%d %H:%M:%S')}")
     logger.info("📊 Дашборд использует план из БД (вакансии)")
     logger.info("🎯 Подбор объектов использует текущие потребности (без привязки к дате)")
+    logger.info("📋 Паспорта объектов доступны в админ-панели")
+    logger.info(f"📦 Максимальный размер загружаемого файла: {app.config['MAX_CONTENT_LENGTH'] / 1024 / 1024} MB")
     debug_mode = FLASK_ENV == 'development'
     app.run(debug=debug_mode, host='0.0.0.0', port=5001)
