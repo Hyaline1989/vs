@@ -255,11 +255,8 @@ function renderRequirementsTable() {
         <div id="requirementsModal" class="requirements-modal">
             <div class="requirements-modal-content" style="max-width: 95%; width: 1400px;">
                 <div class="requirements-modal-header">
-                    <h3>📊 Управление текущими потребностями в персонале</h3>
+                    <h3>📊 Управление потребностями в персонале</h3>
                     <div>
-                        <span style="padding:6px 12px; background: rgba(255,255,255,0.2); border-radius:4px; margin-right:10px;">
-                            📅 Текущие потребности (постоянные)
-                        </span>
                         <button class="btn-add-object" onclick="showAddObjectModal()" style="background: #27ae60; color: white; border: none; padding: 6px 12px; border-radius: 4px; margin-right: 10px; cursor: pointer;">
                             + Добавить объект
                         </button>
