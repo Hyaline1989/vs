@@ -13,6 +13,11 @@
             min-height: 100vh;
         }
         
+        .app-logo-img {
+            max-width: 200px;
+            height: auto;
+        }
+        
         .welcome-page {
             background: white;
             border-radius: 28px;
@@ -113,13 +118,18 @@
         .app-container {
             padding: 40px 20px;
         }
+        
+        .logo-container {
+            text-align: center;
+            margin-bottom: 20px;
+        }
     </style>
 </head>
 <body>
     <div class="app-container">
         <div class="welcome-page">
-            <div class="welcome-icon">
-                <i class="fas fa-chalkboard-user"></i>
+            <div class="logo-container">
+                <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Вектор" class="app-logo-img">
             </div>
             
             <div class="user-badge-large" id="userWelcomeBadge">
@@ -151,9 +161,6 @@
     <script src="{{ url_for('static', filename='common.js') }}"></script>
     
     <script>
-        // Используем глобальную переменную из common.js, не объявляем новую
-        
-        // Загрузка данных пользователя
         async function loadUserData() {
             try {
                 const response = await fetch('/api/auth/me', { credentials: 'include' });
@@ -171,11 +178,9 @@
             }
         }
         
-        // Отображение информации о пользователе
         function displayUserInfo() {
             if (!window.currentUser) return;
             
-            // Обновляем приветственный бейдж
             const userNameSpan = document.getElementById('userName');
             const userRoleSpan = document.getElementById('userRole');
             if (userNameSpan) {
@@ -186,14 +191,12 @@
             }
         }
         
-        // Рендер карточек доступных разделов
         function renderWelcomeCards(permissions) {
             const container = document.getElementById('welcomeCards');
             if (!container) return;
             
             let cardsHtml = '';
             
-            // Карточка дашборда
             if (permissions.dashboard !== false) {
                 cardsHtml += `
                     <a href="/dashboard" class="welcome-card">
@@ -209,7 +212,6 @@
                 `;
             }
             
-            // Карточка подбора объектов
             if (permissions.selection !== false) {
                 cardsHtml += `
                     <a href="/selection" class="welcome-card">
@@ -225,7 +227,6 @@
                 `;
             }
             
-            // Карточка админ-панели (только для админов и руководителей)
             if (window.currentUser.role === 'admin' || window.currentUser.role === 'manager') {
                 cardsHtml += `
                     <a href="/admin" class="welcome-card">
@@ -254,7 +255,6 @@
             container.innerHTML = cardsHtml;
         }
         
-        // Инициализация
         document.addEventListener('DOMContentLoaded', function() {
             loadUserData();
         });

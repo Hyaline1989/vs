@@ -8,6 +8,11 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='images/favicon.png') }}">
     <style>
+        .app-logo-img {
+            max-width: 180px;
+            height: auto;
+        }
+        
         .profile-container {
             max-width: 800px;
             margin: 0 auto;
@@ -225,7 +230,7 @@
     <div class="app-container">
         <div class="app-header">
             <div class="logo-container">
-                <h1 class="app-logo">Вектор</h1>
+                <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Вектор" class="app-logo-img">
                 <p class="app-subtitle">Управление вахтовым персоналом</p>
             </div>
             <div class="header-right">

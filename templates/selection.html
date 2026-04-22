@@ -9,7 +9,11 @@
     <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='images/favicon.png') }}">
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <style>
-        /* Дополнительные стили для подбора объектов */
+        .app-logo-img {
+            max-width: 180px;
+            height: auto;
+        }
+        
         .position-stats {
             display: flex;
             gap: 15px;
@@ -35,7 +39,6 @@
             }
         }
         
-        /* Стили для модального окна управления потребностями */
         .requirements-modal {
             position: fixed;
             z-index: 1000;
@@ -82,7 +85,6 @@
             overflow-y: auto;
         }
         
-        /* ИСПРАВЛЕННЫЕ СТИЛИ ДЛЯ ТАБЛИЦЫ - ЗАКРЕПЛЕНИЕ ВСЕЙ ШАПКИ */
         .requirements-table {
             width: 100%;
             border-collapse: collapse;
@@ -185,7 +187,7 @@
         <!-- ШАПКА -->
         <div class="app-header">
             <div class="logo-container">
-                <h1 class="app-logo">Вектор</h1>
+                <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Вектор" class="app-logo-img">
                 <div class="app-subtitle">Система подбора персонала по объектам</div>
             </div>
             <div class="header-right">
@@ -273,11 +275,10 @@
 
     <script src="{{ url_for('static', filename='common.js') }}"></script>
     <script src="{{ url_for('static', filename='selection.js') }}"></script>
+    <script src="{{ url_for('static', filename='passport_viewer.js') }}"></script>
     
     <script>
-        // Дополнительная инициализация для админ-панели
         document.addEventListener('DOMContentLoaded', async function() {
-            // Проверяем, является ли пользователь админом для показа кнопки в админку
             try {
                 const response = await fetch('/api/auth/me', { credentials: 'include' });
                 if (response.ok) {
@@ -294,10 +295,8 @@
                 console.error('Ошибка проверки прав:', error);
             }
             
-            // Загружаем данные подбора
             await loadSelectionData();
             
-            // Добавляем обработчик для Enter в поле возраста
             const ageInput = document.getElementById('age');
             if (ageInput) {
                 ageInput.addEventListener('keypress', function(e) {
@@ -308,7 +307,6 @@
             }
         });
         
-        // Функция для переключения меню объектов (мобильная версия)
         function toggleObjectMenu() {
             const menu = document.getElementById('objectMenu');
             if (menu) {
@@ -322,7 +320,6 @@
             }
         }
         
-        // Добавляем кнопку для мобильного меню
         function addMobileMenuButton() {
             if (window.innerWidth <= 768 && window.isAdmin) {
                 let menuBtn = document.getElementById('mobileMenuBtn');
@@ -340,15 +337,11 @@
             }
         }
         
-        // Следим за изменением размера окна
         window.addEventListener('resize', function() {
             addMobileMenuButton();
         });
         
-        // Вызываем после загрузки
         setTimeout(addMobileMenuButton, 1000);
     </script>
-    <!-- Подключаем просмотр паспорта -->
-    <script src="{{ url_for('static', filename='passport_viewer.js') }}"></script>
 </body>
 </html>

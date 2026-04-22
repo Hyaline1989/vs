@@ -8,6 +8,11 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='images/favicon.png') }}">
     <style>
+        .app-logo-img {
+            max-width: 180px;
+            height: auto;
+        }
+        
         .no-access-message {
             text-align: center;
             padding: 60px 20px;
@@ -55,13 +60,18 @@
             background: var(--primary-dark);
             transform: translateY(-2px);
         }
+        
+        .logo-container {
+            text-align: center;
+            margin-bottom: 20px;
+        }
     </style>
 </head>
 <body>
     <div class="app-container">
         <div class="app-header">
             <div class="logo-container">
-                <h1 class="app-logo">Вектор</h1>
+                <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Вектор" class="app-logo-img">
                 <p class="app-subtitle">Управление вахтовым персоналом</p>
             </div>
         </div>
@@ -79,7 +89,6 @@
     </div>
     
     <script>
-        // Если есть текущий пользователь, отображаем кнопку выхода
         document.addEventListener('DOMContentLoaded', async function() {
             try {
                 const response = await fetch('/api/auth/me', { credentials: 'include' });
@@ -108,6 +117,16 @@
         function logout() {
             fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
                 .then(() => { window.location.href = '/'; });
+        }
+        
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/[&<>]/g, function(m) {
+                if (m === '&') return '&amp;';
+                if (m === '<') return '&lt;';
+                if (m === '>') return '&gt;';
+                return m;
+            });
         }
     </script>
 </body>
