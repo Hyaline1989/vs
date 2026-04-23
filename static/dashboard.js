@@ -1,4 +1,4 @@
-// static/dashboard.js - исправленная версия с правильным скрытием индикаторов
+// static/dashboard.js - исправленная версия с оптимизированным отчётом (без прогресс-бара)
 
 // ========== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ==========
 let currentDashboardData = {
@@ -32,14 +32,12 @@ async function loadDashboardForDate(dateString) {
         if (data.error) {
             showError(data.error);
             hideUpdateIndicator();
-            // Если ошибка, показываем сообщение вместо индикаторов
             showErrorInContainers(data.error);
             return;
         }
         
         updateUpdateTime();
         
-        // Обновляем данные
         if (data.offices) {
             updateOffices(data.offices);
             currentDashboardData.offices = data.offices;
@@ -55,7 +53,6 @@ async function loadDashboardForDate(dateString) {
             currentDashboardData.summary = data.summary;
         }
         
-        // Скрываем индикатор обновления
         hideUpdateIndicator();
         
     } catch (error) {
@@ -85,7 +82,6 @@ function showErrorInContainers(message) {
     }
 }
 
-// Обновление офисов (полное обновление, но без мигания)
 function updateOffices(offices) {
     const container = document.getElementById('offices-container');
     if (!container) return;
@@ -93,7 +89,7 @@ function updateOffices(offices) {
     const officesConfig = [
         { key: 'agent', name: 'Агент' },
         { key: 'potok', name: 'Поток' },
-        { key: 'gorkiy52', name: 'Горький52' },
+        // { key: 'gorkiy52', name: 'Горький52' },
         { key: 'bishkek', name: 'Бишкек' },
         { key: 'complect', name: 'Комплект' }
     ];
@@ -121,7 +117,6 @@ function updateOffices(offices) {
         noDataImage.style.display = hasData ? 'none' : 'block';
     }
     
-    // Удаляем индикатор загрузки, если он был
     const loadingElement = container.querySelector('.loading');
     if (loadingElement) {
         loadingElement.remove();
@@ -139,7 +134,6 @@ function updateOfficeContent(officeElement, name, data) {
                 countSpan.textContent = '0';
             }
         }
-        // Проверяем, есть ли уже сообщение об отсутствии данных
         const existingEmpty = officeElement.querySelector('.empty-objects');
         if (!existingEmpty && !officeElement.querySelector('.office-objects')) {
             officeElement.innerHTML = `
@@ -154,7 +148,6 @@ function updateOfficeContent(officeElement, name, data) {
         return;
     }
     
-    // Строим объекты
     let objectsHtml = '';
     for (const [objName, count] of Object.entries(data.objects)) {
         objectsHtml += `
@@ -165,7 +158,6 @@ function updateOfficeContent(officeElement, name, data) {
         `;
     }
     
-    // Обновляем содержимое
     officeElement.innerHTML = `
         <div class="office-header">
             <span class="toggle">▼</span>
@@ -176,7 +168,6 @@ function updateOfficeContent(officeElement, name, data) {
     `;
 }
 
-// Обновление таблицы план/факт
 function updatePlanFactTable(comparison) {
     const container = document.getElementById('plan-fact-container');
     if (!container) return;
@@ -232,7 +223,6 @@ function updatePlanFactTable(comparison) {
         return;
     }
     
-    // Формируем HTML
     let html = '';
     items.forEach(item => {
         const badgeClass = getBadgeClass(item.plan, item.fact);
@@ -318,7 +308,106 @@ function getBadgeClass(plan, fact) {
     return 'badge-neutral';
 }
 
-// ========== ФУНКЦИИ ВЫГРУЗКИ ОТЧЁТА ==========
+// ========== ОПТИМИЗИРОВАННАЯ ФУНКЦИЯ ВЫГРУЗКИ ОТЧЁТА ==========
+async function exportFullReport() {
+    const { fromDate, toDate } = getReportDateRange();
+    
+    const exportBtn = document.getElementById('export-full-report');
+    if (!exportBtn) return;
+    
+    const originalText = exportBtn.innerHTML;
+    exportBtn.disabled = true;
+    exportBtn.innerHTML = '<span class="refresh-icon">↻</span> Загрузка...';
+    
+    try {
+        const response = await fetch(`/api/report?from=${fromDate}&to=${toDate}`, { 
+            credentials: 'include',
+            headers: {
+                'Cache-Control': 'no-cache'
+            }
+        });
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`HTTP ${response.status}: ${errorText}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.error) throw new Error(data.error);
+        
+        const headers = [
+            'Дата', 
+            'Объект', 
+            'План', 
+            'Приоритет',
+            'Комплект', 
+            'Поток', 
+            'Горький52', 
+            'Агент', 
+            'Бишкек',
+            'Всего направлено'
+        ];
+        
+        const rows = [];
+        
+        for (const day of data) {
+            for (const [obj, stats] of Object.entries(day.objects || {})) {
+                const totalSent = (stats.complect || 0) + (stats.potok || 0) + 
+                                  (stats.gorkiy || 0) + (stats.agent || 0) + 
+                                  (stats.bishkek || 0);
+                
+                if (stats.plan === 0 && totalSent === 0) continue;
+                
+                rows.push([
+                    day.date,
+                    obj,
+                    stats.plan || 0,
+                    stats.is_high ? '🔥 ПРИОРИТЕТ' : '',
+                    stats.complect || 0,
+                    stats.potok || 0,
+                    stats.gorkiy || 0,
+                    stats.agent || 0,
+                    stats.bishkek || 0,
+                    totalSent
+                ]);
+            }
+        }
+        
+        rows.sort((a, b) => {
+            if (a[3] && !b[3]) return -1;
+            if (!a[3] && b[3]) return 1;
+            const dateCompare = a[0].localeCompare(b[0]);
+            if (dateCompare !== 0) return dateCompare;
+            return a[1].localeCompare(b[1]);
+        });
+        
+        if (rows.length === 0) {
+            showNotification('⚠️ Нет данных для выгрузки за выбранный период', 'warning');
+            return;
+        }
+        
+        const csvContent = [headers.join(';'), ...rows.map(r => r.join(';'))].join('\n');
+        const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `report_${fromDate}_${toDate}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        showNotification(`✅ Отчёт выгружен (${rows.length} записей)`, 'success');
+    } catch (error) {
+        console.error('Ошибка выгрузки отчёта:', error);
+        showNotification('❌ Не удалось выгрузить отчёт: ' + error.message, 'error');
+    } finally {
+        exportBtn.disabled = false;
+        exportBtn.innerHTML = originalText;
+    }
+}
+
 function getReportDateRange() {
     const from = document.getElementById('report-from')?.value || getTodayDate();
     const to = document.getElementById('report-to')?.value || getTodayDate();
@@ -341,51 +430,6 @@ function updatePeriodDisplay() {
     }
 }
 
-async function exportFullReport() {
-    const { fromDate, toDate } = getReportDateRange();
-    showNotification('🔄 Формируем отчёт...', 'info');
-    
-    try {
-        const response = await fetch(`/api/report?from=${fromDate}&to=${toDate}`, { credentials: 'include' });
-        const data = await response.json();
-        
-        if (data.error) throw new Error(data.error);
-        
-        const headers = ['Дата', 'Объект', 'План', 'Комплект', 'Поток', 'Горький52', 'Агент', 'Бишкек'];
-        const rows = [];
-        
-        data.forEach(day => {
-            for (const [obj, stats] of Object.entries(day.objects || {})) {
-                rows.push([
-                    day.date,
-                    obj,
-                    stats.plan || 0,
-                    stats.complect || 0,
-                    stats.potok || 0,
-                    stats.gorkiy || 0,
-                    stats.agent || 0,
-                    stats.bishkek || 0
-                ]);
-            }
-        });
-        
-        const csvContent = [headers.join(';'), ...rows.map(r => r.join(';'))].join('\n');
-        const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `report_${fromDate}_${toDate}.csv`;
-        a.click();
-        URL.revokeObjectURL(url);
-        
-        showNotification('✅ Отчёт выгружен', 'success');
-    } catch (error) {
-        console.error('Ошибка выгрузки отчёта:', error);
-        showNotification('❌ Не удалось выгрузить отчёт', 'error');
-    }
-}
-
-// Экспорт
 window.manualRefresh = manualRefresh;
 window.exportFullReport = exportFullReport;
 window.updatePeriodDisplay = updatePeriodDisplay;

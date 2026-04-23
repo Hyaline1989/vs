@@ -2771,3 +2771,72 @@ body {
 .objects-header .add-user-btn i {
     margin-right: 8px;
 }
+
+/* static/style.css - добавить в конец файла */
+
+/* Стили для прогресс-бара отчёта */
+#reportProgress {
+    animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Улучшенные стили для кнопки экспорта */
+.export-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Стиль для приоритетных строк в отображении */
+.object-tag.priority-high {
+    background: rgba(255, 87, 34, 0.15);
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-weight: bold;
+}
+
+/* Анимация для индикатора обновления */
+.update-indicator {
+    animation: fadeInOut 0.3s ease;
+}
+
+@keyframes fadeInOut {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* Улучшенная таблица отчёта на экране */
+.discrepancy-item .badge {
+    font-family: monospace;
+    font-size: 0.85rem;
+}
+
+/* Стиль для информационного тоста */
+.notification-warning {
+    border-left-color: #f39c12;
+    background: #fff8e7;
+}
+
+/* Мобильная адаптация прогресс-бара */
+@media (max-width: 768px) {
+    #reportProgress {
+        left: 10px;
+        right: 10px;
+        bottom: 10px;
+        padding: 12px;
+    }
+    
+    #reportProgress .progress-text {
+        font-size: 0.85rem;
+    }
+}

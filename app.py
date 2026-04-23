@@ -23,7 +23,7 @@ def get_moscow_date():
 from config import *
 from bitrix_api import BitrixAPI
 from comparer import DataComparer
-from database import init_db, cleanup_old_records, init_objects_settings, init_vacancy_tables, cleanup_old_unused_avatars, init_current_requirements_table, init_passports_table
+from database import init_db, cleanup_old_records, init_objects_settings, init_vacancy_tables, cleanup_old_unused_avatars, init_current_requirements_table, init_passports_table, init_daily_snapshots_table
 from models import User
 
 # Импортируем blueprint'ы
@@ -135,6 +135,8 @@ if init_db():
     logger.info("✅ Таблица текущих потребностей инициализирована")
     init_passports_table()
     logger.info("✅ Таблица паспортов объектов инициализирована")
+    init_daily_snapshots_table()
+    logger.info("✅ Таблица ежедневных снапшотов инициализирована")
 else:
     logger.error("❌ Ошибка при инициализации базы данных")
 
@@ -222,12 +224,82 @@ def debug_upload_limit():
         'route_sheets_files': files
     })
 
+# ========== ФОНОВАЯ ЗАДАЧА ДЛЯ ЕЖЕДНЕВНОГО СНИПШОТА ==========
+
+def generate_daily_snapshot():
+    """Генерирует снапшот за прошедший день (запускается в 20:00 МСК)"""
+    from database import save_daily_snapshots_batch, get_plan_requirements_for_date, delete_snapshots_for_date
+    from datetime import timedelta
+    
+    # Инициализируем таблицу, если её нет (на всякий случай)
+    init_daily_snapshots_table()
+    
+    # Берём вчерашний день
+    yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
+    
+    logger.info(f"🔄 Запуск фоновой генерации снапшота за {yesterday}")
+    
+    try:
+        target_date = datetime.strptime(yesterday, '%Y-%m-%d')
+        offices_stats = bitrix_api.get_all_offices_stats(target_date)
+        plans = get_plan_requirements_for_date(target_date)
+        
+        delete_snapshots_for_date(yesterday)
+        
+        snapshots = []
+        
+        for office_name, office_data in offices_stats.items():
+            for obj_name, count in office_data.get('objects', {}).items():
+                plan_info = plans.get(obj_name, {})
+                snapshots.append({
+                    'object_name': obj_name,
+                    'office_name': office_name,
+                    'count': count,
+                    'plan': plan_info.get('count', 0),
+                    'is_high': plan_info.get('is_high', False)
+                })
+        
+        for obj_name, plan_info in plans.items():
+            already_added = any(s['object_name'] == obj_name for s in snapshots)
+            if not already_added:
+                snapshots.append({
+                    'object_name': obj_name,
+                    'office_name': 'complect',
+                    'count': 0,
+                    'plan': plan_info.get('count', 0),
+                    'is_high': plan_info.get('is_high', False)
+                })
+        
+        if snapshots:
+            save_daily_snapshots_batch(yesterday, snapshots)
+            logger.info(f"✅ Снапшот за {yesterday} сохранён ({len(snapshots)} записей)")
+        else:
+            logger.warning(f"⚠️ Нет данных для снапшота за {yesterday}")
+            
+    except Exception as e:
+        logger.error(f"❌ Ошибка при генерации снапшота: {e}", exc_info=True)
+
+
 # ========== ФОНОВЫЕ ЗАДАЧИ ==========
 scheduler = BackgroundScheduler()
 scheduler.add_job(func=cleanup_old_records, trigger="cron", hour=3, minute=0, args=[30], 
                   id='cleanup_database')
 scheduler.add_job(func=cleanup_old_unused_avatars, trigger="cron", hour=3, minute=30, 
                   id='cleanup_avatars')
+
+# Добавляем задачу для ежедневного снапшота (каждый день в 20:00)
+try:
+    scheduler.add_job(
+        func=generate_daily_snapshot,
+        trigger='cron',
+        hour=20,
+        minute=0,
+        id='daily_snapshot'
+    )
+    logger.info("✅ Запланирована ежедневная генерация снапшотов в 20:00")
+except Exception as e:
+    logger.warning(f"⚠️ Не удалось запланировать задачу снапшотов: {e}")
+
 scheduler.start()
 atexit.register(lambda: scheduler.shutdown())
 
@@ -252,5 +324,6 @@ if __name__ == '__main__':
     logger.info("🎯 Подбор объектов использует текущие потребности (без привязки к дате)")
     logger.info("📋 Паспорта объектов доступны в админ-панели")
     logger.info(f"📦 Максимальный размер загружаемого файла: {app.config['MAX_CONTENT_LENGTH'] / 1024 / 1024} MB")
+    logger.info("📸 Ежедневные снапшоты генерируются в 20:00")
     debug_mode = FLASK_ENV == 'development'
     app.run(debug=debug_mode, host='0.0.0.0', port=5001)

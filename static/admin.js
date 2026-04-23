@@ -1,5 +1,4 @@
 // static/admin.js - полная версия с мобильной адаптацией и правами для руководителя
-// static/admin.js - добавьте в самое начало, после комментариев
 
 // ========== ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ ДЛЯ БЕЗОПАСНОГО HTML ==========
 function escapeHtml(unsafe) {
@@ -23,6 +22,15 @@ function formatDateTime(dateString) {
     const date = new Date(dateString);
     return date.toLocaleString('ru-RU');
 }
+
+function getTodayDate() {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
 // ========== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ==========
 let usersList = [];
 let currentEditUserId = null;
@@ -686,6 +694,37 @@ function filterUsers() {
     }
 }
 
+// ========== ГЕНЕРАЦИЯ СНАПШОТОВ ==========
+async function generateSnapshots() {
+    const fromDate = prompt('Введите начальную дату (ГГГГ-ММ-ДД):', getTodayDate());
+    if (!fromDate) return;
+    
+    const toDate = prompt('Введите конечную дату (ГГГГ-ММ-ДД):', fromDate);
+    if (!toDate) return;
+    
+    showNotification('🔄 Генерация снапшотов...', 'info');
+    
+    try {
+        const response = await fetch('/api/snapshot/generate-range', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ from: fromDate, to: toDate })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showNotification(`✅ Сгенерировано ${data.success_count} снапшотов из ${data.total}`, 'success');
+        } else {
+            showNotification('❌ Ошибка генерации', 'error');
+        }
+    } catch (error) {
+        console.error('Ошибка:', error);
+        showNotification('❌ Ошибка генерации', 'error');
+    }
+}
+
 // ========== СЛЕДИМ ЗА ИЗМЕНЕНИЕМ РАЗМЕРА ОКНА ==========
 let resizeTimer;
 window.addEventListener('resize', function() {
@@ -730,3 +769,4 @@ window.filterUsers = filterUsers;
 window.openAddUserModal = openAddUserModal;
 window.saveUser = saveUser;
 window.loadUsers = loadUsers;
+window.generateSnapshots = generateSnapshots;
