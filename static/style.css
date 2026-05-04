@@ -1,4 +1,5 @@
 /* static/style.css - полная версия */
+/* ========== ОСНОВНЫЕ СТИЛИ ========== */
 
 :root {
     --primary: #A42C30;
@@ -1307,24 +1308,62 @@ body {
 .vacancy-women { color: #e74c3c; }
 .vacancy-family { color: #9b59b6; }
 
-.flip-btn {
-    position: absolute;
-    bottom: 15px;
-    right: 15px;
-    background: var(--primary);
+/* Стили для блока с кнопками на карточке */
+.card-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 15px;
+    width: 100%;
+}
+
+/* Кнопка "Направить сотрудника" */
+.direction-btn {
+    background: #27ae60;
     color: white;
     border: none;
-    padding: 10px 20px;
+    padding: 10px 16px;
     border-radius: 25px;
     cursor: pointer;
     font-size: 13px;
     transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+}
+
+.direction-btn:hover {
+    background: #219a52;
+    transform: scale(1.02);
+}
+
+/* Кнопка "Подробнее о должностях" (переопределяем для карточки) */
+.flip-btn {
+    position: static !important;
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 10px 16px;
+    border-radius: 25px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
 }
 
 .flip-btn:hover {
     background: var(--primary-dark);
     transform: scale(1.02);
 }
+
+/* Маленькая кнопка направления для каждой должности - УБРАНА (не отображается) */
+/* direction-btn-small полностью удалён */
 
 .positions-list {
     margin-top: 15px;
@@ -1756,6 +1795,49 @@ body {
     transform: translateY(-1px);
 }
 
+/* Стили для файлов в модальном окне направления */
+.file-list {
+    margin-top: 8px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.file-input-wrapper {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+    align-items: center;
+}
+
+.file-input {
+    flex: 1;
+    padding: 6px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 0.85rem;
+}
+
+.file-input:hover {
+    border-color: #27ae60;
+}
+
+.remove-file-btn {
+    background: #e74c3c;
+    color: white;
+    border: none;
+    width: 30px;
+    height: 30px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s;
+}
+
+.remove-file-btn:hover {
+    background: #c0392b;
+    transform: scale(1.05);
+}
+
 /* Анимации */
 @keyframes slideIn {
     from {
@@ -1798,7 +1880,7 @@ body {
     }
 }
 
-@media (max-width: 600px) {
+@media (max-width: 768px) {
     .filters {
         grid-template-columns: 1fr;
     }
@@ -1888,6 +1970,10 @@ body {
         width: 100%;
         justify-content: flex-start;
     }
+    
+    .direction-btn-small {
+        width: 100%;
+    }
 }
 
 @media (min-width: 1600px) {
@@ -1902,672 +1988,7 @@ body {
     }
 }
 
-/* static/style.css - добавляем в конец файла */
-
-/* ========== АДАПТИВНЫЕ СТИЛИ ДЛЯ МОБИЛЬНЫХ УСТРОЙСТВ ========== */
-
-/* Мобильная версия (до 768px) */
-@media (max-width: 768px) {
-    .app-container {
-        padding: 10px;
-    }
-    
-    .app-header {
-        padding: 15px;
-        flex-direction: column;
-        gap: 15px;
-    }
-    
-    .logo-container {
-        text-align: center;
-    }
-    
-    .app-logo {
-        font-size: 1.5rem;
-    }
-    
-    .app-subtitle {
-        font-size: 0.75rem;
-    }
-    
-    .header-right {
-        width: 100%;
-        flex-direction: column;
-        gap: 10px;
-    }
-    
-    .system-switcher {
-        width: 100%;
-        justify-content: center;
-        flex-wrap: wrap;
-        gap: 8px;
-        padding: 5px;
-    }
-    
-    .system-btn {
-        padding: 8px 16px;
-        font-size: 0.85rem;
-        flex: 1;
-        min-width: 100px;
-        justify-content: center;
-    }
-    
-    .system-btn span {
-        display: inline;
-    }
-    
-    .user-info-container {
-        width: 100%;
-        justify-content: center;
-        flex-wrap: wrap;
-    }
-    
-    .user-badge {
-        font-size: 0.8rem;
-        padding: 6px 12px;
-    }
-    
-    .logout-button {
-        padding: 6px 12px;
-        font-size: 0.8rem;
-    }
-    
-    /* Дашборд */
-    .dashboard-header {
-        flex-direction: column;
-        align-items: stretch;
-        padding: 12px;
-    }
-    
-    .date-controls {
-        flex-direction: column;
-        width: 100%;
-    }
-    
-    .date-field {
-        width: 100%;
-        justify-content: space-between;
-    }
-    
-    .date-picker {
-        flex: 1;
-        padding: 8px 12px;
-    }
-    
-    .refresh-container {
-        align-items: center;
-        width: 100%;
-    }
-    
-    .two-panel {
-        grid-template-columns: 1fr;
-        gap: 15px;
-    }
-    
-    .panel-card {
-        padding: 20px;
-        min-height: auto;
-    }
-    
-    .panel-title {
-        font-size: 1.2rem;
-        flex-direction: column;
-        text-align: center;
-    }
-    
-    .office-header {
-        flex-wrap: wrap;
-    }
-    
-    .office-name {
-        font-size: 1rem;
-        flex: 1;
-    }
-    
-    .office-objects {
-        margin-left: 20px;
-    }
-    
-    .object-row {
-        font-size: 0.85rem;
-        flex-wrap: wrap;
-        gap: 8px;
-    }
-    
-    .discrepancy-item {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 8px;
-        padding: 10px;
-    }
-    
-    .object-tag {
-        width: 100%;
-    }
-    
-    .export-period-selector {
-        flex-direction: column;
-        gap: 10px;
-    }
-    
-    .export-date-field {
-        width: 100%;
-        justify-content: space-between;
-    }
-    
-    .date-picker.small {
-        width: auto;
-        flex: 1;
-    }
-    
-    /* Подбор объектов */
-    .filters {
-        padding: 15px;
-        grid-template-columns: 1fr;
-        gap: 12px;
-    }
-    
-    .filter-group {
-        margin-bottom: 0;
-    }
-    
-    .filter-group label {
-        font-size: 0.85rem;
-    }
-    
-    .filter-group input,
-    .filter-group select {
-        padding: 8px;
-        font-size: 0.85rem;
-    }
-    
-    .results-grid {
-        grid-template-columns: 1fr;
-        gap: 15px;
-    }
-    
-    .flip-card {
-        height: auto;
-        min-height: 450px;
-    }
-    
-    .flip-card-front,
-    .flip-card-back {
-        padding: 15px;
-        font-size: 0.85rem;
-    }
-    
-    .flip-card-front h3 a {
-        font-size: 1.2rem;
-    }
-    
-    .vacancy-stats {
-        flex-direction: row;
-        flex-wrap: wrap;
-        gap: 10px;
-    }
-    
-    .vacancy-stat {
-        min-width: 70px;
-    }
-    
-    .vacancy-value {
-        font-size: 1.3rem;
-    }
-    
-    .vacancy-label {
-        font-size: 0.7rem;
-    }
-    
-    .flip-card-front p {
-        font-size: 0.85rem;
-        margin: 8px 0;
-    }
-    
-    .flip-btn {
-        padding: 8px 16px;
-        font-size: 0.75rem;
-    }
-    
-    .admin-controls {
-        padding: 12px;
-    }
-    
-    .admin-controls h3 {
-        font-size: 1rem;
-    }
-    
-    .admin-controls p {
-        font-size: 0.75rem;
-    }
-    
-    .admin-buttons {
-        flex-direction: column;
-        gap: 8px;
-    }
-    
-    .admin-btn {
-        padding: 8px 16px;
-        font-size: 0.85rem;
-        width: 100%;
-    }
-    
-    /* Админ-панель */
-    .admin-page {
-        padding: 15px;
-    }
-    
-    .admin-page-header {
-        flex-direction: column;
-        gap: 15px;
-        text-align: center;
-    }
-    
-    .admin-page-header h2 {
-        font-size: 1.2rem;
-    }
-    
-    .add-user-btn {
-        padding: 10px 20px;
-        font-size: 0.85rem;
-        width: 100%;
-        justify-content: center;
-    }
-    
-    .admin-filters {
-        flex-direction: column;
-        gap: 10px;
-    }
-    
-    .admin-filters .filter-group {
-        width: 100%;
-        min-width: auto;
-    }
-    
-    .refresh-btn-small {
-        width: 100%;
-        padding: 10px;
-    }
-    
-    .users-table-container {
-        padding: 10px;
-        overflow-x: auto;
-    }
-    
-    .users-table {
-        font-size: 0.75rem;
-        min-width: 600px;
-    }
-    
-    .users-table th,
-    .users-table td {
-        padding: 8px 10px;
-    }
-    
-    .actions-cell {
-        display: flex;
-        gap: 5px;
-        flex-wrap: wrap;
-    }
-    
-    .action-btn {
-        padding: 4px 8px;
-        font-size: 0.85rem;
-    }
-    
-    /* Модальные окна */
-    .modal-content {
-        width: 95%;
-        max-width: 95%;
-        margin: 10px;
-    }
-    
-    .modal-header {
-        padding: 15px;
-    }
-    
-    .modal-header h3 {
-        font-size: 1rem;
-    }
-    
-    .modal-body {
-        padding: 15px;
-    }
-    
-    .form-group label {
-        font-size: 0.85rem;
-    }
-    
-    .form-group input,
-    .form-group select {
-        padding: 8px 12px;
-        font-size: 0.85rem;
-    }
-    
-    .form-actions {
-        flex-direction: column-reverse;
-        gap: 10px;
-    }
-    
-    .btn-cancel,
-    .btn-save {
-        width: 100%;
-        padding: 10px;
-    }
-    
-    .objects-perms-header {
-        flex-direction: column;
-        gap: 8px;
-    }
-    
-    .btn-small {
-        width: 100%;
-        padding: 8px;
-    }
-    
-    .object-perm-item {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 10px;
-        padding: 12px;
-    }
-    
-    .object-perm-name {
-        font-size: 0.85rem;
-    }
-    
-    .object-perm-checkboxes {
-        width: 100%;
-    }
-    
-    .perm-checkbox-small {
-        width: 100%;
-        justify-content: space-between;
-    }
-    
-    /* Приветственная страница */
-    .welcome-page {
-        padding: 20px;
-        margin: 10px;
-    }
-    
-    .welcome-icon {
-        font-size: 60px;
-    }
-    
-    .welcome-title {
-        font-size: 1.3rem;
-    }
-    
-    .welcome-subtitle {
-        font-size: 0.85rem;
-    }
-    
-    .welcome-cards {
-        grid-template-columns: 1fr;
-        gap: 15px;
-    }
-    
-    .welcome-card {
-        padding: 20px;
-    }
-    
-    .welcome-card-icon {
-        font-size: 36px;
-    }
-    
-    .welcome-card-title {
-        font-size: 1rem;
-    }
-    
-    .welcome-card-desc {
-        font-size: 0.75rem;
-    }
-    
-    /* Страница ошибки */
-    .no-access-message {
-        margin: 20px;
-        padding: 30px 20px;
-    }
-    
-    .no-access-message h3 {
-        font-size: 1.2rem;
-    }
-    
-    .return-btn {
-        padding: 10px 20px;
-        font-size: 0.9rem;
-        width: 100%;
-        justify-content: center;
-    }
-}
-
-/* Планшеты (768px - 1024px) */
-@media (min-width: 769px) and (max-width: 1024px) {
-    .app-container {
-        padding: 15px;
-    }
-    
-    .system-btn {
-        padding: 8px 16px;
-        font-size: 0.9rem;
-    }
-    
-    .two-panel {
-        gap: 20px;
-    }
-    
-    .results-grid {
-        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    }
-    
-    .admin-filters {
-        flex-wrap: wrap;
-    }
-    
-    .admin-filters .filter-group {
-        min-width: 180px;
-    }
-    
-    .users-table {
-        font-size: 0.85rem;
-    }
-    
-    .users-table th,
-    .users-table td {
-        padding: 10px 12px;
-    }
-}
-
-/* Для очень маленьких экранов (до 480px) */
-@media (max-width: 480px) {
-    .system-btn {
-        padding: 6px 12px;
-        font-size: 0.75rem;
-    }
-    
-    .system-btn i {
-        font-size: 0.85rem;
-    }
-    
-    .system-btn span {
-        font-size: 0.7rem;
-    }
-    
-    .user-badge {
-        font-size: 0.7rem;
-        padding: 4px 10px;
-    }
-    
-    .logout-button {
-        font-size: 0.7rem;
-        padding: 4px 10px;
-    }
-    
-    .panel-title {
-        font-size: 1rem;
-    }
-    
-    .office-name {
-        font-size: 0.9rem;
-    }
-    
-    .object-name {
-        font-size: 0.8rem;
-    }
-    
-    .vacancy-value {
-        font-size: 1.1rem;
-    }
-    
-    .flip-card {
-        min-height: 400px;
-    }
-    
-    .users-table {
-        min-width: 550px;
-    }
-    
-    .modal-content {
-        width: 98%;
-    }
-    
-    .modal-header {
-        padding: 12px;
-    }
-    
-    .modal-body {
-        padding: 12px;
-    }
-}
-
-/* Горизонтальная ориентация на мобильных */
-@media (max-width: 768px) and (orientation: landscape) {
-    .flip-card {
-        min-height: 350px;
-    }
-    
-    .results-grid {
-        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    }
-    
-    .modal-content {
-        max-height: 85vh;
-    }
-    
-    .objects-perms-list {
-        max-height: 250px;
-    }
-}
-
-/* Стили для скролла на мобильных */
-@media (max-width: 768px) {
-    .users-table-container {
-        -webkit-overflow-scrolling: touch;
-    }
-    
-    .objects-perms-list {
-        -webkit-overflow-scrolling: touch;
-    }
-    
-    .flip-card-back {
-        overflow-y: auto;
-        -webkit-overflow-scrolling: touch;
-    }
-}
-
-/* Улучшаем тач-таргеты на мобильных */
-@media (max-width: 768px) {
-    button,
-    .system-btn,
-    .add-user-btn,
-    .refresh-btn,
-    .refresh-btn-small,
-    .action-btn,
-    .flip-btn,
-    .admin-btn,
-    .btn-cancel,
-    .btn-save,
-    .btn-small,
-    .return-btn {
-        min-height: 44px;
-        min-width: 44px;
-    }
-    
-    .action-btn {
-        min-height: 36px;
-        min-width: 36px;
-    }
-    
-    input,
-    select,
-    .date-picker {
-        min-height: 40px;
-    }
-}
-
-/* Стили для раскрывающегося меню на мобильных (если понадобится) */
-.mobile-menu-toggle {
-    display: none;
-}
-
-@media (max-width: 768px) {
-    .mobile-menu-toggle {
-        display: block;
-        position: fixed;
-        bottom: 20px;
-        right: 20px;
-        background: var(--primary);
-        color: white;
-        width: 50px;
-        height: 50px;
-        border-radius: 50%;
-        border: none;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-        z-index: 1000;
-        cursor: pointer;
-        font-size: 24px;
-    }
-    
-    .mobile-menu-toggle:hover {
-        background: var(--primary-dark);
-    }
-}
-
-/* Стили для лучшей читаемости на мобильных */
-@media (max-width: 768px) {
-    body {
-        font-size: 14px;
-    }
-    
-    .summary-row {
-        font-size: 0.85rem;
-    }
-    
-    .summary-value {
-        font-size: 0.9rem;
-    }
-    
-    .progress-bar {
-        height: 10px;
-    }
-    
-    .badge-green,
-    .badge-red,
-    .badge-purple,
-    .badge-neutral {
-        font-size: 0.7rem;
-        padding: 2px 8px;
-    }
-    
-    .role-badge,
-    .status-badge {
-        font-size: 0.65rem;
-        padding: 2px 8px;
-    }
-}
-
-/* ========== СТИЛИ ДЛЯ ВКЛАДОК РФ/СНГ ========== */
+/* Стили для вкладок РФ/СНГ */
 .citizenship-tabs {
     margin-top: 10px;
     width: 100%;
@@ -2615,229 +2036,31 @@ body {
     animation: fadeIn 0.3s ease;
 }
 
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(5px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-/* Стили для списка должностей на обратной стороне */
-.position-item {
-    background: rgba(255, 255, 255, 0.1);
-    padding: 12px 15px;
-    margin-bottom: 12px;
-    border-radius: 12px;
-    transition: all 0.2s;
-}
-
-.position-item:hover {
-    background: rgba(255, 255, 255, 0.15);
-    transform: translateX(3px);
-}
-
-.position-name {
-    font-weight: bold;
-    font-size: 1rem;
-    margin-bottom: 8px;
-    color: white;
-    border-left: 3px solid #ffd700;
-    padding-left: 10px;
-}
-
 .position-stats {
     display: flex;
     gap: 15px;
-    margin-top: 8px;
+    margin-top: 5px;
     font-size: 0.85rem;
     flex-wrap: wrap;
 }
 
 .position-stats span {
     background: rgba(255, 255, 255, 0.15);
-    padding: 3px 10px;
-    border-radius: 20px;
+    padding: 2px 8px;
+    border-radius: 15px;
 }
 
 .no-positions {
     text-align: center;
-    padding: 30px 20px;
-    color: rgba(255, 255, 255, 0.6);
+    padding: 20px;
+    color: rgba(255, 255, 255, 0.7);
     font-style: italic;
 }
 
-/* Адаптация для мобильных устройств */
 @media (max-width: 768px) {
-    .tab-btn {
-        flex: 1;
-        text-align: center;
-        padding: 6px 12px;
-        font-size: 0.75rem;
-    }
-    
     .position-stats {
         flex-direction: column;
         gap: 5px;
-    }
-    
-    .position-stats span {
-        display: inline-block;
-        width: auto;
-    }
-    
-    .position-name {
-        font-size: 0.85rem;
-    }
-    
-    .tab-content {
-        max-height: 280px;
-    }
-}
-
-/* Стили для скролла на обратной стороне */
-.flip-card-back .positions-list {
-    scrollbar-width: thin;
-    scrollbar-color: rgba(255, 255, 255, 0.3) rgba(255, 255, 255, 0.1);
-}
-
-.flip-card-back .positions-list::-webkit-scrollbar {
-    width: 5px;
-}
-
-.flip-card-back .positions-list::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 10px;
-}
-
-.flip-card-back .positions-list::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.3);
-    border-radius: 10px;
-}
-
-/* Стили для форм с двумя колонками */
-.form-row {
-    display: flex;
-    gap: 15px;
-    flex-wrap: wrap;
-}
-
-.form-row .form-group {
-    flex: 1;
-}
-
-/* Стили для ссылок на объекты */
-.object-link {
-    color: var(--primary);
-    margin-left: 8px;
-    font-size: 0.8rem;
-    text-decoration: none;
-}
-
-.object-link:hover {
-    color: var(--primary-dark);
-    text-decoration: underline;
-}
-
-/* Кнопка возврата */
-.return-btn {
-    background: var(--primary);
-    color: white;
-    border: none;
-    padding: 10px 24px;
-    border-radius: 30px;
-    cursor: pointer;
-    transition: all 0.2s;
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    text-decoration: none;
-}
-
-.return-btn:hover {
-    background: var(--primary-dark);
-    transform: translateY(-1px);
-}
-
-/* Стиль для кнопки добавления объекта - красный */
-.objects-header .add-user-btn {
-    background: var(--primary);
-    color: white;
-    border: none;
-}
-
-.objects-header .add-user-btn:hover {
-    background: var(--primary-dark);
-    transform: translateY(-2px);
-}
-
-.objects-header .add-user-btn i {
-    margin-right: 8px;
-}
-
-/* static/style.css - добавить в конец файла */
-
-/* Стили для прогресс-бара отчёта */
-#reportProgress {
-    animation: slideUp 0.3s ease;
-}
-
-@keyframes slideUp {
-    from {
-        opacity: 0;
-        transform: translateY(20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-/* Улучшенные стили для кнопки экспорта */
-.export-btn:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-    transform: none;
-}
-
-/* Стиль для приоритетных строк в отображении */
-.object-tag.priority-high {
-    background: rgba(255, 87, 34, 0.15);
-    padding: 2px 8px;
-    border-radius: 20px;
-    font-weight: bold;
-}
-
-/* Анимация для индикатора обновления */
-.update-indicator {
-    animation: fadeInOut 0.3s ease;
-}
-
-@keyframes fadeInOut {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-
-/* Улучшенная таблица отчёта на экране */
-.discrepancy-item .badge {
-    font-family: monospace;
-    font-size: 0.85rem;
-}
-
-/* Стиль для информационного тоста */
-.notification-warning {
-    border-left-color: #f39c12;
-    background: #fff8e7;
-}
-
-/* Мобильная адаптация прогресс-бара */
-@media (max-width: 768px) {
-    #reportProgress {
-        left: 10px;
-        right: 10px;
-        bottom: 10px;
-        padding: 12px;
-    }
-    
-    #reportProgress .progress-text {
-        font-size: 0.85rem;
     }
 }
 
@@ -2867,15 +2090,147 @@ body {
     font-size: 0.75rem;
 }
 
-/* Специальный стиль для страницы welcome (белый фон с красной шапкой) */
-.welcome-page .app-footer .footer-links a {
+.footer-on-red {
+    margin-top: 40px;
+    padding: 20px;
+    text-align: center;
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.footer-on-red .footer-links {
+    display: flex;
+    justify-content: center;
+    gap: 30px;
+    flex-wrap: wrap;
+    margin-bottom: 15px;
+}
+
+.footer-on-red .footer-links a {
     color: white;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    opacity: 0.9;
+    transition: opacity 0.3s;
 }
 
-.welcome-page .app-footer {
-    border-top-color: rgba(255, 255, 255, 0.2);
+.footer-on-red .footer-links a:hover {
+    opacity: 0.7;
+    text-decoration: underline;
 }
 
-.welcome-page .app-footer .footer-copyright {
+.footer-on-red .footer-copyright {
     color: rgba(255, 255, 255, 0.7);
+    font-size: 0.75rem;
+}
+
+/* Стили для возвратной кнопки */
+.return-btn {
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 10px 24px;
+    border-radius: 30px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+}
+
+.return-btn:hover {
+    background: var(--primary-dark);
+    transform: translateY(-1px);
+}
+
+/* Стили для welcome страницы */
+.welcome-page {
+    background: white;
+    border-radius: 28px;
+    padding: 40px;
+    text-align: center;
+    max-width: 800px;
+    margin: 0 auto;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
+}
+
+.welcome-icon {
+    font-size: 80px;
+    color: var(--primary);
+    margin-bottom: 20px;
+}
+
+.welcome-title {
+    font-size: 2rem;
+    color: var(--dark);
+    margin-bottom: 10px;
+}
+
+.welcome-subtitle {
+    color: var(--gray);
+    font-size: 1rem;
+    margin-bottom: 30px;
+}
+
+.welcome-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    margin: 40px 0;
+}
+
+.welcome-card {
+    background: #f8f9fa;
+    border-radius: 20px;
+    padding: 25px;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    text-decoration: none;
+    color: var(--dark);
+    display: block;
+}
+
+.welcome-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+    background: white;
+    border: 1px solid var(--primary-bg);
+}
+
+.welcome-card-icon {
+    font-size: 48px;
+    margin-bottom: 15px;
+}
+
+.welcome-card-title {
+    font-size: 1.2rem;
+    font-weight: 600;
+    margin-bottom: 10px;
+}
+
+.welcome-card-desc {
+    font-size: 0.85rem;
+    color: var(--gray);
+}
+
+.user-badge-large {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--primary-bg);
+    padding: 10px 20px;
+    border-radius: 40px;
+    margin-bottom: 20px;
+}
+
+.logout-link {
+    color: var(--danger);
+    text-decoration: none;
+    margin-left: 10px;
+}
+
+.logout-link:hover {
+    text-decoration: underline;
 }

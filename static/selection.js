@@ -1,4 +1,4 @@
-// static/selection.js - ВЕРСИЯ С УЛУЧШЕННОЙ ФИЛЬТРАЦИЕЙ ПО ГРАЖДАНСТВУ
+// static/selection.js - ПОЛНАЯ ВЕРСИЯ
 // ========== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ==========
 let objects = [];
 let vacancyData = {};
@@ -108,7 +108,7 @@ async function loadVacancyData() {
     }
 }
 
-// ========== ФИЛЬТРАЦИЯ ОБЪЕКТОВ (НОВАЯ ЛОГИКА) ==========
+// ========== ФИЛЬТРАЦИЯ ОБЪЕКТОВ ==========
 function filterAndDisplayObjects() {
     const age = parseInt(document.getElementById('age')?.value || 25);
     const gender = document.getElementById('gender')?.value || 'все';
@@ -118,34 +118,25 @@ function filterAndDisplayObjects() {
     const filtered = objects.filter(obj => {
         if (!obj.visible) return false;
         
-        // Возраст
         const ageMatch = age >= obj.ageMin && age <= obj.ageMax;
         if (!ageMatch) return false;
         
-        // Судимость
         const convictionMatch = hasConviction ? obj.allowsConviction : true;
         if (!convictionMatch) return false;
         
-        // Получаем актуальные потребности
         const stats = getVacancyStats(obj.name);
         
-        // Проверяем, есть ли вообще потребность по этому объекту
         const totalMen = (stats.rf?.men || 0) + (stats.cis?.men || 0);
         const totalWomen = (stats.rf?.women || 0) + (stats.cis?.women || 0);
         const totalFamily = (stats.rf?.family || 0) + (stats.cis?.family || 0);
         const totalAll = totalMen + totalWomen + totalFamily;
         
-        // Если нет потребности - не показываем
         if (totalAll === 0) return false;
-        
-        // ========== НОВАЯ ЛОГИКА ФИЛЬТРАЦИИ ПО ГРАЖДАНСТВУ ==========
-        // Проверяем, ТРЕБУЮТСЯ ли кандидаты выбранного гражданства
         
         let nationalityMatch = false;
         
         switch (nationality) {
             case 'РФ':
-                // Нужны ли РФ мужчины/женщины/семьи?
                 const needRFMen = (stats.rf?.men || 0) > 0;
                 const needRFWomen = (stats.rf?.women || 0) > 0;
                 const needRFFamily = (stats.rf?.family || 0) > 0;
@@ -153,7 +144,6 @@ function filterAndDisplayObjects() {
                 break;
                 
             case 'СНГ':
-                // Нужны ли СНГ мужчины/женщины/семьи?
                 const needCISMen = (stats.cis?.men || 0) > 0;
                 const needCISWomen = (stats.cis?.women || 0) > 0;
                 const needCISFamily = (stats.cis?.family || 0) > 0;
@@ -161,7 +151,6 @@ function filterAndDisplayObjects() {
                 break;
                 
             case 'РБ':
-                // РБ обрабатывается как РФ (поскольку в структуре нет отдельного поля для РБ)
                 const needRBMen = (stats.rf?.men || 0) > 0;
                 const needRBWomen = (stats.rf?.women || 0) > 0;
                 const needRBFamily = (stats.rf?.family || 0) > 0;
@@ -178,22 +167,17 @@ function filterAndDisplayObjects() {
         
         if (!nationalityMatch) return false;
         
-        // ========== ФИЛЬТРАЦИЯ ПО ПОЛУ (с учётом потребности) ==========
         if (gender === 'мужчина') {
-            // Нужны ли мужчины? (РФ или СНГ)
             const needMen = (stats.rf?.men || 0) > 0 || (stats.cis?.men || 0) > 0;
             if (!needMen) return false;
-            // Проверяем, принимает ли объект мужчин
             if (!obj.allowedGenders?.includes('мужчина')) return false;
         }
         else if (gender === 'женщина') {
-            // Нужны ли женщины?
             const needWomen = (stats.rf?.women || 0) > 0 || (stats.cis?.women || 0) > 0;
             if (!needWomen) return false;
             if (!obj.allowedGenders?.includes('женщина')) return false;
         }
         else if (gender === 'семейные') {
-            // Нужны ли семейные пары?
             const needFamily = (stats.rf?.family || 0) > 0 || (stats.cis?.family || 0) > 0;
             if (!needFamily) return false;
         }
@@ -239,10 +223,11 @@ function displayResults(objectsToDisplay) {
     sorted.forEach((obj, idx) => {
         const stats = getVacancyStats(obj.name);
         
-        // Показываем ВСЕ цифры (РФ + СНГ) в карточке, независимо от фильтра
         const totalMen = (stats.rf?.men || 0) + (stats.cis?.men || 0);
         const totalWomen = (stats.rf?.women || 0) + (stats.cis?.women || 0);
         const totalFamily = (stats.rf?.family || 0) + (stats.cis?.family || 0);
+        
+        window.currentObjectName = obj.name;
         
         const card = document.createElement('div');
         card.className = `flip-card ${obj.priority ? 'priority-card' : ''}`;
@@ -251,7 +236,6 @@ function displayResults(objectsToDisplay) {
         const orderNumber = window.isAdmin ? `<span class="order-badge">${idx + 1}</span>` : '';
         const dragHandle = window.isAdmin ? '<div class="drag-handle-main">⋮⋮</div>' : '';
         
-        // Показываем ВСЕ допустимые гражданства (не меняем от фильтра)
         let nationalityText = '';
         if (obj.allowedNationalities?.length > 0) {
             if (obj.allowedNationalities.includes('РФ') && obj.allowedNationalities.includes('СНГ')) nationalityText = 'РФ + СНГ';
@@ -272,12 +256,17 @@ function displayResults(objectsToDisplay) {
                     <p><strong>Возраст:</strong> ${obj.ageMin} - ${obj.ageMax} лет</p>
                     <p><strong>Гражданство:</strong> ${nationalityText}</p>
                     <p><strong>Судимость:</strong> ${obj.allowsConviction ? 'Принимают' : 'Не принимают'}</p>
-                    <button class="flip-btn" onclick="flipCard(this)">Подробнее о должностях</button>
+                    <div class="card-buttons">
+                        <button class="direction-btn" onclick="openDirectionForm(${obj.id}, '${escapeHtml(obj.name)}', '')">
+                            <i class="fas fa-paper-plane"></i> Направить сотрудника
+                        </button>
+                        <button class="flip-btn" onclick="flipCard(this)">Подробнее о должностях</button>
+                    </div>
                 </div>
                 <div class="flip-card-back">
                     <h3>${orderNumber}${escapeHtml(obj.name)} - Должности</h3>
                     <div class="positions-list">
-                        ${renderPositions(stats.positions)}
+                        ${renderPositions(stats.positions, obj.id, obj.name)}
                     </div>
                     <button class="flip-btn" onclick="flipCard(this)">Назад</button>
                 </div>
@@ -287,8 +276,7 @@ function displayResults(objectsToDisplay) {
     });
 }
 
-// Функция для отображения должностей (всегда показывает РФ + СНГ)
-function renderPositions(positions) {
+function renderPositions(positions, objectId, objectName) {
     if (!positions || positions.length === 0) {
         return '<div class="no-positions">Нет должностей</div>';
     }
@@ -393,7 +381,6 @@ function renderRequirementsTable() {
         
         const isPriority = objData?.is_high || false;
         
-        // Экранируем имя объекта для использования в onclick
         const safeObjNameForJs = objName.replace(/'/g, "\\'");
         
         for (let i = 0; i < positions.length; i++) {
@@ -420,10 +407,9 @@ function renderRequirementsTable() {
                 ${i === 0 ? `<td rowspan="${rowCount}" style="text-align:center; vertical-align:middle; background:#fff3cd;">
                     <input type="checkbox" class="priority-checkbox" data-obj="${escapeHtml(objName)}" ${isPriority ? 'checked' : ''} style="width:20px; height:20px;">
                 </td>` : ''}
-             </tr>`;
+             </td>`;
         }
         
-        // Итоговая строка
         tableHtml += `<tr style="background:#f0f0f0; font-weight:bold;">
             <td style="text-align:right;">📊 ВСЕГО:</td>
             <td><input type="text" value="${totals.rfMen}" readonly style="width:60px; text-align:center; background:#e8e8e8;"></td>
@@ -438,12 +424,12 @@ function renderRequirementsTable() {
     }
     
     if (objectNames.length === 0) {
-        tableHtml += `<tr><td colspan="10" style="text-align:center; padding:40px;">Нет объектов. Нажмите "Добавить объект"<tr></tr>`;
+        tableHtml += `<tr><td colspan="10" style="text-align:center; padding:40px;">Нет объектов. Нажмите "Добавить объект"</td></td>`;
     }
     
     tableHtml += `
                         </tbody>
-                        <tfoot><tr style="background:#2c3e50; color:white;"><td colspan="8" style="text-align:right;"><strong>ОБЩИЙ ИТОГ:</strong></td><td style="text-align:center;"><strong>${grandTotal}</strong></td><td style="background:#2c3e50;"></td></tr></tfoot>
+                        <tfoot><tr style="background:#2c3e50; color:white;"><td colspan="8" style="text-align:right;"><strong>ОБЩИЙ ИТОГ:</strong></td><td style="text-align:center;"><strong>${grandTotal}</strong></td><td style="background:#2c3e50;"></td><tr></tfoot>
                     </table>
                 </div>
                 <div class="requirements-modal-footer">
@@ -487,7 +473,6 @@ function updateRowTotals(objectName) {
         if (totalCell) totalCell.textContent = total;
     }
     
-    // Обновляем итоговую строку объекта
     const tbody = rows[0]?.closest('tbody');
     if (tbody) {
         const allRows = tbody.querySelectorAll('tr');
@@ -577,7 +562,6 @@ async function saveAllData() {
         });
         
         if (response.ok) {
-            // Обновляем приоритеты в objects и vacancyData
             for (const chk of priorityChecks) {
                 const objName = chk.getAttribute('data-obj');
                 const obj = objects.find(o => o.name === objName);
@@ -931,19 +915,204 @@ async function deletePosition(objectName, positionName) {
     }
 }
 
+// ========== НАПРАВЛЕНИЕ СОТРУДНИКА (СОЗДАНИЕ ЛИДА) ==========
+
+let currentDirectionObject = null;
+let currentDirectionPosition = null;
+
+function openDirectionForm(objectId, objectName, positionName) {
+    currentDirectionObject = { id: objectId, name: objectName };
+    currentDirectionPosition = positionName || '';
+    
+    let modal = document.getElementById('directionModal');
+    if (modal) modal.remove();
+    
+    modal = document.createElement('div');
+    modal.id = 'directionModal';
+    modal.className = 'modal';
+    modal.style.display = 'flex';
+    
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header" style="background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);">
+                <h3><i class="fas fa-paper-plane"></i> Направить сотрудника</h3>
+                <button class="modal-close" onclick="closeDirectionModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="directionForm" onsubmit="submitDirection(event)">
+                    <div class="form-group">
+                        <label>ФИО кандидата *</label>
+                        <input type="text" id="candidateName" required placeholder="Иванов Иван Иванович" autocomplete="off">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Номер телефона *</label>
+                        <input type="tel" id="candidatePhone" required placeholder="+7 (XXX) XXX-XX-XX" autocomplete="off">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>ФИО агента *</label>
+                        <input type="text" id="agentName" required placeholder="Петров Петр Петрович" autocomplete="off">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Объект *</label>
+                        <input type="text" id="agentObject" required placeholder="Название объекта" autocomplete="off">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Прикреплённые файлы</label>
+                        <div id="fileList" class="file-list"></div>
+                        <button type="button" class="btn-small" onclick="addFileInput()" style="margin-top: 8px; background: #3498db;">
+                            <i class="fas fa-plus"></i> Добавить файл
+                        </button>
+                        <div class="info-text" style="margin-top: 8px;">
+                            <i class="fas fa-info-circle"></i> 
+                            Поддерживаются: PDF, DOC, DOCX, JPG, PNG. Максимум 10 файлов, каждый до 10 MB
+                        </div>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="button" class="btn-cancel" onclick="closeDirectionModal()">Отмена</button>
+                        <button type="submit" class="btn-save" style="background: #27ae60;">
+                            <i class="fas fa-paper-plane"></i> Направить
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    addFileInput();
+}
+
+function addFileInput() {
+    const fileList = document.getElementById('fileList');
+    if (!fileList) return;
+    
+    const fileCount = fileList.querySelectorAll('.file-input-wrapper').length;
+    
+    if (fileCount >= 10) {
+        showToast('Максимум 10 файлов', 'warning');
+        return;
+    }
+    
+    const wrapper = document.createElement('div');
+    wrapper.className = 'file-input-wrapper';
+    wrapper.style.cssText = 'display: flex; gap: 8px; margin-bottom: 8px; align-items: center;';
+    wrapper.innerHTML = `
+        <input type="file" name="attachments" class="file-input" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" style="flex: 1; padding: 6px; border: 1px solid #ddd; border-radius: 6px;">
+        <button type="button" class="remove-file-btn" onclick="this.parentElement.remove()" style="background: #e74c3c; color: white; border: none; width: 30px; height: 30px; border-radius: 4px; cursor: pointer; font-size: 14px;">✕</button>
+    `;
+    fileList.appendChild(wrapper);
+}
+
+function closeDirectionModal() {
+    const modal = document.getElementById('directionModal');
+    if (modal) modal.remove();
+    currentDirectionObject = null;
+    currentDirectionPosition = null;
+}
+
+async function submitDirection(event) {
+    event.preventDefault();
+    
+    const candidateName = document.getElementById('candidateName')?.value.trim();
+    const candidatePhone = document.getElementById('candidatePhone')?.value.trim();
+    const agentName = document.getElementById('agentName')?.value.trim();
+    const agentObject = document.getElementById('agentObject')?.value.trim();
+    
+    if (!candidateName) {
+        showToast('Введите ФИО кандидата', 'error');
+        return;
+    }
+    
+    if (!candidatePhone) {
+        showToast('Введите номер телефона', 'error');
+        return;
+    }
+    
+    if (!agentName) {
+        showToast('Введите ФИО агента', 'error');
+        return;
+    }
+    
+    if (!agentObject) {
+        showToast('Введите объект', 'error');
+        return;
+    }
+    
+    const phoneDigits = candidatePhone.replace(/\D/g, '');
+    if (phoneDigits.length < 10) {
+        showToast('Введите корректный номер телефона (минимум 10 цифр)', 'error');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('object_id', currentDirectionObject.id);
+    formData.append('object_name', currentDirectionObject.name);
+    formData.append('position_name', currentDirectionPosition || '');
+    formData.append('candidate_name', candidateName);
+    formData.append('candidate_phone', candidatePhone);
+    formData.append('agent_name', agentName);
+    formData.append('agent_object', agentObject);
+    
+    const fileInputs = document.querySelectorAll('.file-input');
+    fileInputs.forEach(input => {
+        if (input.files && input.files[0]) {
+            formData.append('attachments', input.files[0]);
+        }
+    });
+    
+    const submitBtn = document.querySelector('#directionForm .btn-save');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Отправка...';
+    
+    try {
+        const response = await fetch('/api/selection/create-deal', {
+            method: 'POST',
+            credentials: 'include',
+            body: formData
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok && result.success) {
+            showToast(`✅ Лид создан! ID: ${result.lead_id}`, 'success');
+            closeDirectionModal();
+            if (typeof loadSelectionData === 'function') {
+                setTimeout(() => loadSelectionData(), 1000);
+            }
+        } else {
+            showToast(`❌ Ошибка: ${result.error || 'Не удалось создать лид'}`, 'error');
+        }
+    } catch (error) {
+        console.error('Ошибка:', error);
+        showToast('❌ Ошибка при отправке. Проверьте соединение.', 'error');
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
+    }
+}
+
 // ========== ИНИЦИАЛИЗАЦИЯ ФИЛЬТРОВ ==========
 function initFilters() {
-    // Устанавливаем значения по умолчанию
     const nationalitySelect = document.getElementById('nationality');
     const genderSelect = document.getElementById('gender');
     
-    if (nationalitySelect) {
+    if (nationalitySelect && nationalitySelect.value === 'РФ') {
         nationalitySelect.value = 'все';
     }
-    if (genderSelect) {
+    if (genderSelect && genderSelect.value === '') {
         genderSelect.value = 'все';
     }
 }
+
+document.addEventListener('DOMContentLoaded', function() {
+    initFilters();
+});
 
 // Глобальные функции
 window.flipCard = flipCard;
@@ -963,8 +1132,7 @@ window.closeAddPositionModal = closeAddPositionModal;
 window.createNewPosition = createNewPosition;
 window.deleteObject = deleteObject;
 window.deletePosition = deletePosition;
-
-// Запускаем инициализацию фильтров при загрузке страницы
-document.addEventListener('DOMContentLoaded', function() {
-    initFilters();
-});
+window.openDirectionForm = openDirectionForm;
+window.closeDirectionModal = closeDirectionModal;
+window.addFileInput = addFileInput;
+window.submitDirection = submitDirection;

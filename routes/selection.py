@@ -1,9 +1,12 @@
-# routes/selection.py
+# routes/selection.py - полная версия
 # -*- coding: utf-8 -*-
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, send_file
 from flask_login import current_user, login_required
 import logging
 import sqlite3
+import os
+import uuid
+from werkzeug.utils import secure_filename
 
 from database import (
     get_objects_settings, update_object_settings, get_global_order, save_global_order,
@@ -17,6 +20,18 @@ logger = logging.getLogger(__name__)
 selection_bp = Blueprint('selection', __name__, url_prefix='/api/selection')
 
 google_api = None
+
+# Настройки для загрузки файлов (временная папка, файлы не сохраняются)
+UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static', 'uploads', 'temp')
+ALLOWED_EXTENSIONS = {'pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png', 'txt'}
+
+# Создаём папку для временных файлов, если её нет
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
 
 def init_selection_apis(google):
     global google_api
@@ -47,14 +62,12 @@ def selection_settings():
             global_order = [obj['id'] for obj in db_objects]
             save_global_order(global_order)
         
-        # Получаем ТЕКУЩИЕ потребности (без привязки к дате)
         current_req = get_current_requirements()
         
         objects = []
         for db_obj in db_objects:
             setting = next((s for s in objects_settings if s['id'] == db_obj['id']), None)
             
-            # Берём потребности из текущих (без даты)
             req_data = current_req.get(db_obj['name'], {})
             total_count = (req_data.get('rf', {}).get('men', 0) + 
                           req_data.get('rf', {}).get('women', 0) + 
@@ -152,4 +165,99 @@ def debug_priority():
         })
     except Exception as e:
         logger.error(f"Ошибка диагностики приоритетов: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+# ========== НАПРАВЛЕНИЕ СОТРУДНИКА (СОЗДАНИЕ ЛИДА С ФАЙЛАМИ) ==========
+
+@selection_bp.route('/create-deal', methods=['POST'])
+@login_required
+def create_direction_deal():
+    """Создание лида в Bitrix24 с прикреплением всех файлов"""
+    if not current_user.can_view_selection():
+        return jsonify({'error': 'Forbidden'}), 403
+    
+    try:
+        # Получаем данные из формы
+        object_id = request.form.get('object_id')
+        object_name = request.form.get('object_name')
+        position_name = request.form.get('position_name', '')
+        candidate_name = request.form.get('candidate_name', '').strip()
+        candidate_phone = request.form.get('candidate_phone', '').strip()
+        agent_name = request.form.get('agent_name', '').strip()
+        agent_object = request.form.get('agent_object', '').strip()
+        
+        # Валидация
+        if not object_name:
+            return jsonify({'error': 'Не указан объект'}), 400
+        
+        if not candidate_name:
+            return jsonify({'error': 'Введите ФИО кандидата'}), 400
+        
+        if not candidate_phone:
+            return jsonify({'error': 'Введите номер телефона'}), 400
+        
+        if not agent_name:
+            return jsonify({'error': 'Введите ФИО агента'}), 400
+        
+        if not agent_object:
+            return jsonify({'error': 'Введите объект'}), 400
+        
+        # Получаем ВСЕ файлы
+        files = request.files.getlist('attachments')
+        valid_files = [f for f in files if f and f.filename]
+        
+        # Получаем информацию о пользователе
+        directed_by = current_user.full_name or current_user.username
+        
+        # Формируем название лида
+        lead_title = f"Сделка от агентов - {candidate_name}"
+        
+        from bitrix_api import BitrixAPI
+        from config import BITRIX_WEBHOOK_URL, SOURCE_AGENT
+        
+        bitrix_api = BitrixAPI(BITRIX_WEBHOOK_URL)
+        
+        # Подготавливаем данные для лида
+        lead_data = {
+            'title': lead_title,
+            'candidate_name': candidate_name,
+            'candidate_phone': candidate_phone,
+            'object_name': object_name,
+            'position_name': position_name,
+            'directed_by': directed_by,
+            'agent_name': agent_name,
+            'agent_object': agent_object,
+            'comment': '',
+            'source_id': SOURCE_AGENT
+        }
+        
+        # Создаём лид с ВСЕМИ файлами
+        lead_id = bitrix_api.create_lead_with_files(lead_data, valid_files)
+        
+        if not lead_id:
+            return jsonify({'error': 'Ошибка создания лида в Bitrix24'}), 500
+        
+        # Логируем действие
+        from database import log_user_action
+        log_user_action(
+            current_user.id,
+            'create_lead',
+            f"Создан лид: {candidate_name} → {agent_object} (агент: {agent_name}, файлов: {len(valid_files)}, лид {lead_id})",
+            request.remote_addr
+        )
+        
+        # Формируем ссылку на лид в Bitrix24
+        lead_url = f"https://crm.complect.org/crm/lead/details/{lead_id}/"
+        
+        return jsonify({
+            'success': True,
+            'lead_id': lead_id,
+            'lead_url': lead_url,
+            'files_count': len(valid_files),
+            'message': f'Лид создан! ID: {lead_id}, файлов: {len(valid_files)}'
+        })
+        
+    except Exception as e:
+        logger.error(f"Ошибка создания лида: {e}", exc_info=True)
         return jsonify({'error': str(e)}), 500

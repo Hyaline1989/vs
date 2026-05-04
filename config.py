@@ -1,4 +1,4 @@
-# config.py - обновленная версия с разделением на РФ и СНГ
+# config.py - полная версия с существующим источником
 # -*- coding: utf-8 -*-
 import os
 from dotenv import load_dotenv
@@ -31,6 +31,9 @@ SOURCE_BISHKEK = "REPEAT_SALE"                # Подбор Бишкек
 SOURCE_AGENT = "UC_3HKPIP"                    # Агент
 SOURCE_PEREVAHTOVKA = "UC_5LI24O"             # Перевахтовка
 SOURCE_REFERRAL = "UC_1S4DWZ"                 # Приведи друга
+
+# Источник для направлений из CRM (используем существующий источник Агент)
+SOURCE_CRM_DIRECTION = SOURCE_AGENT
 
 # Все офисы для фильтрации
 ALL_OFFICES = [
@@ -177,9 +180,9 @@ OBJECTS_BASE = [
      "allowedGenders": ["мужчина", "женщина"], "allowedNationalities": ["РФ"], 
      "allowsConviction": False, "link": "https://docs.google.com/spreadsheets/d/13FLpkCRuY8Bhdq8VzAsUMXlH-O6DcnwMlb3a1d82z44/edit?gid=244932662#gid=244932662"},
     {"id": 22, "name": "Мармеладыч", "ageMin": 18, "ageMax": 50, 
-     "allowedGenders": ["мужчина", "женщина"], "allowedNationalities": ["РФ", "РБ"], 
+     "allowedGenders": ["мужчина", "женщина"], "allowedNationalities": ["РФ", "РБ", "СНГ"], 
      "allowsConviction": True, "link": "https://docs.google.com/spreadsheets/d/13FLpkCRuY8Bhdq8VzAsUMXlH-O6DcnwMlb3a1d82z44/edit?gid=1707924363#gid=1707924363"},
     {"id": 23, "name": "Невский кондитер", "ageMin": 18, "ageMax": 55, 
-     "allowedGenders": ["мужчина", "женщина"], "allowedNationalities": ["РФ", "РБ"], 
+     "allowedGenders": ["мужчина", "женщина"], "allowedNationalities": ["РФ", "РБ", "СНГ"], 
      "allowsConviction": True, "link": "https://docs.google.com/spreadsheets/d/13FLpkCRuY8Bhdq8VzAsUMXlH-O6DcnwMlb3a1d82z44/edit?gid=401397030#gid=401397030"}
 ]
