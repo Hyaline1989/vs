@@ -1,4 +1,4 @@
-// static/selection.js - ВЕРСИЯ БЕЗ ПРИВЯЗКИ К ДАТЕ
+// static/selection.js - ВЕРСИЯ С УЛУЧШЕННОЙ ФИЛЬТРАЦИЕЙ ПО ГРАЖДАНСТВУ
 // ========== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ==========
 let objects = [];
 let vacancyData = {};
@@ -108,36 +108,96 @@ async function loadVacancyData() {
     }
 }
 
+// ========== ФИЛЬТРАЦИЯ ОБЪЕКТОВ (НОВАЯ ЛОГИКА) ==========
 function filterAndDisplayObjects() {
     const age = parseInt(document.getElementById('age')?.value || 25);
     const gender = document.getElementById('gender')?.value || 'все';
-    const nationality = document.getElementById('nationality')?.value || 'РФ';
+    const nationality = document.getElementById('nationality')?.value || 'все';
     const hasConviction = document.getElementById('hasConviction')?.value === 'true';
     
     const filtered = objects.filter(obj => {
         if (!obj.visible) return false;
+        
+        // Возраст
         const ageMatch = age >= obj.ageMin && age <= obj.ageMax;
         if (!ageMatch) return false;
         
-        let nationalityMatch = false;
-        if (nationality === 'РФ') nationalityMatch = obj.allowedNationalities?.includes('РФ');
-        else if (nationality === 'СНГ') nationalityMatch = obj.allowedNationalities?.includes('СНГ');
-        else if (nationality === 'РБ') nationalityMatch = obj.allowedNationalities?.includes('РБ');
-        else nationalityMatch = true;
-        if (!nationalityMatch) return false;
-        
+        // Судимость
         const convictionMatch = hasConviction ? obj.allowsConviction : true;
         if (!convictionMatch) return false;
         
+        // Получаем актуальные потребности
         const stats = getVacancyStats(obj.name);
-        const totalMen = stats.rf.men + stats.cis.men;
-        const totalWomen = stats.rf.women + stats.cis.women;
-        const totalFamily = stats.rf.family + stats.cis.family;
         
-        if (gender === 'все') return (totalMen > 0 || totalWomen > 0 || totalFamily > 0);
-        if (gender === 'мужчина') return obj.allowedGenders?.includes('мужчина') && totalMen > 0;
-        if (gender === 'женщина') return obj.allowedGenders?.includes('женщина') && totalWomen > 0;
-        if (gender === 'семейные') return totalFamily > 0;
+        // Проверяем, есть ли вообще потребность по этому объекту
+        const totalMen = (stats.rf?.men || 0) + (stats.cis?.men || 0);
+        const totalWomen = (stats.rf?.women || 0) + (stats.cis?.women || 0);
+        const totalFamily = (stats.rf?.family || 0) + (stats.cis?.family || 0);
+        const totalAll = totalMen + totalWomen + totalFamily;
+        
+        // Если нет потребности - не показываем
+        if (totalAll === 0) return false;
+        
+        // ========== НОВАЯ ЛОГИКА ФИЛЬТРАЦИИ ПО ГРАЖДАНСТВУ ==========
+        // Проверяем, ТРЕБУЮТСЯ ли кандидаты выбранного гражданства
+        
+        let nationalityMatch = false;
+        
+        switch (nationality) {
+            case 'РФ':
+                // Нужны ли РФ мужчины/женщины/семьи?
+                const needRFMen = (stats.rf?.men || 0) > 0;
+                const needRFWomen = (stats.rf?.women || 0) > 0;
+                const needRFFamily = (stats.rf?.family || 0) > 0;
+                nationalityMatch = needRFMen || needRFWomen || needRFFamily;
+                break;
+                
+            case 'СНГ':
+                // Нужны ли СНГ мужчины/женщины/семьи?
+                const needCISMen = (stats.cis?.men || 0) > 0;
+                const needCISWomen = (stats.cis?.women || 0) > 0;
+                const needCISFamily = (stats.cis?.family || 0) > 0;
+                nationalityMatch = needCISMen || needCISWomen || needCISFamily;
+                break;
+                
+            case 'РБ':
+                // РБ обрабатывается как РФ (поскольку в структуре нет отдельного поля для РБ)
+                const needRBMen = (stats.rf?.men || 0) > 0;
+                const needRBWomen = (stats.rf?.women || 0) > 0;
+                const needRBFamily = (stats.rf?.family || 0) > 0;
+                nationalityMatch = needRBMen || needRBWomen || needRBFamily;
+                break;
+                
+            case 'все':
+                nationalityMatch = true;
+                break;
+                
+            default:
+                nationalityMatch = true;
+        }
+        
+        if (!nationalityMatch) return false;
+        
+        // ========== ФИЛЬТРАЦИЯ ПО ПОЛУ (с учётом потребности) ==========
+        if (gender === 'мужчина') {
+            // Нужны ли мужчины? (РФ или СНГ)
+            const needMen = (stats.rf?.men || 0) > 0 || (stats.cis?.men || 0) > 0;
+            if (!needMen) return false;
+            // Проверяем, принимает ли объект мужчин
+            if (!obj.allowedGenders?.includes('мужчина')) return false;
+        }
+        else if (gender === 'женщина') {
+            // Нужны ли женщины?
+            const needWomen = (stats.rf?.women || 0) > 0 || (stats.cis?.women || 0) > 0;
+            if (!needWomen) return false;
+            if (!obj.allowedGenders?.includes('женщина')) return false;
+        }
+        else if (gender === 'семейные') {
+            // Нужны ли семейные пары?
+            const needFamily = (stats.rf?.family || 0) > 0 || (stats.cis?.family || 0) > 0;
+            if (!needFamily) return false;
+        }
+        
         return true;
     });
     
@@ -151,6 +211,7 @@ function getVacancyStats(objectName) {
     return vacancyData[objectName];
 }
 
+// ========== ОТОБРАЖЕНИЕ РЕЗУЛЬТАТОВ ==========
 function displayResults(objectsToDisplay) {
     const container = document.getElementById('results');
     const countDisplay = document.getElementById('resultsCount');
@@ -177,9 +238,11 @@ function displayResults(objectsToDisplay) {
     
     sorted.forEach((obj, idx) => {
         const stats = getVacancyStats(obj.name);
-        const totalMen = stats.rf.men + stats.cis.men;
-        const totalWomen = stats.rf.women + stats.cis.women;
-        const totalFamily = stats.rf.family + stats.cis.family;
+        
+        // Показываем ВСЕ цифры (РФ + СНГ) в карточке, независимо от фильтра
+        const totalMen = (stats.rf?.men || 0) + (stats.cis?.men || 0);
+        const totalWomen = (stats.rf?.women || 0) + (stats.cis?.women || 0);
+        const totalFamily = (stats.rf?.family || 0) + (stats.cis?.family || 0);
         
         const card = document.createElement('div');
         card.className = `flip-card ${obj.priority ? 'priority-card' : ''}`;
@@ -187,8 +250,8 @@ function displayResults(objectsToDisplay) {
         
         const orderNumber = window.isAdmin ? `<span class="order-badge">${idx + 1}</span>` : '';
         const dragHandle = window.isAdmin ? '<div class="drag-handle-main">⋮⋮</div>' : '';
-        const safeLink = obj.link && (obj.link.startsWith('http://') || obj.link.startsWith('https://')) ? obj.link : '#';
         
+        // Показываем ВСЕ допустимые гражданства (не меняем от фильтра)
         let nationalityText = '';
         if (obj.allowedNationalities?.length > 0) {
             if (obj.allowedNationalities.includes('РФ') && obj.allowedNationalities.includes('СНГ')) nationalityText = 'РФ + СНГ';
@@ -214,10 +277,7 @@ function displayResults(objectsToDisplay) {
                 <div class="flip-card-back">
                     <h3>${orderNumber}${escapeHtml(obj.name)} - Должности</h3>
                     <div class="positions-list">
-                        ${stats.positions?.length > 0 ? stats.positions.filter(p => {
-                            const total = (p.rf?.men || 0) + (p.rf?.women || 0) + (p.rf?.family || 0) + (p.cis?.men || 0) + (p.cis?.women || 0) + (p.cis?.family || 0);
-                            return total > 0;
-                        }).map(p => `<div class="position-item"><strong>${escapeHtml(p.name)}</strong><div class="position-stats"><span>🇷🇺 РФ: ${p.rf?.men || 0}м ${p.rf?.women || 0}ж ${p.rf?.family || 0}с</span><span>🌍 СНГ: ${p.cis?.men || 0}м ${p.cis?.women || 0}ж ${p.cis?.family || 0}с</span></div></div>`).join('') : '<div>Нет должностей</div>'}
+                        ${renderPositions(stats.positions)}
                     </div>
                     <button class="flip-btn" onclick="flipCard(this)">Назад</button>
                 </div>
@@ -225,6 +285,43 @@ function displayResults(objectsToDisplay) {
         `;
         container.appendChild(card);
     });
+}
+
+// Функция для отображения должностей (всегда показывает РФ + СНГ)
+function renderPositions(positions) {
+    if (!positions || positions.length === 0) {
+        return '<div class="no-positions">Нет должностей</div>';
+    }
+    
+    let html = '';
+    
+    for (const pos of positions) {
+        const menRF = pos.rf?.men || 0;
+        const womenRF = pos.rf?.women || 0;
+        const familyRF = pos.rf?.family || 0;
+        const menCIS = pos.cis?.men || 0;
+        const womenCIS = pos.cis?.women || 0;
+        const familyCIS = pos.cis?.family || 0;
+        
+        const total = menRF + womenRF + familyRF + menCIS + womenCIS + familyCIS;
+        if (total === 0) continue;
+        
+        html += `
+            <div class="position-item">
+                <div class="position-name">${escapeHtml(pos.name)}</div>
+                <div class="position-stats">
+                    <span>🇷🇺 РФ: ${menRF}м ${womenRF}ж ${familyRF}с</span>
+                    <span>🌍 СНГ: ${menCIS}м ${womenCIS}ж ${familyCIS}с</span>
+                </div>
+            </div>
+        `;
+    }
+    
+    if (html === '') {
+        html = '<div class="no-positions">Нет должностей с потребностью</div>';
+    }
+    
+    return html;
 }
 
 // ========== ГЛАВНОЕ МОДАЛЬНОЕ ОКНО ==========
@@ -296,7 +393,7 @@ function renderRequirementsTable() {
         
         const isPriority = objData?.is_high || false;
         
-        // Экранируем имя объекта для использования в onclick (одинарные кавычки)
+        // Экранируем имя объекта для использования в onclick
         const safeObjNameForJs = objName.replace(/'/g, "\\'");
         
         for (let i = 0; i < positions.length; i++) {
@@ -311,7 +408,7 @@ function renderRequirementsTable() {
                     ${escapeHtml(objName)}
                     <button onclick="deleteObject('${safeObjNameForJs}')" style="display:block; margin-top:8px; background:#e74c3c; color:white; border:none; padding:3px 8px; border-radius:3px; font-size:11px; cursor:pointer;">🗑 Удалить объект</button>
                     <button onclick="showAddPositionModal('${safeObjNameForJs}')" style="display:block; margin-top:5px; background:#3498db; color:white; border:none; padding:3px 8px; border-radius:3px; font-size:11px; cursor:pointer;">+ Добавить должность</button>
-                </div>` : ''}
+                </td>` : ''}
                 <td>${escapeHtml(pos.name)} <button onclick="deletePosition('${safeObjNameForJs}','${safePosName}')" style="margin-left:8px; background:#e74c3c; color:white; border:none; padding:2px 6px; border-radius:3px; font-size:10px; cursor:pointer;">✕</button></td>
                 <td><input type="number" class="editable rf-men" data-obj="${escapeHtml(objName)}" data-pos="${escapeHtml(pos.name)}" value="${pos.rf?.men||0}" min="0" style="width:60px; text-align:center;"></td>
                 <td><input type="number" class="editable rf-women" data-obj="${escapeHtml(objName)}" data-pos="${escapeHtml(pos.name)}" value="${pos.rf?.women||0}" min="0" style="width:60px; text-align:center;"></td>
@@ -323,7 +420,7 @@ function renderRequirementsTable() {
                 ${i === 0 ? `<td rowspan="${rowCount}" style="text-align:center; vertical-align:middle; background:#fff3cd;">
                     <input type="checkbox" class="priority-checkbox" data-obj="${escapeHtml(objName)}" ${isPriority ? 'checked' : ''} style="width:20px; height:20px;">
                 </td>` : ''}
-            </tr>`;
+             </tr>`;
         }
         
         // Итоговая строка
@@ -337,16 +434,16 @@ function renderRequirementsTable() {
             <td><input type="text" value="${totals.cisFamily}" readonly style="width:60px; text-align:center; background:#e8e8e8;"></td>
             <td style="background:#d4edda; text-align:center;">${totalAll}</td>
             <td style="background:#f0f0f0;"></td>
-        </tr>`;
+         </tr>`;
     }
     
     if (objectNames.length === 0) {
-        tableHtml += `<tr><td colspan="10" style="text-align:center; padding:40px;">Нет объектов. Нажмите "Добавить объект"</td></tr>`;
+        tableHtml += `<tr><td colspan="10" style="text-align:center; padding:40px;">Нет объектов. Нажмите "Добавить объект"<tr></tr>`;
     }
     
     tableHtml += `
                         </tbody>
-                        <tfoot><tr style="background:#2c3e50; color:white;"><td colspan="8" style="text-align:right;"><strong>ОБЩИЙ ИТОГ:</strong></td><td style="text-align:center;"><strong>${grandTotal}</strong></td><td style="background:#2c3e50;"></td></tfoot>
+                        <tfoot><tr style="background:#2c3e50; color:white;"><td colspan="8" style="text-align:right;"><strong>ОБЩИЙ ИТОГ:</strong></td><td style="text-align:center;"><strong>${grandTotal}</strong></td><td style="background:#2c3e50;"></td></tr></tfoot>
                     </table>
                 </div>
                 <div class="requirements-modal-footer">
@@ -783,17 +880,10 @@ async function deleteObject(objectName) {
         const result = await response.json();
         
         if (response.ok) {
-            // Удаляем из локального объекта vacancyData
             delete vacancyData[objectName];
             showToast(result.message || `Объект "${objectName}" удалён`, 'success');
-            
-            // Закрываем текущее модальное окно
             closeRequirementsModal();
-            
-            // Принудительно перезагружаем данные с сервера
             await loadVacancyData();
-            
-            // Открываем модальное окно заново с обновлёнными данными
             openRequirementsModal();
         } else {
             if (response.status === 404 && vacancyData[objectName]) {
@@ -841,6 +931,20 @@ async function deletePosition(objectName, positionName) {
     }
 }
 
+// ========== ИНИЦИАЛИЗАЦИЯ ФИЛЬТРОВ ==========
+function initFilters() {
+    // Устанавливаем значения по умолчанию
+    const nationalitySelect = document.getElementById('nationality');
+    const genderSelect = document.getElementById('gender');
+    
+    if (nationalitySelect) {
+        nationalitySelect.value = 'все';
+    }
+    if (genderSelect) {
+        genderSelect.value = 'все';
+    }
+}
+
 // Глобальные функции
 window.flipCard = flipCard;
 window.toggleDebug = toggleDebug;
@@ -859,3 +963,8 @@ window.closeAddPositionModal = closeAddPositionModal;
 window.createNewPosition = createNewPosition;
 window.deleteObject = deleteObject;
 window.deletePosition = deletePosition;
+
+// Запускаем инициализацию фильтров при загрузке страницы
+document.addEventListener('DOMContentLoaded', function() {
+    initFilters();
+});
