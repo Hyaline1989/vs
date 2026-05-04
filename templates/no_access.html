@@ -129,5 +129,31 @@
             });
         }
     </script>
+<!-- Footer -->
+<footer style="margin-top: 40px; padding: 20px; text-align: center; border-top: 1px solid rgba(164, 44, 48, 0.2);">
+    <div style="display: flex; justify-content: center; gap: 30px; flex-wrap: wrap; margin-bottom: 15px;">
+        <a href="/faq" style="color: var(--primary); text-decoration: none;">
+            <i class="fas fa-question-circle"></i> Часто задаваемые вопросы
+        </a>
+        <a href="#" id="footerSupportLink" style="color: var(--primary); text-decoration: none;">
+            <i class="fas fa-headset"></i> Поддержка
+        </a>
+    </div>
+    <div style="color: var(--gray); font-size: 0.7rem;">
+        <p>© 2024 Вектор — Управление вахтовым персоналом</p>
+    </div>
+</footer>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const supportLink = document.getElementById('footerSupportLink');
+        if (supportLink) {
+            supportLink.addEventListener('click', function(e) {
+                e.preventDefault();
+                window.location.href = 'mailto:support@complect.org?subject=Вопрос%20по%20системе%20Вектор';
+            });
+        }
+    });
+</script>    
 </body>
 </html>

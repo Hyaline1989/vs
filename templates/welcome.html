@@ -14,7 +14,7 @@
         }
         
         .app-logo-img {
-            max-width: 200px;
+            max-width: 180px;
             height: auto;
         }
         
@@ -87,14 +87,6 @@
             color: var(--gray);
         }
         
-        .welcome-footer {
-            margin-top: 30px;
-            padding-top: 20px;
-            border-top: 1px solid #e9ecef;
-            color: var(--gray);
-            font-size: 0.85rem;
-        }
-        
         .user-badge-large {
             display: inline-flex;
             align-items: center;
@@ -122,6 +114,57 @@
         .logo-container {
             text-align: center;
             margin-bottom: 20px;
+        }
+
+        /* Стили для футера - белая ссылка на красном фоне */
+        .footer-on-red {
+            margin-top: 40px;
+            padding: 20px;
+            text-align: center;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .footer-on-red .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            flex-wrap: wrap;
+            margin-bottom: 15px;
+        }
+        
+        .footer-on-red .footer-links a {
+            color: white;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            opacity: 0.9;
+            transition: opacity 0.3s;
+        }
+        
+        .footer-on-red .footer-links a:hover {
+            opacity: 0.7;
+            text-decoration: underline;
+        }
+        
+        .footer-on-red .footer-copyright {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.75rem;
+        }
+        
+        @media (max-width: 768px) {
+            .footer-on-red {
+                margin-top: 30px;
+                padding: 15px;
+            }
+            
+            .footer-on-red .footer-links {
+                gap: 20px;
+            }
+            
+            .footer-on-red .footer-links a {
+                font-size: 0.85rem;
+            }
         }
     </style>
 </head>
@@ -156,6 +199,18 @@
                 </a>
             </div>
         </div>
+
+        <!-- Footer - на красном фоне, ссылка белая -->
+        <footer class="footer-on-red">
+            <div class="footer-links">
+                <a href="/faq">
+                    <i class="fas fa-question-circle"></i> FAQ
+                </a>
+            </div>
+            <div class="footer-copyright">
+                <p>© 2024 Вектор — Управление вахтовым персоналом. Все права защищены.</p>
+            </div>
+        </footer>
     </div>
 
     <script src="{{ url_for('static', filename='common.js') }}"></script>

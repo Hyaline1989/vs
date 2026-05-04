@@ -210,6 +210,12 @@ def admin_panel():
 def profile_page():
     return render_template('profile.html')
 
+@app.route('/faq')
+@login_required
+def faq_page():
+    """Страница часто задаваемых вопросов - руководство пользователя"""
+    return render_template('faq.html')
+
 # ========== ДИАГНОСТИЧЕСКИЙ ЭНДПОИНТ ==========
 @app.route('/api/debug/upload-limit', methods=['GET'])
 def debug_upload_limit():
@@ -325,5 +331,6 @@ if __name__ == '__main__':
     logger.info("📋 Паспорта объектов доступны в админ-панели")
     logger.info(f"📦 Максимальный размер загружаемого файла: {app.config['MAX_CONTENT_LENGTH'] / 1024 / 1024} MB")
     logger.info("📸 Ежедневные снапшоты генерируются в 20:00")
+    logger.info("❓ FAQ - руководство пользователя доступно по адресу /faq")
     debug_mode = FLASK_ENV == 'development'
     app.run(debug=debug_mode, host='0.0.0.0', port=5001)
