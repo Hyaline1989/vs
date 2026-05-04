@@ -230,7 +230,7 @@ def debug_upload_limit():
         'route_sheets_files': files
     })
 
-# ========== ФОНОВАЯ ЗАДАЧА ДЛЯ ЕЖЕДНЕВНОГО СНИПШОТА ==========
+# ========== ФОНДОВАЯ ЗАДАЧА ДЛЯ ЕЖЕДНЕВНОГО СНИПШОТА ==========
 
 def generate_daily_snapshot():
     """Генерирует снапшот за прошедший день (запускается в 20:00 МСК)"""
@@ -309,6 +309,34 @@ except Exception as e:
 scheduler.start()
 atexit.register(lambda: scheduler.shutdown())
 
+# ========== ФУНКЦИЯ ДЛЯ АВТОМАТИЧЕСКОГО ЗАПУСКА МИГРАЦИЙ ==========
+
+def run_migrations_if_needed():
+    """Запускает миграции при старте приложения (если venv доступен)"""
+    import os
+    import subprocess
+    
+    # Проверяем, есть ли виртуальное окружение
+    venv_python = os.path.join(os.path.dirname(__file__), "venv", "bin", "python")
+    
+    if os.path.exists(venv_python):
+        try:
+            result = subprocess.run(
+                [venv_python, "run_migration.py"],
+                cwd=os.path.dirname(__file__),
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            if result.returncode == 0:
+                logger.info("✅ Миграции проверены/применены")
+            else:
+                logger.warning(f"⚠️ Проблема с миграциями: {result.stderr}")
+        except Exception as e:
+            logger.warning(f"⚠️ Не удалось запустить миграции: {e}")
+    else:
+        logger.info("ℹ️ Виртуальное окружение не найдено, пропускаем миграции")
+
 # ========== HEALTH CHECK ==========
 @app.route('/api/health')
 def health():
@@ -324,6 +352,9 @@ def health():
 
 # ========== ЗАПУСК ПРИЛОЖЕНИЯ ==========
 if __name__ == '__main__':
+    # Запускаем миграции при старте
+    run_migrations_if_needed()
+    
     logger.info("🚀 Запуск объединённого CRM Dashboard...")
     logger.info(f"🕐 Московское время: {get_moscow_now().strftime('%Y-%m-%d %H:%M:%S')}")
     logger.info("📊 Дашборд использует план из БД (вакансии)")
