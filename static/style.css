@@ -1205,7 +1205,7 @@ body {
 
 .results-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
     gap: 20px;
 }
 
@@ -1880,99 +1880,314 @@ body {
     }
 }
 
+/* static/style.css - исправленные стили для мобильной версии */
+
 @media (max-width: 768px) {
-    .filters {
+    /* Общие - убираем скролл */
+    body {
+        overflow-x: hidden;
+    }
+    
+    .app-container {
+        padding: 10px;
+        overflow-x: hidden;
+    }
+    
+    /* Сетка результатов */
+    .results-grid {
+        display: grid;
         grid-template-columns: 1fr;
+        gap: 16px;
+        padding: 5px;
     }
     
-    .dashboard-header {
-        flex-direction: column;
-    }
-    
-    .date-controls {
-        width: 100%;
-    }
-    
-    .date-field {
-        flex: 1;
-    }
-    
-    .date-field input {
-        flex: 1;
-    }
-    
+    /* Карточка */
     .flip-card {
-        height: 520px;
-    }
-    
-    .discrepancy-item {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 8px;
-    }
-    
-    .object-tag {
+        height: auto;
+        min-height: 380px;
         width: 100%;
+        overflow: hidden;
     }
     
+    .flip-card-inner {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        transition: transform 0.6s;
+        transform-style: preserve-3d;
+    }
+    
+    .flip-card-front,
+    .flip-card-back {
+        position: absolute;
+        width: 100%;
+        height: auto;
+        min-height: 380px;
+        backface-visibility: hidden;
+        border-radius: 16px;
+        padding: 15px;
+        box-sizing: border-box;
+        overflow-y: auto;
+        overflow-x: hidden;
+        font-size: 14px;
+    }
+    
+    .flip-card-front {
+        background: white;
+        border-left: 4px solid var(--primary);
+    }
+    
+    .flip-card-back {
+        background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+        color: white;
+        transform: rotateY(180deg);
+    }
+    
+    /* Заголовок карточки */
+    .flip-card-front h3 {
+        font-size: 1rem;
+        margin-bottom: 12px;
+        padding-right: 25px;
+        word-break: break-word;
+    }
+    
+    .flip-card-front h3 a {
+        font-size: 0.95rem;
+        text-decoration: none;
+        color: var(--dark);
+        word-break: break-word;
+    }
+    
+    /* Приоритетная карточка */
+    .priority-card .flip-card-front {
+        border-left: 4px solid #ff9800;
+        background: linear-gradient(135deg, rgba(255, 153, 0, 0.08), white);
+    }
+    
+    /* Блок статистики - горизонтально в одну строку */
     .vacancy-stats {
-        flex-direction: column;
-        gap: 10px;
+        display: flex;
+        flex-direction: row;
+        justify-content: space-around;
+        margin: 12px 0;
+        padding: 10px 5px;
+        background: #f8f9fa;
+        border-radius: 12px;
+        gap: 5px;
+        flex-wrap: nowrap;
     }
     
-    .menu-controls button {
-        min-width: auto;
+    .vacancy-stat {
+        text-align: center;
+        flex: 1;
+        min-width: 0;
     }
     
     .vacancy-value {
-        font-size: 1.5rem;
+        font-size: 1.2rem;
+        font-weight: bold;
+        white-space: nowrap;
     }
     
-    .flip-card-front h3 {
-        font-size: 1.1rem;
+    .vacancy-label {
+        font-size: 0.65rem;
+        color: var(--gray);
+        white-space: nowrap;
     }
     
-    .admin-panel-header {
-        flex-direction: column;
-        text-align: center;
-    }
+    .vacancy-men { color: #3498db; }
+    .vacancy-women { color: #e74c3c; }
+    .vacancy-family { color: #9b59b6; }
     
-    .users-table {
+    /* Текст на карточке */
+    .flip-card-front p {
         font-size: 0.8rem;
+        margin: 8px 0;
+        line-height: 1.3;
+        word-break: break-word;
     }
     
-    .users-table th,
-    .users-table td {
-        padding: 8px 10px;
-    }
-    
-    .actions-cell {
+    /* Блок кнопок */
+    .card-buttons {
         display: flex;
-        gap: 5px;
-    }
-    
-    .action-btn {
-        padding: 4px 8px;
-    }
-    
-    .modal-content {
-        width: 95%;
-        max-width: 95%;
-    }
-    
-    .object-perm-item {
         flex-direction: column;
-        align-items: flex-start;
-        gap: 10px;
+        gap: 8px;
+        margin-top: 12px;
+        width: 100%;
     }
     
-    .object-perm-checkboxes {
+    .direction-btn {
+        background: #27ae60;
+        color: white;
+        border: none;
+        padding: 8px 12px;
+        border-radius: 25px;
+        cursor: pointer;
+        font-size: 12px;
+        transition: all 0.3s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
         width: 100%;
-        justify-content: flex-start;
     }
     
-    .direction-btn-small {
+    .direction-btn:hover {
+        background: #219a52;
+    }
+    
+    .flip-btn {
+        position: static !important;
+        background: var(--primary);
+        color: white;
+        border: none;
+        padding: 8px 12px;
+        border-radius: 25px;
+        cursor: pointer;
+        font-size: 12px;
+        transition: all 0.3s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
         width: 100%;
+    }
+    
+    .flip-btn:hover {
+        background: var(--primary-dark);
+    }
+    
+    /* Drag handle */
+    .drag-handle-main {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        cursor: grab;
+        color: #7f8c8d;
+        font-size: 18px;
+        padding: 5px;
+    }
+    
+    /* Обратная сторона карточки */
+    .flip-card-back h3 {
+        font-size: 0.95rem;
+        margin-bottom: 12px;
+        padding-right: 20px;
+        word-break: break-word;
+    }
+    
+    .positions-list {
+        margin-top: 10px;
+    }
+    
+    .position-item {
+        background: rgba(255, 255, 255, 0.1);
+        padding: 10px;
+        margin-bottom: 10px;
+        border-radius: 10px;
+        word-break: break-word;
+    }
+    
+    .position-name {
+        font-weight: bold;
+        font-size: 0.8rem;
+        margin-bottom: 6px;
+        border-left: 2px solid #ffd700;
+        padding-left: 8px;
+        word-break: break-word;
+    }
+    
+    .position-stats {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 8px;
+        font-size: 0.7rem;
+    }
+    
+    .position-stats span {
+        background: rgba(255, 255, 255, 0.15);
+        padding: 2px 8px;
+        border-radius: 12px;
+        display: inline-block;
+        white-space: nowrap;
+    }
+    
+    .no-positions {
+        text-align: center;
+        padding: 15px;
+        color: rgba(255, 255, 255, 0.7);
+        font-style: italic;
+        font-size: 0.75rem;
+    }
+    
+    /* Порядковый номер */
+    .order-badge {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        background: var(--primary);
+        color: white;
+        border-radius: 50%;
+        text-align: center;
+        line-height: 20px;
+        font-size: 10px;
+        margin-right: 6px;
+        font-weight: bold;
+    }
+    
+    /* Скрываем скролл для flip-card */
+    .flip-card-front::-webkit-scrollbar,
+    .flip-card-back::-webkit-scrollbar {
+        width: 3px;
+    }
+    
+    .flip-card-front::-webkit-scrollbar-track,
+    .flip-card-back::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 3px;
+    }
+    
+    .flip-card-front::-webkit-scrollbar-thumb,
+    .flip-card-back::-webkit-scrollbar-thumb {
+        background: var(--primary);
+        border-radius: 3px;
+    }
+}
+
+/* Для очень маленьких экранов (до 480px) */
+@media (max-width: 480px) {
+    .vacancy-stats {
+        padding: 8px 3px;
+        gap: 3px;
+    }
+    
+    .vacancy-value {
+        font-size: 1rem;
+    }
+    
+    .vacancy-label {
+        font-size: 0.55rem;
+    }
+    
+    .flip-card-front h3 a {
+        font-size: 0.85rem;
+    }
+    
+    .direction-btn,
+    .flip-btn {
+        padding: 6px 10px;
+        font-size: 11px;
+    }
+    
+    .position-stats {
+        flex-direction: column;
+        gap: 4px;
+    }
+    
+    .position-stats span {
+        white-space: normal;
+        word-break: break-word;
     }
 }
 
