@@ -1,4 +1,4 @@
-// static/selection.js - ПОЛНАЯ ВЕРСИЯ
+// static/selection.js - ПОЛНАЯ ВЕРСИЯ С АВТОЗАПОЛНЕНИЕМ ИЗ ПРОФИЛЯ
 // ========== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ==========
 let objects = [];
 let vacancyData = {};
@@ -6,6 +6,7 @@ let globalOrder = [];
 let debugMode = false;
 let hasUnsavedChanges = false;
 let currentUserRole = null;
+let currentUserProfile = null;  // Данные профиля текущего пользователя
 
 // ========== СИСТЕМА УВЕДОМЛЕНИЙ ==========
 function showToast(message, type = 'info') {
@@ -34,10 +35,30 @@ function showToast(message, type = 'info') {
     setTimeout(() => { toast.style.animation = 'slideOut 0.3s ease'; setTimeout(() => toast.remove(), 300); }, 3000);
 }
 
+// ========== ЗАГРУЗКА ПРОФИЛЯ ПОЛЬЗОВАТЕЛЯ ==========
+async function loadCurrentUserProfile() {
+    try {
+        const response = await fetch('/api/profile', { credentials: 'include' });
+        if (response.ok) {
+            currentUserProfile = await response.json();
+            console.log('✅ Профиль загружен:', currentUserProfile);
+        } else {
+            console.warn('Не удалось загрузить профиль пользователя');
+        }
+    } catch (error) {
+        console.error('Ошибка загрузки профиля:', error);
+    }
+}
+
 // ========== ЗАГРУЗКА ДАННЫХ ==========
 async function loadSelectionData() {
     try {
         console.log('Загрузка данных для подбора объектов...');
+        
+        // Загружаем профиль пользователя
+        if (!currentUserProfile) {
+            await loadCurrentUserProfile();
+        }
         
         const userResponse = await fetch('/api/auth/me', { credentials: 'include' });
         if (userResponse.ok) {
@@ -312,7 +333,220 @@ function renderPositions(positions, objectId, objectName) {
     return html;
 }
 
-// ========== ГЛАВНОЕ МОДАЛЬНОЕ ОКНО ==========
+// ========== НАПРАВЛЕНИЕ СОТРУДНИКА (СОЗДАНИЕ ЛИДА) ==========
+
+let currentDirectionObject = null;
+let currentDirectionPosition = null;
+
+async function openDirectionForm(objectId, objectName, positionName) {
+    currentDirectionObject = { id: objectId, name: objectName };
+    currentDirectionPosition = positionName || '';
+    
+    // Загружаем профиль пользователя, если ещё не загружен
+    if (!currentUserProfile) {
+        await loadCurrentUserProfile();
+    }
+    
+    // Получаем данные для автозаполнения
+    const agentName = currentUserProfile?.full_name || currentUserProfile?.username || '';
+    const agentEmail = currentUserProfile?.email || '';
+    
+    let modal = document.getElementById('directionModal');
+    if (modal) modal.remove();
+    
+    modal = document.createElement('div');
+    modal.id = 'directionModal';
+    modal.className = 'modal';
+    modal.style.display = 'flex';
+    
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header" style="background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);">
+                <h3><i class="fas fa-paper-plane"></i> Направить сотрудника</h3>
+                <button class="modal-close" onclick="closeDirectionModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="directionForm" onsubmit="submitDirection(event)">
+                    <div class="form-group">
+                        <label>ФИО кандидата *</label>
+                        <input type="text" id="candidateName" required placeholder="Иванов Иван Иванович" autocomplete="off">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Номер телефона *</label>
+                        <input type="tel" id="candidatePhone" required placeholder="+7 (XXX) XXX-XX-XX" autocomplete="off">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>ФИО агента *</label>
+                        <input type="text" id="agentName" required value="${escapeHtml(agentName)}" placeholder="Петров Петр Петрович" readonly style="background: #f5f5f5; cursor: default;">
+                        <div class="info-text" style="font-size: 0.7rem; color: #27ae60; margin-top: 4px;">
+                            <i class="fas fa-user-check"></i> Автоматически из вашего профиля
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Email агента</label>
+                        <input type="email" id="agentEmail" value="${escapeHtml(agentEmail)}" placeholder="example@mail.ru" readonly style="background: #f5f5f5; cursor: default;">
+                        <div class="info-text" style="font-size: 0.7rem; color: var(--gray);">
+                            <i class="fas fa-envelope"></i> Для обратной связи (из профиля)
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Объект *</label>
+                        <input type="text" id="agentObject" required placeholder="Название объекта" autocomplete="off">
+                        <div class="info-text" style="font-size: 0.7rem; color: var(--gray);">
+                            <i class="fas fa-building"></i> Укажите объект, куда направляется кандидат
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Прикреплённые файлы</label>
+                        <div id="fileList" class="file-list"></div>
+                        <button type="button" class="btn-small" onclick="addFileInput()" style="margin-top: 8px; background: #3498db;">
+                            <i class="fas fa-plus"></i> Добавить файл
+                        </button>
+                        <div class="info-text" style="margin-top: 8px;">
+                            <i class="fas fa-info-circle"></i> 
+                            Поддерживаются: PDF, DOC, DOCX, JPG, PNG. Максимум 10 файлов, каждый до 10 MB
+                        </div>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="button" class="btn-cancel" onclick="closeDirectionModal()">Отмена</button>
+                        <button type="submit" class="btn-save" style="background: #27ae60;">
+                            <i class="fas fa-paper-plane"></i> Направить
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    addFileInput();
+    
+    // Автоматически фокусируемся на первом поле
+    setTimeout(() => {
+        const candidateNameInput = document.getElementById('candidateName');
+        if (candidateNameInput) candidateNameInput.focus();
+    }, 100);
+}
+
+function addFileInput() {
+    const fileList = document.getElementById('fileList');
+    if (!fileList) return;
+    
+    const fileCount = fileList.querySelectorAll('.file-input-wrapper').length;
+    
+    if (fileCount >= 10) {
+        showToast('Максимум 10 файлов', 'warning');
+        return;
+    }
+    
+    const wrapper = document.createElement('div');
+    wrapper.className = 'file-input-wrapper';
+    wrapper.style.cssText = 'display: flex; gap: 8px; margin-bottom: 8px; align-items: center;';
+    wrapper.innerHTML = `
+        <input type="file" name="attachments" class="file-input" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" style="flex: 1; padding: 6px; border: 1px solid #ddd; border-radius: 6px;">
+        <button type="button" class="remove-file-btn" onclick="this.parentElement.remove()" style="background: #e74c3c; color: white; border: none; width: 30px; height: 30px; border-radius: 4px; cursor: pointer; font-size: 14px;">✕</button>
+    `;
+    fileList.appendChild(wrapper);
+}
+
+function closeDirectionModal() {
+    const modal = document.getElementById('directionModal');
+    if (modal) modal.remove();
+    currentDirectionObject = null;
+    currentDirectionPosition = null;
+}
+
+async function submitDirection(event) {
+    event.preventDefault();
+    
+    const candidateName = document.getElementById('candidateName')?.value.trim();
+    const candidatePhone = document.getElementById('candidatePhone')?.value.trim();
+    const agentName = document.getElementById('agentName')?.value.trim();
+    const agentEmail = document.getElementById('agentEmail')?.value.trim();
+    const agentObject = document.getElementById('agentObject')?.value.trim();
+    
+    if (!candidateName) {
+        showToast('Введите ФИО кандидата', 'error');
+        return;
+    }
+    
+    if (!candidatePhone) {
+        showToast('Введите номер телефона', 'error');
+        return;
+    }
+    
+    if (!agentName) {
+        showToast('Введите ФИО агента', 'error');
+        return;
+    }
+    
+    if (!agentObject) {
+        showToast('Введите объект', 'error');
+        return;
+    }
+    
+    const phoneDigits = candidatePhone.replace(/\D/g, '');
+    if (phoneDigits.length < 10) {
+        showToast('Введите корректный номер телефона (минимум 10 цифр)', 'error');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('object_id', currentDirectionObject.id);
+    formData.append('object_name', currentDirectionObject.name);
+    formData.append('position_name', currentDirectionPosition || '');
+    formData.append('candidate_name', candidateName);
+    formData.append('candidate_phone', candidatePhone);
+    formData.append('agent_name', agentName);
+    formData.append('agent_email', agentEmail);
+    formData.append('agent_object', agentObject);
+    
+    const fileInputs = document.querySelectorAll('.file-input');
+    fileInputs.forEach(input => {
+        if (input.files && input.files[0]) {
+            formData.append('attachments', input.files[0]);
+        }
+    });
+    
+    const submitBtn = document.querySelector('#directionForm .btn-save');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Отправка...';
+    
+    try {
+        const response = await fetch('/api/selection/create-deal', {
+            method: 'POST',
+            credentials: 'include',
+            body: formData
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok && result.success) {
+            showToast(`✅ Лид создан! ID: ${result.lead_id}`, 'success');
+            closeDirectionModal();
+            if (typeof loadSelectionData === 'function') {
+                setTimeout(() => loadSelectionData(), 1000);
+            }
+        } else {
+            showToast(`❌ Ошибка: ${result.error || 'Не удалось создать лид'}`, 'error');
+        }
+    } catch (error) {
+        console.error('Ошибка:', error);
+        showToast('❌ Ошибка при отправке. Проверьте соединение.', 'error');
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
+    }
+}
+
+// ========== ГЛАВНОЕ МОДАЛЬНОЕ ОКНО ДЛЯ УПРАВЛЕНИЯ ПОТРЕБНОСТЯМИ ==========
 async function openRequirementsModal() {
     if (!window.isAdmin) {
         showToast('Только администратор может управлять потребностями', 'error');
@@ -395,7 +629,7 @@ function renderRequirementsTable() {
                     ${escapeHtml(objName)}
                     <button onclick="deleteObject('${safeObjNameForJs}')" style="display:block; margin-top:8px; background:#e74c3c; color:white; border:none; padding:3px 8px; border-radius:3px; font-size:11px; cursor:pointer;">🗑 Удалить объект</button>
                     <button onclick="showAddPositionModal('${safeObjNameForJs}')" style="display:block; margin-top:5px; background:#3498db; color:white; border:none; padding:3px 8px; border-radius:3px; font-size:11px; cursor:pointer;">+ Добавить должность</button>
-                </td>` : ''}
+                  </td>` : ''}
                 <td>${escapeHtml(pos.name)} <button onclick="deletePosition('${safeObjNameForJs}','${safePosName}')" style="margin-left:8px; background:#e74c3c; color:white; border:none; padding:2px 6px; border-radius:3px; font-size:10px; cursor:pointer;">✕</button></td>
                 <td><input type="number" class="editable rf-men" data-obj="${escapeHtml(objName)}" data-pos="${escapeHtml(pos.name)}" value="${pos.rf?.men||0}" min="0" style="width:60px; text-align:center;"></td>
                 <td><input type="number" class="editable rf-women" data-obj="${escapeHtml(objName)}" data-pos="${escapeHtml(pos.name)}" value="${pos.rf?.women||0}" min="0" style="width:60px; text-align:center;"></td>
@@ -406,8 +640,8 @@ function renderRequirementsTable() {
                 <td class="row-total" style="background:#e8f4f8; font-weight:bold; text-align:center;">${rowTotal}</td>
                 ${i === 0 ? `<td rowspan="${rowCount}" style="text-align:center; vertical-align:middle; background:#fff3cd;">
                     <input type="checkbox" class="priority-checkbox" data-obj="${escapeHtml(objName)}" ${isPriority ? 'checked' : ''} style="width:20px; height:20px;">
-                </td>` : ''}
-             </td>`;
+                  </td>` : ''}
+              </tr>`;
         }
         
         tableHtml += `<tr style="background:#f0f0f0; font-weight:bold;">
@@ -420,16 +654,16 @@ function renderRequirementsTable() {
             <td><input type="text" value="${totals.cisFamily}" readonly style="width:60px; text-align:center; background:#e8e8e8;"></td>
             <td style="background:#d4edda; text-align:center;">${totalAll}</td>
             <td style="background:#f0f0f0;"></td>
-         </tr>`;
+          </tr>`;
     }
     
     if (objectNames.length === 0) {
-        tableHtml += `<tr><td colspan="10" style="text-align:center; padding:40px;">Нет объектов. Нажмите "Добавить объект"</td></td>`;
+        tableHtml += `<tr><td colspan="10" style="text-align:center; padding:40px;">Нет объектов. Нажмите "Добавить объект"</td></tr>`;
     }
     
     tableHtml += `
                         </tbody>
-                        <tfoot><tr style="background:#2c3e50; color:white;"><td colspan="8" style="text-align:right;"><strong>ОБЩИЙ ИТОГ:</strong></td><td style="text-align:center;"><strong>${grandTotal}</strong></td><td style="background:#2c3e50;"></td><tr></tfoot>
+                        <tfoot><tr style="background:#2c3e50; color:white;"><td colspan="8" style="text-align:right;"><strong>ОБЩИЙ ИТОГ:</strong></td><td style="text-align:center;"><strong>${grandTotal}</strong></td><td style="background:#2c3e50;"></td></tr></tfoot>
                     </table>
                 </div>
                 <div class="requirements-modal-footer">
@@ -915,188 +1149,6 @@ async function deletePosition(objectName, positionName) {
     }
 }
 
-// ========== НАПРАВЛЕНИЕ СОТРУДНИКА (СОЗДАНИЕ ЛИДА) ==========
-
-let currentDirectionObject = null;
-let currentDirectionPosition = null;
-
-function openDirectionForm(objectId, objectName, positionName) {
-    currentDirectionObject = { id: objectId, name: objectName };
-    currentDirectionPosition = positionName || '';
-    
-    let modal = document.getElementById('directionModal');
-    if (modal) modal.remove();
-    
-    modal = document.createElement('div');
-    modal.id = 'directionModal';
-    modal.className = 'modal';
-    modal.style.display = 'flex';
-    
-    modal.innerHTML = `
-        <div class="modal-content" style="max-width: 500px;">
-            <div class="modal-header" style="background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);">
-                <h3><i class="fas fa-paper-plane"></i> Направить сотрудника</h3>
-                <button class="modal-close" onclick="closeDirectionModal()">&times;</button>
-            </div>
-            <div class="modal-body">
-                <form id="directionForm" onsubmit="submitDirection(event)">
-                    <div class="form-group">
-                        <label>ФИО кандидата *</label>
-                        <input type="text" id="candidateName" required placeholder="Иванов Иван Иванович" autocomplete="off">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>Номер телефона *</label>
-                        <input type="tel" id="candidatePhone" required placeholder="+7 (XXX) XXX-XX-XX" autocomplete="off">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>ФИО агента *</label>
-                        <input type="text" id="agentName" required placeholder="Петров Петр Петрович" autocomplete="off">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>Объект *</label>
-                        <input type="text" id="agentObject" required placeholder="Название объекта" autocomplete="off">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>Прикреплённые файлы</label>
-                        <div id="fileList" class="file-list"></div>
-                        <button type="button" class="btn-small" onclick="addFileInput()" style="margin-top: 8px; background: #3498db;">
-                            <i class="fas fa-plus"></i> Добавить файл
-                        </button>
-                        <div class="info-text" style="margin-top: 8px;">
-                            <i class="fas fa-info-circle"></i> 
-                            Поддерживаются: PDF, DOC, DOCX, JPG, PNG. Максимум 10 файлов, каждый до 10 MB
-                        </div>
-                    </div>
-                    
-                    <div class="form-actions">
-                        <button type="button" class="btn-cancel" onclick="closeDirectionModal()">Отмена</button>
-                        <button type="submit" class="btn-save" style="background: #27ae60;">
-                            <i class="fas fa-paper-plane"></i> Направить
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    addFileInput();
-}
-
-function addFileInput() {
-    const fileList = document.getElementById('fileList');
-    if (!fileList) return;
-    
-    const fileCount = fileList.querySelectorAll('.file-input-wrapper').length;
-    
-    if (fileCount >= 10) {
-        showToast('Максимум 10 файлов', 'warning');
-        return;
-    }
-    
-    const wrapper = document.createElement('div');
-    wrapper.className = 'file-input-wrapper';
-    wrapper.style.cssText = 'display: flex; gap: 8px; margin-bottom: 8px; align-items: center;';
-    wrapper.innerHTML = `
-        <input type="file" name="attachments" class="file-input" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" style="flex: 1; padding: 6px; border: 1px solid #ddd; border-radius: 6px;">
-        <button type="button" class="remove-file-btn" onclick="this.parentElement.remove()" style="background: #e74c3c; color: white; border: none; width: 30px; height: 30px; border-radius: 4px; cursor: pointer; font-size: 14px;">✕</button>
-    `;
-    fileList.appendChild(wrapper);
-}
-
-function closeDirectionModal() {
-    const modal = document.getElementById('directionModal');
-    if (modal) modal.remove();
-    currentDirectionObject = null;
-    currentDirectionPosition = null;
-}
-
-async function submitDirection(event) {
-    event.preventDefault();
-    
-    const candidateName = document.getElementById('candidateName')?.value.trim();
-    const candidatePhone = document.getElementById('candidatePhone')?.value.trim();
-    const agentName = document.getElementById('agentName')?.value.trim();
-    const agentObject = document.getElementById('agentObject')?.value.trim();
-    
-    if (!candidateName) {
-        showToast('Введите ФИО кандидата', 'error');
-        return;
-    }
-    
-    if (!candidatePhone) {
-        showToast('Введите номер телефона', 'error');
-        return;
-    }
-    
-    if (!agentName) {
-        showToast('Введите ФИО агента', 'error');
-        return;
-    }
-    
-    if (!agentObject) {
-        showToast('Введите объект', 'error');
-        return;
-    }
-    
-    const phoneDigits = candidatePhone.replace(/\D/g, '');
-    if (phoneDigits.length < 10) {
-        showToast('Введите корректный номер телефона (минимум 10 цифр)', 'error');
-        return;
-    }
-    
-    const formData = new FormData();
-    formData.append('object_id', currentDirectionObject.id);
-    formData.append('object_name', currentDirectionObject.name);
-    formData.append('position_name', currentDirectionPosition || '');
-    formData.append('candidate_name', candidateName);
-    formData.append('candidate_phone', candidatePhone);
-    formData.append('agent_name', agentName);
-    formData.append('agent_object', agentObject);
-    
-    const fileInputs = document.querySelectorAll('.file-input');
-    fileInputs.forEach(input => {
-        if (input.files && input.files[0]) {
-            formData.append('attachments', input.files[0]);
-        }
-    });
-    
-    const submitBtn = document.querySelector('#directionForm .btn-save');
-    const originalText = submitBtn.innerHTML;
-    submitBtn.disabled = true;
-    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Отправка...';
-    
-    try {
-        const response = await fetch('/api/selection/create-deal', {
-            method: 'POST',
-            credentials: 'include',
-            body: formData
-        });
-        
-        const result = await response.json();
-        
-        if (response.ok && result.success) {
-            showToast(`✅ Лид создан! ID: ${result.lead_id}`, 'success');
-            closeDirectionModal();
-            if (typeof loadSelectionData === 'function') {
-                setTimeout(() => loadSelectionData(), 1000);
-            }
-        } else {
-            showToast(`❌ Ошибка: ${result.error || 'Не удалось создать лид'}`, 'error');
-        }
-    } catch (error) {
-        console.error('Ошибка:', error);
-        showToast('❌ Ошибка при отправке. Проверьте соединение.', 'error');
-    } finally {
-        submitBtn.disabled = false;
-        submitBtn.innerHTML = originalText;
-    }
-}
-
 // ========== ИНИЦИАЛИЗАЦИЯ ФИЛЬТРОВ ==========
 function initFilters() {
     const nationalitySelect = document.getElementById('nationality');
@@ -1112,6 +1164,7 @@ function initFilters() {
 
 document.addEventListener('DOMContentLoaded', function() {
     initFilters();
+    loadCurrentUserProfile(); // Загружаем профиль при загрузке страницы
 });
 
 // Глобальные функции

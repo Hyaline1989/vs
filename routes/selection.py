@@ -1,4 +1,4 @@
-# routes/selection.py - полная версия
+# routes/selection.py - полная версия с поддержкой email
 # -*- coding: utf-8 -*-
 from flask import Blueprint, request, jsonify, send_file
 from flask_login import current_user, login_required
@@ -185,6 +185,7 @@ def create_direction_deal():
         candidate_name = request.form.get('candidate_name', '').strip()
         candidate_phone = request.form.get('candidate_phone', '').strip()
         agent_name = request.form.get('agent_name', '').strip()
+        agent_email = request.form.get('agent_email', '').strip()
         agent_object = request.form.get('agent_object', '').strip()
         
         # Валидация
@@ -227,6 +228,7 @@ def create_direction_deal():
             'position_name': position_name,
             'directed_by': directed_by,
             'agent_name': agent_name,
+            'agent_email': agent_email,
             'agent_object': agent_object,
             'comment': '',
             'source_id': SOURCE_AGENT
@@ -243,7 +245,7 @@ def create_direction_deal():
         log_user_action(
             current_user.id,
             'create_lead',
-            f"Создан лид: {candidate_name} → {agent_object} (агент: {agent_name}, файлов: {len(valid_files)}, лид {lead_id})",
+            f"Создан лид: {candidate_name} → {agent_object} (агент: {agent_name}, email: {agent_email}, файлов: {len(valid_files)}, лид {lead_id})",
             request.remote_addr
         )
         

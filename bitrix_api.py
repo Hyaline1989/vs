@@ -1,4 +1,4 @@
-# bitrix_api.py - полная версия
+# bitrix_api.py - полная версия с поддержкой email в пользовательском поле
 # -*- coding: utf-8 -*-
 import requests
 import re
@@ -16,6 +16,8 @@ PASSPORT_FIELD = "UF_CRM_1707988048727"
 AGENT_NAME_FIELD = "UF_CRM_1708339537928"
 # Константа для поля "Объект от агента"
 AGENT_OBJECT_FIELD = "UF_CRM_1777895760218"
+# Константа для поля "Email агента" - ДОБАВЛЯЕМ
+AGENT_EMAIL_FIELD = "UF_CRM_1778049472057"
 
 
 class BitrixAPI:
@@ -176,18 +178,18 @@ class BitrixAPI:
         """Удаляет только эмодзи, сохраняя оригинальный регистр"""
         if not text:
             return text
-        emoji_pattern = re.compile("["
-            u"\U0001F600-\U0001F64F"
-            u"\U0001F300-\U0001F5FF"
-            u"\U0001F680-\U0001F6FF"
-            u"\U0001F1E0-\U0001F1FF"
-            u"\U00002702-\U000027B0"
-            u"\U000024C2-\U0001F251"
-            u"\U0001F900-\U0001F9FF"
-            u"\U0001FA70-\U0001FAFF"
-            u"\U00002600-\U000027BF"
-            u"\U0001F004-\U0001F0CF"
-            u"\U0001F18E-\U0001F1FF"
+        emoji_pattern = re.compile("[" 
+            u"\U0001F600-\U0001F64F" 
+            u"\U0001F300-\U0001F5FF" 
+            u"\U0001F680-\U0001F6FF" 
+            u"\U0001F1E0-\U0001F1FF" 
+            u"\U00002702-\U000027B0" 
+            u"\U000024C2-\U0001F251" 
+            u"\U0001F900-\U0001F9FF" 
+            u"\U0001FA70-\U0001FAFF" 
+            u"\U00002600-\U000027BF" 
+            u"\U0001F004-\U0001F0CF" 
+            u"\U0001F18E-\U0001F1FF" 
             "]+", flags=re.UNICODE)
         result = emoji_pattern.sub('', text).strip()
         result = ' '.join(result.split())
@@ -221,13 +223,14 @@ class BitrixAPI:
     # ========== МЕТОДЫ ДЛЯ НАПРАВЛЕНИЯ СОТРУДНИКА (ЛИДЫ) ==========
     
     def create_lead_from_direction(self, lead_data):
-        """Создаёт лид для направления сотрудника"""
+        """Создаёт лид для направления сотрудника с поддержкой email в отдельном поле"""
         method = 'crm.lead.add'
         
         title = lead_data.get('title', 'Новое направление')
         
         # Получаем объект от агента
         agent_object = lead_data.get('agent_object', '')
+        agent_email = lead_data.get('agent_email', '')
         
         comments = f"""📋 ИНФОРМАЦИЯ О НАПРАВЛЕНИИ
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -237,6 +240,8 @@ class BitrixAPI:
 🏢 Объект: {agent_object}
 💼 Должность: {lead_data.get('position_name', 'Не указана')}
 👨‍💼 Направил: {lead_data.get('directed_by', 'Неизвестно')}
+
+📧 Email агента: {agent_email if agent_email else 'Не указан'}
 
 📝 КОММЕНТАРИЙ:
 {lead_data.get('comment', 'Нет комментария')}
@@ -253,6 +258,7 @@ class BitrixAPI:
         if not agent_name:
             agent_name = lead_data.get('directed_by', '')
         
+        # Формируем поля для лида
         fields = {
             'TITLE': title,
             'NAME': first_name,
@@ -267,12 +273,18 @@ class BitrixAPI:
             AGENT_OBJECT_FIELD: agent_object,
         }
         
+        # Добавляем email в отдельное пользовательское поле (если оно есть)
+        if agent_email:
+            fields[AGENT_EMAIL_FIELD] = agent_email
+            logger.info(f"📧 Email агента ({AGENT_EMAIL_FIELD}): {agent_email}")
+        
         params = {'fields': fields}
         
         try:
             logger.info(f"Создание лида: {title}")
-            logger.info(f"ФИО агента: {agent_name}")
-            logger.info(f"Объект: {agent_object}")
+            logger.info(f"ФИО агента ({AGENT_NAME_FIELD}): {agent_name}")
+            logger.info(f"Email агента ({AGENT_EMAIL_FIELD}): {agent_email}")
+            logger.info(f"Объект ({AGENT_OBJECT_FIELD}): {agent_object}")
             response = requests.post(f"{self.webhook_url}{method}", json=params, timeout=30)
             result = response.json()
             
