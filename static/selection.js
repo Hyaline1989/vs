@@ -171,13 +171,6 @@ function filterAndDisplayObjects() {
                 nationalityMatch = needCISMen || needCISWomen || needCISFamily;
                 break;
                 
-            case 'РБ':
-                const needRBMen = (stats.rf?.men || 0) > 0;
-                const needRBWomen = (stats.rf?.women || 0) > 0;
-                const needRBFamily = (stats.rf?.family || 0) > 0;
-                nationalityMatch = needRBMen || needRBWomen || needRBFamily;
-                break;
-                
             case 'все':
                 nationalityMatch = true;
                 break;
@@ -629,7 +622,7 @@ function renderRequirementsTable() {
                     ${escapeHtml(objName)}
                     <button onclick="deleteObject('${safeObjNameForJs}')" style="display:block; margin-top:8px; background:#e74c3c; color:white; border:none; padding:3px 8px; border-radius:3px; font-size:11px; cursor:pointer;">🗑 Удалить объект</button>
                     <button onclick="showAddPositionModal('${safeObjNameForJs}')" style="display:block; margin-top:5px; background:#3498db; color:white; border:none; padding:3px 8px; border-radius:3px; font-size:11px; cursor:pointer;">+ Добавить должность</button>
-                  </td>` : ''}
+                   </td>` : ''}
                 <td>${escapeHtml(pos.name)} <button onclick="deletePosition('${safeObjNameForJs}','${safePosName}')" style="margin-left:8px; background:#e74c3c; color:white; border:none; padding:2px 6px; border-radius:3px; font-size:10px; cursor:pointer;">✕</button></td>
                 <td><input type="number" class="editable rf-men" data-obj="${escapeHtml(objName)}" data-pos="${escapeHtml(pos.name)}" value="${pos.rf?.men||0}" min="0" style="width:60px; text-align:center;"></td>
                 <td><input type="number" class="editable rf-women" data-obj="${escapeHtml(objName)}" data-pos="${escapeHtml(pos.name)}" value="${pos.rf?.women||0}" min="0" style="width:60px; text-align:center;"></td>
@@ -640,7 +633,7 @@ function renderRequirementsTable() {
                 <td class="row-total" style="background:#e8f4f8; font-weight:bold; text-align:center;">${rowTotal}</td>
                 ${i === 0 ? `<td rowspan="${rowCount}" style="text-align:center; vertical-align:middle; background:#fff3cd;">
                     <input type="checkbox" class="priority-checkbox" data-obj="${escapeHtml(objName)}" ${isPriority ? 'checked' : ''} style="width:20px; height:20px;">
-                  </td>` : ''}
+                   </td>` : ''}
               </tr>`;
         }
         
