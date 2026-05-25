@@ -1,4 +1,4 @@
-// static/selection.js - ПОЛНАЯ ВЕРСИЯ С АВТОЗАПОЛНЕНИЕМ ИЗ ПРОФИЛЯ
+// static/selection.js - ПОЛНАЯ ВЕРСИЯ С АВТОЗАПОЛНЕНИЕМ ИЗ ПРОФИЛЯ (ОБНОВЛЕНА: раздельные Имя/Фамилия/Отчество)
 // ========== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ==========
 let objects = [];
 let vacancyData = {};
@@ -360,9 +360,18 @@ async function openDirectionForm(objectId, objectName, positionName) {
             </div>
             <div class="modal-body">
                 <form id="directionForm" onsubmit="submitDirection(event)">
+                    <!-- 1. ИЗМЕНЕНО: три поля вместо одного -->
                     <div class="form-group">
-                        <label>ФИО кандидата *</label>
-                        <input type="text" id="candidateName" required placeholder="Иванов Иван Иванович" autocomplete="off">
+                        <label>Фамилия кандидата *</label>
+                        <input type="text" id="candidateLastName" required placeholder="Иванов" autocomplete="off">
+                    </div>
+                    <div class="form-group">
+                        <label>Имя кандидата *</label>
+                        <input type="text" id="candidateFirstName" required placeholder="Иван" autocomplete="off">
+                    </div>
+                    <div class="form-group">
+                        <label>Отчество кандидата</label>
+                        <input type="text" id="candidatePatronymic" placeholder="Иванович" autocomplete="off">
                     </div>
                     
                     <div class="form-group">
@@ -394,8 +403,9 @@ async function openDirectionForm(objectId, objectName, positionName) {
                         </div>
                     </div>
                     
+                    <!-- 2. ИЗМЕНЕНО: название блока файлов -->
                     <div class="form-group">
-                        <label>Прикреплённые файлы</label>
+                        <label>Сканы документов</label>
                         <div id="fileList" class="file-list"></div>
                         <button type="button" class="btn-small" onclick="addFileInput()" style="margin-top: 8px; background: #3498db;">
                             <i class="fas fa-plus"></i> Добавить файл
@@ -422,8 +432,8 @@ async function openDirectionForm(objectId, objectName, positionName) {
     
     // Автоматически фокусируемся на первом поле
     setTimeout(() => {
-        const candidateNameInput = document.getElementById('candidateName');
-        if (candidateNameInput) candidateNameInput.focus();
+        const candidateLastNameInput = document.getElementById('candidateLastName');
+        if (candidateLastNameInput) candidateLastNameInput.focus();
     }, 100);
 }
 
@@ -455,30 +465,35 @@ function closeDirectionModal() {
     currentDirectionPosition = null;
 }
 
+// ОБНОВЛЕНО: отправка данных с раздельными полями
 async function submitDirection(event) {
     event.preventDefault();
     
-    const candidateName = document.getElementById('candidateName')?.value.trim();
+    const lastName = document.getElementById('candidateLastName')?.value.trim();
+    const firstName = document.getElementById('candidateFirstName')?.value.trim();
+    const patronymic = document.getElementById('candidatePatronymic')?.value.trim();
     const candidatePhone = document.getElementById('candidatePhone')?.value.trim();
     const agentName = document.getElementById('agentName')?.value.trim();
     const agentEmail = document.getElementById('agentEmail')?.value.trim();
     const agentObject = document.getElementById('agentObject')?.value.trim();
     
-    if (!candidateName) {
-        showToast('Введите ФИО кандидата', 'error');
+    // Валидация
+    if (!lastName) {
+        showToast('Введите фамилию кандидата', 'error');
         return;
     }
-    
+    if (!firstName) {
+        showToast('Введите имя кандидата', 'error');
+        return;
+    }
     if (!candidatePhone) {
         showToast('Введите номер телефона', 'error');
         return;
     }
-    
     if (!agentName) {
         showToast('Введите ФИО агента', 'error');
         return;
     }
-    
     if (!agentObject) {
         showToast('Введите объект', 'error');
         return;
@@ -494,7 +509,11 @@ async function submitDirection(event) {
     formData.append('object_id', currentDirectionObject.id);
     formData.append('object_name', currentDirectionObject.name);
     formData.append('position_name', currentDirectionPosition || '');
-    formData.append('candidate_name', candidateName);
+    
+    // Отправляем раздельно
+    formData.append('candidate_last_name', lastName);
+    formData.append('candidate_first_name', firstName);
+    formData.append('candidate_patronymic', patronymic);
     formData.append('candidate_phone', candidatePhone);
     formData.append('agent_name', agentName);
     formData.append('agent_email', agentEmail);
@@ -622,7 +641,7 @@ function renderRequirementsTable() {
                     ${escapeHtml(objName)}
                     <button onclick="deleteObject('${safeObjNameForJs}')" style="display:block; margin-top:8px; background:#e74c3c; color:white; border:none; padding:3px 8px; border-radius:3px; font-size:11px; cursor:pointer;">🗑 Удалить объект</button>
                     <button onclick="showAddPositionModal('${safeObjNameForJs}')" style="display:block; margin-top:5px; background:#3498db; color:white; border:none; padding:3px 8px; border-radius:3px; font-size:11px; cursor:pointer;">+ Добавить должность</button>
-                   </td>` : ''}
+                    </td>` : ''}
                 <td>${escapeHtml(pos.name)} <button onclick="deletePosition('${safeObjNameForJs}','${safePosName}')" style="margin-left:8px; background:#e74c3c; color:white; border:none; padding:2px 6px; border-radius:3px; font-size:10px; cursor:pointer;">✕</button></td>
                 <td><input type="number" class="editable rf-men" data-obj="${escapeHtml(objName)}" data-pos="${escapeHtml(pos.name)}" value="${pos.rf?.men||0}" min="0" style="width:60px; text-align:center;"></td>
                 <td><input type="number" class="editable rf-women" data-obj="${escapeHtml(objName)}" data-pos="${escapeHtml(pos.name)}" value="${pos.rf?.women||0}" min="0" style="width:60px; text-align:center;"></td>
@@ -633,7 +652,7 @@ function renderRequirementsTable() {
                 <td class="row-total" style="background:#e8f4f8; font-weight:bold; text-align:center;">${rowTotal}</td>
                 ${i === 0 ? `<td rowspan="${rowCount}" style="text-align:center; vertical-align:middle; background:#fff3cd;">
                     <input type="checkbox" class="priority-checkbox" data-obj="${escapeHtml(objName)}" ${isPriority ? 'checked' : ''} style="width:20px; height:20px;">
-                   </td>` : ''}
+                    </td>` : ''}
               </tr>`;
         }
         

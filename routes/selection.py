@@ -1,4 +1,4 @@
-# routes/selection.py - полная версия с поддержкой email
+# routes/selection.py - полная версия с поддержкой email (ОБНОВЛЕНА: раздельные Имя/Фамилия/Отчество)
 # -*- coding: utf-8 -*-
 from flask import Blueprint, request, jsonify, send_file
 from flask_login import current_user, login_required
@@ -173,27 +173,38 @@ def debug_priority():
 @selection_bp.route('/create-deal', methods=['POST'])
 @login_required
 def create_direction_deal():
-    """Создание лида в Bitrix24 с прикреплением всех файлов"""
+    """Создание лида в Bitrix24 с прикреплением всех файлов (обновлено: раздельные поля Имя/Фамилия/Отчество)"""
     if not current_user.can_view_selection():
         return jsonify({'error': 'Forbidden'}), 403
     
     try:
-        # Получаем данные из формы
+        # Получаем данные из формы (ОБНОВЛЕНО: три поля для имени)
         object_id = request.form.get('object_id')
         object_name = request.form.get('object_name')
         position_name = request.form.get('position_name', '')
-        candidate_name = request.form.get('candidate_name', '').strip()
+        
+        # --- Новые поля: раздельные имя, фамилия, отчество ---
+        last_name = request.form.get('candidate_last_name', '').strip()      # Фамилия
+        first_name = request.form.get('candidate_first_name', '').strip()    # Имя
+        patronymic = request.form.get('candidate_patronymic', '').strip()    # Отчество
+        
         candidate_phone = request.form.get('candidate_phone', '').strip()
         agent_name = request.form.get('agent_name', '').strip()
         agent_email = request.form.get('agent_email', '').strip()
         agent_object = request.form.get('agent_object', '').strip()
         
+        # Собираем полное ФИО для заголовка лида (Title)
+        full_name_parts = [last_name, first_name, patronymic]
+        full_name = ' '.join([p for p in full_name_parts if p])
+        
         # Валидация
         if not object_name:
             return jsonify({'error': 'Не указан объект'}), 400
         
-        if not candidate_name:
-            return jsonify({'error': 'Введите ФИО кандидата'}), 400
+        if not first_name:
+            return jsonify({'error': 'Введите имя кандидата'}), 400
+        if not last_name:
+            return jsonify({'error': 'Введите фамилию кандидата'}), 400
         
         if not candidate_phone:
             return jsonify({'error': 'Введите номер телефона'}), 400
@@ -211,18 +222,20 @@ def create_direction_deal():
         # Получаем информацию о пользователе
         directed_by = current_user.full_name or current_user.username
         
-        # Формируем название лида
-        lead_title = f"Сделка от агентов - {candidate_name}"
+        # Формируем название лида (используем собранное ФИО)
+        lead_title = f"Сделка от агентов - {full_name}"
         
         from bitrix_api import BitrixAPI
         from config import BITRIX_WEBHOOK_URL, SOURCE_AGENT
         
         bitrix_api = BitrixAPI(BITRIX_WEBHOOK_URL)
         
-        # Подготавливаем данные для лида
+        # Подготавливаем данные для лида (передаем раздельно)
         lead_data = {
             'title': lead_title,
-            'candidate_name': candidate_name,
+            'first_name': first_name,     # Имя
+            'last_name': last_name,       # Фамилия
+            'patronymic': patronymic,     # Отчество
             'candidate_phone': candidate_phone,
             'object_name': object_name,
             'position_name': position_name,
@@ -245,7 +258,7 @@ def create_direction_deal():
         log_user_action(
             current_user.id,
             'create_lead',
-            f"Создан лид: {candidate_name} → {agent_object} (агент: {agent_name}, email: {agent_email}, файлов: {len(valid_files)}, лид {lead_id})",
+            f"Создан лид: {full_name} → {agent_object} (агент: {agent_name}, email: {agent_email}, файлов: {len(valid_files)}, лид {lead_id})",
             request.remote_addr
         )
         

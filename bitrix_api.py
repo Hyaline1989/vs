@@ -1,4 +1,4 @@
-# bitrix_api.py - полная версия с поддержкой email в пользовательском поле
+# bitrix_api.py - полная версия с поддержкой email и раздельных полей имени/фамилии/отчества
 # -*- coding: utf-8 -*-
 import requests
 import re
@@ -16,7 +16,7 @@ PASSPORT_FIELD = "UF_CRM_1707988048727"
 AGENT_NAME_FIELD = "UF_CRM_1708339537928"
 # Константа для поля "Объект от агента"
 AGENT_OBJECT_FIELD = "UF_CRM_1777895760218"
-# Константа для поля "Email агента" - ДОБАВЛЯЕМ
+# Константа для поля "Email агента"
 AGENT_EMAIL_FIELD = "UF_CRM_1778049472057"
 
 
@@ -223,7 +223,7 @@ class BitrixAPI:
     # ========== МЕТОДЫ ДЛЯ НАПРАВЛЕНИЯ СОТРУДНИКА (ЛИДЫ) ==========
     
     def create_lead_from_direction(self, lead_data):
-        """Создаёт лид для направления сотрудника с поддержкой email в отдельном поле"""
+        """Создаёт лид для направления сотрудника с поддержкой email и раздельных полей имени/фамилии/отчества"""
         method = 'crm.lead.add'
         
         title = lead_data.get('title', 'Новое направление')
@@ -232,10 +232,18 @@ class BitrixAPI:
         agent_object = lead_data.get('agent_object', '')
         agent_email = lead_data.get('agent_email', '')
         
+        # Получаем раздельные поля имени
+        first_name = lead_data.get('first_name', '')
+        last_name = lead_data.get('last_name', '')
+        patronymic = lead_data.get('patronymic', '')
+        
+        # Собираем полное ФИО для комментария
+        full_name = ' '.join([p for p in [last_name, first_name, patronymic] if p])
+        
         comments = f"""📋 ИНФОРМАЦИЯ О НАПРАВЛЕНИИ
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-👤 Кандидат: {lead_data.get('candidate_name', 'Не указан')}
+👤 Кандидат: {full_name if full_name else 'Не указан'}
 📞 Телефон: {lead_data.get('candidate_phone', 'Не указан')}
 🏢 Объект: {agent_object}
 💼 Должность: {lead_data.get('position_name', 'Не указана')}
@@ -248,11 +256,6 @@ class BitrixAPI:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 """
         
-        full_name = lead_data.get('candidate_name', '')
-        name_parts = full_name.split(' ', 1)
-        first_name = name_parts[0] if name_parts else ''
-        last_name = name_parts[1] if len(name_parts) > 1 else ''
-        
         # ФИО агента
         agent_name = lead_data.get('agent_name', '')
         if not agent_name:
@@ -261,8 +264,9 @@ class BitrixAPI:
         # Формируем поля для лида
         fields = {
             'TITLE': title,
-            'NAME': first_name,
-            'LAST_NAME': last_name,
+            'NAME': first_name,           # Имя
+            'LAST_NAME': last_name,       # Фамилия
+            'SECOND_NAME': patronymic,    # Отчество
             'PHONE': [{'VALUE': lead_data.get('candidate_phone', ''), 'VALUE_TYPE': 'WORK'}],
             'COMMENTS': comments,
             'SOURCE_ID': lead_data.get('source_id', 'WEB'),
@@ -282,6 +286,7 @@ class BitrixAPI:
         
         try:
             logger.info(f"Создание лида: {title}")
+            logger.info(f"ФИО кандидата: {last_name} {first_name} {patronymic}")
             logger.info(f"ФИО агента ({AGENT_NAME_FIELD}): {agent_name}")
             logger.info(f"Email агента ({AGENT_EMAIL_FIELD}): {agent_email}")
             logger.info(f"Объект ({AGENT_OBJECT_FIELD}): {agent_object}")
