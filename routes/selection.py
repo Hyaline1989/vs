@@ -11,7 +11,7 @@ from werkzeug.utils import secure_filename
 from database import (
     get_objects_settings, update_object_settings, get_global_order, save_global_order,
     get_user_module_permissions, get_user_object_permissions, get_objects_settings_extended,
-    get_current_requirements, DB_NAME
+    get_current_requirements, DB_NAME, save_or_update_worker_status
 )
 from datetime import datetime
 
@@ -183,7 +183,7 @@ def create_direction_deal():
         object_name = request.form.get('object_name')
         position_name = request.form.get('position_name', '')
         
-        # --- Новые поля: раздельные имя, фамилия, отчество ---
+        # Новые поля: раздельные имя, фамилия, отчество
         last_name = request.form.get('candidate_last_name', '').strip()      # Фамилия
         first_name = request.form.get('candidate_first_name', '').strip()    # Имя
         patronymic = request.form.get('candidate_patronymic', '').strip()    # Отчество
@@ -252,6 +252,25 @@ def create_direction_deal():
         
         if not lead_id:
             return jsonify({'error': 'Ошибка создания лида в Bitrix24'}), 500
+        
+        # Сохраняем статус вахтовика в локальную БД
+        try:
+            # Получаем дату создания сделки из Bitrix (сейчас текущая)
+            deal_date = datetime.now().strftime('%Y-%m-%d')
+            
+            # Сохраняем или обновляем запись о вахтовике
+            save_or_update_worker_status(
+                lead_id=lead_id,
+                worker_full_name=full_name,
+                agent_full_name=agent_name,
+                deal_date=deal_date,
+                check_in_date=None,
+                shift_1_date=None,
+                shift_5_date=None
+            )
+            logger.info(f"✅ Статус вахтовика сохранён для лида {lead_id}")
+        except Exception as e:
+            logger.error(f"Ошибка при сохранении статуса вахтовика: {e}")
         
         # Логируем действие
         from database import log_user_action

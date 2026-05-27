@@ -29,7 +29,7 @@ from models import User
 # Импортируем blueprint'ы
 from routes import (
     auth_bp, admin_bp, dashboard_bp, selection_bp, admin_pages_bp, objects_admin_bp,
-    init_dashboard_apis
+    init_dashboard_apis, worker_status_bp
 )
 from routes.requirements_admin import requirements_admin_bp
 from routes.profile import profile_bp
@@ -149,6 +149,7 @@ app.register_blueprint(admin_pages_bp)
 app.register_blueprint(objects_admin_bp)
 app.register_blueprint(requirements_admin_bp)
 app.register_blueprint(profile_bp)
+app.register_blueprint(worker_status_bp)
 
 # ========== СТРАНИЦЫ ==========
 @app.route('/')
@@ -215,6 +216,22 @@ def profile_page():
 def faq_page():
     """Страница часто задаваемых вопросов - руководство пользователя"""
     return render_template('faq.html')
+
+@app.route('/worker-status')
+@login_required
+def worker_status_page():
+    """Страница статусов вахтовиков"""
+    try:
+        if not current_user.can_view_selection():
+            return render_template('no_access.html', 
+                                 message="У вас нет доступа к этой странице",
+                                 return_url="/welcome"), 403
+        return render_template('worker_status.html')
+    except Exception as e:
+        logger.error(f"Ошибка при загрузке worker_status_page: {e}", exc_info=True)
+        return render_template('no_access.html', 
+                             message="Произошла ошибка при загрузке страницы",
+                             return_url="/welcome"), 500
 
 # ========== ДИАГНОСТИЧЕСКИЙ ЭНДПОИНТ ==========
 @app.route('/api/debug/upload-limit', methods=['GET'])
@@ -306,6 +323,21 @@ try:
 except Exception as e:
     logger.warning(f"⚠️ Не удалось запланировать задачу снапшотов: {e}")
 
+# Добавляем задачу для очистки старых записей вахтовиков (старше 365 дней)
+try:
+    from database.worker_status import delete_old_worker_records
+    scheduler.add_job(
+        func=delete_old_worker_records,
+        trigger='cron',
+        hour=3,
+        minute=15,
+        args=[365],
+        id='cleanup_worker_statuses'
+    )
+    logger.info("✅ Запланирована очистка старых записей вахтовиков (старше 365 дней)")
+except Exception as e:
+    logger.warning(f"⚠️ Не удалось запланировать очистку вахтовиков: {e}")
+
 scheduler.start()
 atexit.register(lambda: scheduler.shutdown())
 
@@ -363,5 +395,6 @@ if __name__ == '__main__':
     logger.info(f"📦 Максимальный размер загружаемого файла: {app.config['MAX_CONTENT_LENGTH'] / 1024 / 1024} MB")
     logger.info("📸 Ежедневные снапшоты генерируются в 20:00")
     logger.info("❓ FAQ - руководство пользователя доступно по адресу /faq")
+    logger.info("👥 Статусы вахтовиков доступны по адресу /worker-status")
     debug_mode = FLASK_ENV == 'development'
     app.run(debug=debug_mode, host='0.0.0.0', port=5001)

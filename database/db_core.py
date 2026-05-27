@@ -208,6 +208,23 @@ def init_db():
             )
         ''')
         
+        # ========== ТАБЛИЦА СТАТУСОВ ВАХТОВИКОВ ==========
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS worker_statuses (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                lead_id INTEGER NOT NULL UNIQUE,
+                worker_full_name TEXT NOT NULL,
+                agent_full_name TEXT NOT NULL,
+                deal_date TEXT NOT NULL,
+                check_in_date TEXT,
+                shift_1_date TEXT,
+                shift_5_date TEXT,
+                last_synced TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
         # Индексы
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_current_req_object ON current_requirements (object_name)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_vacancy_date ON vacancy_requirements (date)')
@@ -221,6 +238,9 @@ def init_db():
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_passports_object_id ON object_passports (object_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_snapshots_date ON daily_snapshots (date)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_snapshots_object ON daily_snapshots (object_name)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_worker_agent ON worker_statuses (agent_full_name)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_worker_deal_date ON worker_statuses (deal_date)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_worker_lead_id ON worker_statuses (lead_id)')
         
         conn.commit()
         

@@ -378,3 +378,122 @@ class BitrixAPI:
     def get_source_id_for_direction(self):
         """Возвращает ID источника для направлений из CRM"""
         return SOURCE_AGENT
+    
+    # ========== МЕТОДЫ ДЛЯ СТАТУСОВ ВАХТОВИКОВ ==========
+    
+    def get_deals_by_agent_fullname(self, agent_fullname, date_from=None, date_to=None):
+        """
+        Получает сделки (лиды) для конкретного агента по полю UF_CRM_65D332164BDB2
+        с фильтрацией по дате создания сделки (DATE_CREATE)
+        """
+        filter_params = {
+            AGENT_NAME_FIELD: agent_fullname  # UF_CRM_1708339537928 - ФИО агента
+        }
+        
+        if date_from:
+            filter_params['>DATE_CREATE'] = date_from + ' 00:00:00'
+        if date_to:
+            filter_params['<DATE_CREATE'] = date_to + ' 23:59:59'
+        
+        all_leads = self._get_all_leads_raw_for_worker(filter_params)
+        return self._process_leads_with_statuses(all_leads)
+    
+    def _get_all_leads_raw_for_worker(self, filter_params):
+        """Получает все лиды с фильтрацией для статусов вахтовиков"""
+        all_leads = []
+        start = 0
+        limit = 50
+        
+        while True:
+            method = 'crm.lead.list'
+            params = {
+                'filter': filter_params,
+                'select': [
+                    'ID', 'TITLE', 'NAME', 'LAST_NAME', 'SECOND_NAME',
+                    'DATE_CREATE',
+                    AGENT_NAME_FIELD,      # UF_CRM_1708339537928 - ФИО агента
+                    AGENT_OBJECT_FIELD,    # UF_CRM_1777895760218 - Объект
+                    'UF_CRM_1684488791039',  # Дата заселения
+                    'UF_CRM_1685531338652',  # Дата отработал 1 смену
+                    'UF_CRM_1684488917199',  # Дата адаптирован 5 смен
+                ],
+                'start': start
+            }
+            
+            try:
+                response = requests.post(f"{self.webhook_url}{method}", json=params, timeout=30)
+                result = response.json()
+                
+                if 'result' in result and result['result']:
+                    leads_batch = result['result']
+                    all_leads.extend(leads_batch)
+                    
+                    if len(leads_batch) < limit:
+                        break
+                    
+                    start += limit
+                else:
+                    break
+                    
+            except Exception as e:
+                logger.error(f"Ошибка при запросе лидов к Bitrix24: {e}")
+                break
+        
+        logger.info(f"Получено {len(all_leads)} лидов из Bitrix24 для агента")
+        return all_leads
+    
+    def _process_leads_with_statuses(self, leads):
+        """Обрабатывает лиды и извлекает информацию о статусах"""
+        if not leads:
+            return []
+        
+        result = []
+        for lead in leads:
+            # Собираем ФИО вахтовика из полей NAME, LAST_NAME, SECOND_NAME
+            first_name = lead.get('NAME', '')
+            last_name = lead.get('LAST_NAME', '')
+            second_name = lead.get('SECOND_NAME', '')
+            
+            worker_full_name = ' '.join([p for p in [last_name, first_name, second_name] if p]).strip()
+            if not worker_full_name:
+                worker_full_name = lead.get('TITLE', 'Не указано')
+            
+            result.append({
+                'lead_id': lead.get('ID'),
+                'title': lead.get('TITLE'),
+                'worker_full_name': worker_full_name,
+                'agent_full_name': lead.get(AGENT_NAME_FIELD, ''),
+                'object_name': lead.get(AGENT_OBJECT_FIELD, ''),
+                'deal_date': lead.get('DATE_CREATE', '')[:10] if lead.get('DATE_CREATE') else '',
+                'check_in_date': lead.get('UF_CRM_1684488791039', ''),
+                'shift_1_date': lead.get('UF_CRM_1685531338652', ''),
+                'shift_5_date': lead.get('UF_CRM_1684488917199', '')
+            })
+        
+        return result
+    
+    def sync_worker_statuses_for_agent(self, agent_fullname, date_from=None, date_to=None):
+        """
+        Синхронизирует статусы вахтовиков для конкретного агента
+        Возвращает список обновлённых/добавленных записей
+        """
+        from database.worker_status import save_or_update_worker_status, update_worker_status_from_bitrix
+        
+        leads = self.get_deals_by_agent_fullname(agent_fullname, date_from, date_to)
+        synced_count = 0
+        
+        for lead in leads:
+            # Сохраняем основную информацию
+            save_or_update_worker_status(
+                lead_id=lead['lead_id'],
+                worker_full_name=lead['worker_full_name'],
+                agent_full_name=lead['agent_full_name'],
+                deal_date=lead['deal_date'],
+                check_in_date=lead['check_in_date'],
+                shift_1_date=lead['shift_1_date'],
+                shift_5_date=lead['shift_5_date']
+            )
+            synced_count += 1
+        
+        logger.info(f"Синхронизировано {synced_count} записей для агента {agent_fullname}")
+        return synced_count

@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Вектор | Статусы вахтовиков</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='images/favicon.png') }}">
+    <style>
+        .app-logo-img {
+            max-width: 180px;
+            height: auto;
+        }
+        
+        .worker-status-container {
+            background: white;
+            border-radius: 20px;
+            padding: 25px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        }
+        
+        .status-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        
+        .status-header h2 {
+            color: var(--dark);
+            margin: 0;
+        }
+        
+        .status-header h2 i {
+            color: var(--primary);
+            margin-right: 10px;
+        }
+        
+        .filters-bar {
+            display: flex;
+            gap: 15px;
+            align-items: flex-end;
+            flex-wrap: wrap;
+            margin-bottom: 25px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 16px;
+        }
+        
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        
+        .filter-group label {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--dark);
+        }
+        
+        .filter-group input {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 0.9rem;
+        }
+        
+        .filter-group input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        
+        .filter-actions {
+            display: flex;
+            gap: 10px;
+            margin-left: auto;
+        }
+        
+        .btn-filter {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .btn-filter:hover {
+            background: var(--primary-dark);
+        }
+        
+        .btn-reset {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .btn-reset:hover {
+            background: #5a6268;
+        }
+        
+        .btn-sync {
+            background: #27ae60;
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .btn-sync:hover {
+            background: #219a52;
+        }
+        
+        .status-table-container {
+            overflow-x: auto;
+        }
+        
+        .status-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+        
+        .status-table th {
+            text-align: left;
+            padding: 12px 15px;
+            background: #f8f9fa;
+            border-bottom: 2px solid var(--primary);
+            font-weight: 600;
+            color: var(--dark);
+        }
+        
+        .status-table td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #e9ecef;
+            vertical-align: middle;
+        }
+        
+        .status-table tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        
+        .status-badge.completed {
+            background: #e8f5e9;
+            color: #27ae60;
+        }
+        
+        .status-badge.pending {
+            background: #fff3e0;
+            color: #f39c12;
+        }
+        
+        .status-badge.not-started {
+            background: #f5f5f5;
+            color: #95a5a6;
+        }
+        
+        .date-cell {
+            font-family: monospace;
+            font-size: 0.85rem;
+        }
+        
+        .no-data {
+            text-align: center;
+            padding: 40px;
+            color: var(--gray);
+        }
+        
+        .agent-info {
+            background: var(--primary-bg);
+            padding: 8px 16px;
+            border-radius: 30px;
+            font-size: 0.9rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        @media (max-width: 768px) {
+            .worker-status-container {
+                padding: 15px;
+            }
+            
+            .filters-bar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .filter-actions {
+                margin-left: 0;
+                justify-content: stretch;
+            }
+            
+            .btn-filter, .btn-reset, .btn-sync {
+                width: 100%;
+            }
+            
+            .status-table th,
+            .status-table td {
+                padding: 8px 10px;
+                font-size: 0.8rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div class="app-header">
+            <div class="logo-container">
+                <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Вектор" class="app-logo-img">
+                <p class="app-subtitle">Управление вахтовым персоналом</p>
+            </div>
+            <div class="header-right">
+                <div class="system-switcher">
+                    <button class="system-btn" onclick="window.location.href='/dashboard'">
+                        <i class="fas fa-chart-line"></i>
+                        <span>Дашборд</span>
+                    </button>
+                    <button class="system-btn" onclick="window.location.href='/selection'">
+                        <i class="fas fa-user-check"></i>
+                        <span>Подбор объектов</span>
+                    </button>
+                    <button class="system-btn active" onclick="window.location.href='/worker-status'">
+                        <i class="fas fa-users"></i>
+                        <span>Вахтовики</span>
+                    </button>
+                    {% if current_user.is_authenticated and (current_user.role == 'admin' or current_user.role == 'manager') %}
+                    <button class="system-btn" onclick="window.location.href='/admin'">
+                        <i class="fas fa-users-cog"></i>
+                        <span>Админ-панель</span>
+                    </button>
+                    {% endif %}
+                </div>
+                <div class="user-info" id="userInfo"></div>
+            </div>
+        </div>
+
+        <div class="worker-status-container">
+            <div class="status-header">
+                <h2><i class="fas fa-users"></i> Статусы направленных вахтовиков</h2>
+                <div class="agent-info" id="agentInfo">
+                    <i class="fas fa-user-tie"></i>
+                    <span id="agentName">Загрузка...</span>
+                </div>
+            </div>
+            
+            <div class="filters-bar">
+                <div class="filter-group">
+                    <label><i class="fas fa-calendar-alt"></i> Дата создания сделки с</label>
+                    <input type="date" id="filterDateFrom">
+                </div>
+                <div class="filter-group">
+                    <label><i class="fas fa-calendar-alt"></i> по</label>
+                    <input type="date" id="filterDateTo">
+                </div>
+                <div class="filter-actions">
+                    <button class="btn-filter" onclick="loadWorkerStatuses()">
+                        <i class="fas fa-search"></i> Применить фильтр
+                    </button>
+                    <button class="btn-reset" onclick="resetFilters()">
+                        <i class="fas fa-undo-alt"></i> Сбросить
+                    </button>
+                    <button class="btn-sync" onclick="syncWithBitrix()">
+                        <i class="fas fa-sync-alt"></i> Синхронизировать
+                    </button>
+                </div>
+            </div>
+            
+            <div class="status-table-container" id="statusTableContainer">
+                <div class="loading">Загрузка данных...</div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="app-footer">
+        <div class="footer-links">
+            <a href="/faq">
+                <i class="fas fa-question-circle"></i> FAQ
+            </a>
+        </div>
+        <div class="footer-copyright">
+            <p>© 2026 Вектор — Управление вахтовым персоналом. Все права защищены.</p>
+        </div>
+    </footer>
+
+    <script src="{{ url_for('static', filename='common.js') }}"></script>
+    <script>
+        let currentAgentName = '';
+        
+        async function loadWorkerStatuses() {
+            const container = document.getElementById('statusTableContainer');
+            if (!container) return;
+            
+            container.innerHTML = '<div class="loading">Загрузка данных...</div>';
+            
+            const dateFrom = document.getElementById('filterDateFrom')?.value || '';
+            const dateTo = document.getElementById('filterDateTo')?.value || '';
+            
+            let url = '/api/worker-status';
+            const params = [];
+            if (dateFrom) params.push(`date_from=${dateFrom}`);
+            if (dateTo) params.push(`date_to=${dateTo}`);
+            if (params.length) url += '?' + params.join('&');
+            
+            try {
+                const response = await fetch(url, { credentials: 'include' });
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    container.innerHTML = `<div class="error-state">❌ ${data.error || 'Ошибка загрузки'}</div>`;
+                    return;
+                }
+                
+                currentAgentName = data.agent_name;
+                const agentNameSpan = document.getElementById('agentName');
+                if (agentNameSpan) agentNameSpan.textContent = currentAgentName;
+                
+                renderStatusTable(data.statuses);
+                
+            } catch (error) {
+                console.error('Ошибка:', error);
+                container.innerHTML = '<div class="error-state">❌ Ошибка загрузки данных</div>';
+            }
+        }
+        
+        function renderStatusTable(statuses) {
+            const container = document.getElementById('statusTableContainer');
+            
+            if (!statuses || statuses.length === 0) {
+                container.innerHTML = `
+                    <div class="no-data">
+                        <i class="fas fa-info-circle" style="font-size: 48px; margin-bottom: 15px;"></i>
+                        <p>Нет данных о направленных вахтовиках</p>
+                        <p style="font-size: 0.8rem;">Попробуйте изменить фильтр или нажмите "Синхронизировать"</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            let html = `
+                <table class="status-table">
+                    <thead>
+                        <tr>
+                            <th>ФИО вахтовика</th>
+                            <th>Дата сделки</th>
+                            <th>Заселён</th>
+                            <th>Отработал 1 смену</th>
+                            <th>Отработал 5 смен</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            
+            for (const s of statuses) {
+                const dealDate = s.deal_date ? formatDateForDisplay(s.deal_date) : '—';
+                const checkInDate = s.check_in_date ? formatDateForDisplay(s.check_in_date) : '—';
+                const shift1Date = s.shift_1_date ? formatDateForDisplay(s.shift_1_date) : '—';
+                const shift5Date = s.shift_5_date ? formatDateForDisplay(s.shift_5_date) : '—';
+                
+                const checkInStatus = s.check_in_date ? 'completed' : 'pending';
+                const shift1Status = s.shift_1_date ? 'completed' : 'pending';
+                const shift5Status = s.shift_5_date ? 'completed' : 'pending';
+                
+                html += `
+                    <tr>
+                        <td><strong>${escapeHtml(s.worker_full_name)}</strong></td>
+                        <td class="date-cell">${escapeHtml(dealDate)}</td>
+                        <td>
+                            <span class="status-badge ${checkInStatus}">
+                                ${s.check_in_date ? '✅ ' + escapeHtml(checkInDate) : '⏳ Не заселен'}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="status-badge ${shift1Status}">
+                                ${s.shift_1_date ? '✅ ' + escapeHtml(shift1Date) : '⏳ Не отработал'}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="status-badge ${shift5Status}">
+                                ${s.shift_5_date ? '✅ ' + escapeHtml(shift5Date) : '⏳ Не отработал'}
+                            </span>
+                        </td>
+                    </tr>
+                `;
+            }
+            
+            html += `
+                    </tbody>
+                </table>
+                <div style="margin-top: 15px; font-size: 0.75rem; color: var(--gray); text-align: center;">
+                    <i class="fas fa-info-circle"></i> Всего: ${statuses.length} направлений
+                </div>
+            `;
+            
+            container.innerHTML = html;
+        }
+        
+        function formatDateForDisplay(dateStr) {
+            if (!dateStr) return '—';
+            if (dateStr.includes('-')) {
+                const parts = dateStr.split('-');
+                if (parts.length === 3) {
+                    return `${parts[2]}.${parts[1]}.${parts[0]}`;
+                }
+            }
+            return dateStr;
+        }
+        
+        function resetFilters() {
+            document.getElementById('filterDateFrom').value = '';
+            document.getElementById('filterDateTo').value = '';
+            loadWorkerStatuses();
+        }
+        
+        async function syncWithBitrix() {
+            const dateFrom = document.getElementById('filterDateFrom')?.value || '';
+            const dateTo = document.getElementById('filterDateTo')?.value || '';
+            
+            const syncBtn = document.querySelector('.btn-sync');
+            const originalText = syncBtn.innerHTML;
+            syncBtn.disabled = true;
+            syncBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Синхронизация...';
+            
+            try {
+                const response = await fetch('/api/worker-status/sync', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ date_from: dateFrom, date_to: dateTo })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    showNotification(`✅ Синхронизировано ${data.synced_count} записей`, 'success');
+                    await loadWorkerStatuses();
+                } else {
+                    showNotification(`❌ ${data.error || 'Ошибка синхронизации'}`, 'error');
+                }
+            } catch (error) {
+                console.error('Ошибка:', error);
+                showNotification('❌ Ошибка синхронизации', 'error');
+            } finally {
+                syncBtn.disabled = false;
+                syncBtn.innerHTML = originalText;
+            }
+        }
+        
+        function showNotification(message, type) {
+            const notification = document.createElement('div');
+            notification.className = `notification notification-${type}`;
+            notification.textContent = message;
+            notification.style.cssText = `
+                position: fixed;
+                bottom: 20px;
+                right: 20px;
+                background: white;
+                padding: 12px 20px;
+                border-radius: 30px;
+                box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+                z-index: 10001;
+                border-left: 4px solid ${type === 'success' ? '#27ae60' : type === 'error' ? '#e74c3c' : '#A42C30'};
+                animation: slideIn 0.3s ease;
+            `;
+            document.body.appendChild(notification);
+            setTimeout(() => {
+                notification.style.opacity = '0';
+                setTimeout(() => notification.remove(), 300);
+            }, 3000);
+        }
+        
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/[&<>]/g, function(m) {
+                if (m === '&') return '&amp;';
+                if (m === '<') return '&lt;';
+                if (m === '>') return '&gt;';
+                return m;
+            });
+        }
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            const today = new Date();
+            const monthAgo = new Date();
+            monthAgo.setMonth(monthAgo.getMonth() - 1);
+            
+            const dateFromInput = document.getElementById('filterDateFrom');
+            const dateToInput = document.getElementById('filterDateTo');
+            
+            if (dateFromInput) dateFromInput.value = monthAgo.toISOString().split('T')[0];
+            if (dateToInput) dateToInput.value = today.toISOString().split('T')[0];
+            
+            loadWorkerStatuses();
+        });
+    </script>
+</body>
+</html>

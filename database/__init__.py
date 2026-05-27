@@ -86,6 +86,15 @@ from database.snapshots import (
     delete_snapshots_for_date
 )
 
+# Статусы вахтовиков
+from database.worker_status import (
+    get_worker_statuses,
+    save_or_update_worker_status,
+    update_worker_status_from_bitrix,
+    delete_old_worker_records,
+    get_worker_status_by_lead_id
+)
+
 __all__ = [
     # core
     'DB_NAME', 'get_db_connection', 'init_db',
@@ -124,5 +133,10 @@ __all__ = [
     # snapshots
     'save_daily_snapshot', 'save_daily_snapshots_batch',
     'get_snapshot_report', 'check_snapshot_exists',
-    'delete_snapshots_for_date'
+    'delete_snapshots_for_date',
+    
+    # worker_status
+    'get_worker_statuses', 'save_or_update_worker_status',
+    'update_worker_status_from_bitrix', 'delete_old_worker_records',
+    'get_worker_status_by_lead_id'
 ]
