@@ -258,6 +258,7 @@
             
             let cardsHtml = '';
             
+            // Дашборд
             if (permissions.dashboard !== false) {
                 cardsHtml += `
                     <a href="/dashboard" class="welcome-card">
@@ -273,6 +274,7 @@
                 `;
             }
             
+            // Подбор объектов
             if (permissions.selection !== false) {
                 cardsHtml += `
                     <a href="/selection" class="welcome-card">
@@ -288,8 +290,8 @@
                 `;
             }
             
-            // Карточка "Вахтовики" - доступна всем, у кого есть доступ к подбору
-            if (permissions.selection !== false) {
+            // Вахтовики - добавлен новый модуль
+            if (permissions.worker_status !== false) {
                 cardsHtml += `
                     <a href="/worker-status" class="welcome-card">
                         <div class="welcome-card-icon">
@@ -304,6 +306,7 @@
                 `;
             }
             
+            // Админ-панель (только для admin и manager)
             if (window.currentUser.role === 'admin' || window.currentUser.role === 'manager') {
                 cardsHtml += `
                     <a href="/admin" class="welcome-card">

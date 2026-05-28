@@ -65,7 +65,7 @@ def init_db():
             CREATE TABLE IF NOT EXISTS user_module_permissions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL,
-                module_name TEXT NOT NULL CHECK(module_name IN ('dashboard', 'selection')),
+                module_name TEXT NOT NULL CHECK(module_name IN ('dashboard', 'selection', 'worker_status')),
                 can_view INTEGER DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -263,8 +263,8 @@ def init_db():
             
             cursor.execute('''
                 INSERT INTO user_module_permissions (user_id, module_name, can_view)
-                VALUES (?, 'dashboard', 1), (?, 'selection', 1)
-            ''', (admin_id, admin_id))
+                VALUES (?, 'dashboard', 1), (?, 'selection', 1), (?, 'worker_status', 1)
+            ''', (admin_id, admin_id, admin_id))
             
             cursor.execute('SELECT id FROM objects_settings')
             all_objects = cursor.fetchall()

@@ -77,6 +77,7 @@ def create_user_api():
     # Даём базовые права на модули
     set_user_module_permission(user_id, 'dashboard', True)
     set_user_module_permission(user_id, 'selection', True)
+    set_user_module_permission(user_id, 'worker_status', True)
     
     if role == 'admin':
         grant_all_objects_access(user_id, True, True)
@@ -223,7 +224,7 @@ def update_user_module_perms(user_id):
     data = request.get_json()
     
     for module, can_view in data.items():
-        if module in ['dashboard', 'selection']:
+        if module in ['dashboard', 'selection', 'worker_status']:
             # Для manager: проверяем, что он не выдаёт доступ к модулю, к которому сам не имеет доступа
             if current_user.role == 'manager':
                 if not my_module_perms.get(module, False):

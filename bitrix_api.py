@@ -1,4 +1,4 @@
-# bitrix_api.py - полная версия с поддержкой email и раздельных полей имени/фамилии/отчества
+# bitrix_api.py - полная версия с получением данных из сделки
 # -*- coding: utf-8 -*-
 import requests
 import re
@@ -18,6 +18,11 @@ AGENT_NAME_FIELD = "UF_CRM_1708339537928"
 AGENT_OBJECT_FIELD = "UF_CRM_1777895760218"
 # Константа для поля "Email агента"
 AGENT_EMAIL_FIELD = "UF_CRM_1778049472057"
+
+# Константы для полей статусов вахтовиков (в СДЕЛКЕ)
+CHECK_IN_FIELD = "UF_CRM_1684488791039"      # Дата заселения
+SHIFT_1_FIELD = "UF_CRM_1685531338652"      # Дата отработал 1 смену
+SHIFT_5_FIELD = "UF_CRM_1684488917199"      # Дата адаптирован (5 смен)
 
 
 class BitrixAPI:
@@ -223,21 +228,17 @@ class BitrixAPI:
     # ========== МЕТОДЫ ДЛЯ НАПРАВЛЕНИЯ СОТРУДНИКА (ЛИДЫ) ==========
     
     def create_lead_from_direction(self, lead_data):
-        """Создаёт лид для направления сотрудника с поддержкой email и раздельных полей имени/фамилии/отчества"""
+        """Создаёт лид для направления сотрудника"""
         method = 'crm.lead.add'
         
         title = lead_data.get('title', 'Новое направление')
-        
-        # Получаем объект от агента
         agent_object = lead_data.get('agent_object', '')
         agent_email = lead_data.get('agent_email', '')
         
-        # Получаем раздельные поля имени
         first_name = lead_data.get('first_name', '')
         last_name = lead_data.get('last_name', '')
         patronymic = lead_data.get('patronymic', '')
         
-        # Собираем полное ФИО для комментария
         full_name = ' '.join([p for p in [last_name, first_name, patronymic] if p])
         
         comments = f"""📋 ИНФОРМАЦИЯ О НАПРАВЛЕНИИ
@@ -256,17 +257,15 @@ class BitrixAPI:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 """
         
-        # ФИО агента
         agent_name = lead_data.get('agent_name', '')
         if not agent_name:
             agent_name = lead_data.get('directed_by', '')
         
-        # Формируем поля для лида
         fields = {
             'TITLE': title,
-            'NAME': first_name,           # Имя
-            'LAST_NAME': last_name,       # Фамилия
-            'SECOND_NAME': patronymic,    # Отчество
+            'NAME': first_name,
+            'LAST_NAME': last_name,
+            'SECOND_NAME': patronymic,
             'PHONE': [{'VALUE': lead_data.get('candidate_phone', ''), 'VALUE_TYPE': 'WORK'}],
             'COMMENTS': comments,
             'SOURCE_ID': lead_data.get('source_id', 'WEB'),
@@ -277,19 +276,13 @@ class BitrixAPI:
             AGENT_OBJECT_FIELD: agent_object,
         }
         
-        # Добавляем email в отдельное пользовательское поле (если оно есть)
         if agent_email:
             fields[AGENT_EMAIL_FIELD] = agent_email
-            logger.info(f"📧 Email агента ({AGENT_EMAIL_FIELD}): {agent_email}")
         
         params = {'fields': fields}
         
         try:
             logger.info(f"Создание лида: {title}")
-            logger.info(f"ФИО кандидата: {last_name} {first_name} {patronymic}")
-            logger.info(f"ФИО агента ({AGENT_NAME_FIELD}): {agent_name}")
-            logger.info(f"Email агента ({AGENT_EMAIL_FIELD}): {agent_email}")
-            logger.info(f"Объект ({AGENT_OBJECT_FIELD}): {agent_object}")
             response = requests.post(f"{self.webhook_url}{method}", json=params, timeout=30)
             result = response.json()
             
@@ -310,17 +303,13 @@ class BitrixAPI:
             return True
         
         try:
-            # Формируем массив файлов для поля
             file_data_array = []
             
             for file in files:
                 if not file or not file.filename:
                     continue
                 
-                # Возвращаем указатель в начало файла
                 file.seek(0)
-                
-                # Читаем файл и кодируем в base64
                 file_content = file.read()
                 file_base64 = base64.b64encode(file_content).decode('utf-8')
                 
@@ -331,7 +320,6 @@ class BitrixAPI:
             if not file_data_array:
                 return False
             
-            # Отправляем массив файлов в поле
             method = 'crm.lead.update'
             params = {
                 'id': lead_id,
@@ -357,13 +345,12 @@ class BitrixAPI:
             return False
     
     def create_lead_with_files(self, lead_data, files=None):
-        """Создаёт лид и прикрепляет все файлы к пользовательскому полю"""
+        """Создаёт лид и прикрепляет все файлы"""
         lead_id = self.create_lead_from_direction(lead_data)
         
         if not lead_id:
             return None
         
-        # Фильтруем валидные файлы
         valid_files = [f for f in files if f and f.filename] if files else []
         
         if valid_files:
@@ -376,18 +363,71 @@ class BitrixAPI:
         return lead_id
     
     def get_source_id_for_direction(self):
-        """Возвращает ID источника для направлений из CRM"""
         return SOURCE_AGENT
     
-    # ========== МЕТОДЫ ДЛЯ СТАТУСОВ ВАХТОВИКОВ ==========
+    # ========== МЕТОДЫ ДЛЯ СТАТУСОВ ВАХТОВИКОВ (из СДЕЛКИ) ==========
+    
+    def _get_deal_by_lead_id(self, lead_id):
+        """Находит сделку, связанную с лидом"""
+        method = 'crm.deal.list'
+        params = {
+            'filter': {'LEAD_ID': lead_id},
+            'select': ['ID', 'LEAD_ID', 'TITLE']
+        }
+        
+        try:
+            response = requests.post(f"{self.webhook_url}{method}", json=params, timeout=30)
+            result = response.json()
+            
+            if 'result' in result and result['result']:
+                deals = result['result']
+                if deals:
+                    return deals[0]['ID']
+            return None
+        except Exception as e:
+            logger.error(f"Ошибка поиска сделки по лиду {lead_id}: {e}")
+            return None
+    
+    def _get_deal_statuses(self, deal_id):
+        """Получает статусные поля из сделки"""
+        method = 'crm.deal.get'
+        params = {'id': deal_id}
+        
+        try:
+            response = requests.post(f"{self.webhook_url}{method}", json=params, timeout=30)
+            result = response.json()
+            
+            if 'result' in result:
+                deal = result['result']
+                
+                check_in = deal.get(CHECK_IN_FIELD, '')
+                shift_1 = deal.get(SHIFT_1_FIELD, '')
+                shift_5 = deal.get(SHIFT_5_FIELD, '')
+                
+                # Очищаем даты
+                for val in [check_in, shift_1, shift_5]:
+                    if val and len(str(val)) > 10:
+                        if val == check_in:
+                            check_in = str(check_in)[:10]
+                        elif val == shift_1:
+                            shift_1 = str(shift_1)[:10]
+                        elif val == shift_5:
+                            shift_5 = str(shift_5)[:10]
+                
+                return {
+                    'check_in_date': check_in,
+                    'shift_1_date': shift_1,
+                    'shift_5_date': shift_5
+                }
+            return None
+        except Exception as e:
+            logger.error(f"Ошибка получения статусов из сделки {deal_id}: {e}")
+            return None
     
     def get_deals_by_agent_fullname(self, agent_fullname, date_from=None, date_to=None):
-        """
-        Получает сделки (лиды) для конкретного агента по полю UF_CRM_65D332164BDB2
-        с фильтрацией по дате создания сделки (DATE_CREATE)
-        """
+        """Получает лиды агента и обогащает их данными из связанных сделок"""
         filter_params = {
-            AGENT_NAME_FIELD: agent_fullname  # UF_CRM_1708339537928 - ФИО агента
+            AGENT_NAME_FIELD: agent_fullname
         }
         
         if date_from:
@@ -396,10 +436,10 @@ class BitrixAPI:
             filter_params['<DATE_CREATE'] = date_to + ' 23:59:59'
         
         all_leads = self._get_all_leads_raw_for_worker(filter_params)
-        return self._process_leads_with_statuses(all_leads)
+        return self._process_leads_with_deal_statuses(all_leads)
     
     def _get_all_leads_raw_for_worker(self, filter_params):
-        """Получает все лиды с фильтрацией для статусов вахтовиков"""
+        """Получает все лиды с фильтрацией"""
         all_leads = []
         start = 0
         limit = 50
@@ -411,11 +451,8 @@ class BitrixAPI:
                 'select': [
                     'ID', 'TITLE', 'NAME', 'LAST_NAME', 'SECOND_NAME',
                     'DATE_CREATE',
-                    AGENT_NAME_FIELD,      # UF_CRM_1708339537928 - ФИО агента
-                    AGENT_OBJECT_FIELD,    # UF_CRM_1777895760218 - Объект
-                    'UF_CRM_1684488791039',  # Дата заселения
-                    'UF_CRM_1685531338652',  # Дата отработал 1 смену
-                    'UF_CRM_1684488917199',  # Дата адаптирован 5 смен
+                    AGENT_NAME_FIELD,
+                    AGENT_OBJECT_FIELD,
                 ],
                 'start': start
             }
@@ -442,14 +479,14 @@ class BitrixAPI:
         logger.info(f"Получено {len(all_leads)} лидов из Bitrix24 для агента")
         return all_leads
     
-    def _process_leads_with_statuses(self, leads):
-        """Обрабатывает лиды и извлекает информацию о статусах"""
+    def _process_leads_with_deal_statuses(self, leads):
+        """Обрабатывает лиды и получает статусы из связанных сделок"""
         if not leads:
             return []
         
         result = []
         for lead in leads:
-            # Собираем ФИО вахтовика из полей NAME, LAST_NAME, SECOND_NAME
+            # Собираем ФИО вахтовика
             first_name = lead.get('NAME', '')
             last_name = lead.get('LAST_NAME', '')
             second_name = lead.get('SECOND_NAME', '')
@@ -458,32 +495,67 @@ class BitrixAPI:
             if not worker_full_name:
                 worker_full_name = lead.get('TITLE', 'Не указано')
             
+            # Ищем связанную сделку
+            deal_id = self._get_deal_by_lead_id(lead.get('ID'))
+            
+            check_in = ''
+            shift_1 = ''
+            shift_5 = ''
+            
+            if deal_id:
+                logger.info(f"🔍 Найдена сделка {deal_id} для лида {lead.get('ID')}")
+                statuses = self._get_deal_statuses(deal_id)
+                if statuses:
+                    check_in = statuses.get('check_in_date', '')
+                    shift_1 = statuses.get('shift_1_date', '')
+                    shift_5 = statuses.get('shift_5_date', '')
+                    logger.info(f"📋 Из сделки {deal_id}: заселение='{check_in}', 1 смена='{shift_1}', 5 смен='{shift_5}'")
+            else:
+                logger.warning(f"⚠️ Для лида {lead.get('ID')} не найдена связанная сделка")
+            
+            # Преобразуем формат DD.MM.YYYY в YYYY-MM-DD если нужно
+            for date_val in [check_in, shift_1, shift_5]:
+                if date_val and '.' in date_val:
+                    try:
+                        parts = date_val.split('.')
+                        if len(parts) == 3:
+                            new_date = f"{parts[2]}-{parts[1]}-{parts[0]}"
+                            if date_val == check_in:
+                                check_in = new_date
+                            elif date_val == shift_1:
+                                shift_1 = new_date
+                            elif date_val == shift_5:
+                                shift_5 = new_date
+                    except:
+                        pass
+            
+            logger.info(f"📋 Лид {lead.get('ID')}: заселение='{check_in}', 1 смена='{shift_1}', 5 смен='{shift_5}'")
+            
+            deal_date = lead.get('DATE_CREATE', '')
+            if deal_date and len(str(deal_date)) > 10:
+                deal_date = str(deal_date)[:10]
+            
             result.append({
                 'lead_id': lead.get('ID'),
                 'title': lead.get('TITLE'),
                 'worker_full_name': worker_full_name,
                 'agent_full_name': lead.get(AGENT_NAME_FIELD, ''),
                 'object_name': lead.get(AGENT_OBJECT_FIELD, ''),
-                'deal_date': lead.get('DATE_CREATE', '')[:10] if lead.get('DATE_CREATE') else '',
-                'check_in_date': lead.get('UF_CRM_1684488791039', ''),
-                'shift_1_date': lead.get('UF_CRM_1685531338652', ''),
-                'shift_5_date': lead.get('UF_CRM_1684488917199', '')
+                'deal_date': deal_date,
+                'check_in_date': check_in,
+                'shift_1_date': shift_1,
+                'shift_5_date': shift_5
             })
         
         return result
     
     def sync_worker_statuses_for_agent(self, agent_fullname, date_from=None, date_to=None):
-        """
-        Синхронизирует статусы вахтовиков для конкретного агента
-        Возвращает список обновлённых/добавленных записей
-        """
-        from database.worker_status import save_or_update_worker_status, update_worker_status_from_bitrix
+        from database.worker_status import save_or_update_worker_status
         
         leads = self.get_deals_by_agent_fullname(agent_fullname, date_from, date_to)
         synced_count = 0
         
         for lead in leads:
-            # Сохраняем основную информацию
             save_or_update_worker_status(
                 lead_id=lead['lead_id'],
                 worker_full_name=lead['worker_full_name'],
@@ -497,3 +569,88 @@ class BitrixAPI:
         
         logger.info(f"Синхронизировано {synced_count} записей для агента {agent_fullname}")
         return synced_count
+    
+    def get_lead_by_id(self, lead_id):
+        """Получает данные лида и статусы из связанной сделки"""
+        method = 'crm.lead.get'
+        params = {'id': lead_id}
+        
+        try:
+            response = requests.post(f"{self.webhook_url}{method}", json=params, timeout=30)
+            result = response.json()
+            
+            if 'result' in result:
+                lead = result['result']
+                
+                first_name = lead.get('NAME', '')
+                last_name = lead.get('LAST_NAME', '')
+                second_name = lead.get('SECOND_NAME', '')
+                worker_full_name = ' '.join([p for p in [last_name, first_name, second_name] if p]).strip()
+                if not worker_full_name:
+                    worker_full_name = lead.get('TITLE', 'Не указано')
+                
+                # Ищем связанную сделку
+                deal_id = self._get_deal_by_lead_id(lead_id)
+                check_in = ''
+                shift_1 = ''
+                shift_5 = ''
+                
+                if deal_id:
+                    statuses = self._get_deal_statuses(deal_id)
+                    if statuses:
+                        check_in = statuses.get('check_in_date', '')
+                        shift_1 = statuses.get('shift_1_date', '')
+                        shift_5 = statuses.get('shift_5_date', '')
+                
+                return {
+                    'lead_id': lead.get('ID'),
+                    'worker_full_name': worker_full_name,
+                    'agent_full_name': lead.get(AGENT_NAME_FIELD, ''),
+                    'object_name': lead.get(AGENT_OBJECT_FIELD, ''),
+                    'check_in_date': check_in,
+                    'shift_1_date': shift_1,
+                    'shift_5_date': shift_5
+                }
+            else:
+                logger.error(f"Ошибка получения лида {lead_id}: {result}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Ошибка при получении лида {lead_id}: {e}")
+            return None
+    
+    def debug_lead_fields(self, lead_id):
+        """Диагностика лида и связанной сделки"""
+        method = 'crm.lead.get'
+        params = {'id': lead_id}
+        
+        try:
+            response = requests.post(f"{self.webhook_url}{method}", json=params, timeout=30)
+            result = response.json()
+            
+            if 'result' in result:
+                lead = result['result']
+                logger.info(f"\n{'='*60}")
+                logger.info(f"Диагностика лида {lead_id}")
+                logger.info(f"{'='*60}")
+                
+                # Ищем связанную сделку
+                deal_id = self._get_deal_by_lead_id(lead_id)
+                logger.info(f"Связанная сделка: {deal_id}")
+                
+                if deal_id:
+                    # Получаем статусы из сделки
+                    statuses = self._get_deal_statuses(deal_id)
+                    if statuses:
+                        logger.info(f"Дата заселения (из сделки): {statuses.get('check_in_date')}")
+                        logger.info(f"Дата 1 смены (из сделки): {statuses.get('shift_1_date')}")
+                        logger.info(f"Дата 5 смен (из сделки): {statuses.get('shift_5_date')}")
+                
+                logger.info(f"{'='*60}\n")
+                return lead
+            else:
+                logger.error(f"Ошибка получения лида: {result}")
+                return None
+        except Exception as e:
+            logger.error(f"Ошибка: {e}")
+            return None

@@ -465,10 +465,11 @@ async function editPermissions(userId) {
         const objectPerms = await objectPermsRes.json();
         
         // Получаем модули, доступные текущему пользователю (для manager)
-        let availableModules = ['dashboard', 'selection'];
+        let availableModules = ['dashboard', 'selection', 'worker_status'];
         let moduleLabels = {
             'dashboard': '📊 Дашборд План/Факт',
-            'selection': '🎯 Подбор объектов'
+            'selection': '🎯 Подбор объектов',
+            'worker_status': '👥 Вахтовики'
         };
         
         if (window.currentUser?.role === 'manager') {
@@ -562,8 +563,11 @@ async function savePermissions() {
     // Собираем только те модули, которые есть на странице
     const permDashboard = document.getElementById('perm_dashboard');
     const permSelection = document.getElementById('perm_selection');
+    const permWorkerStatus = document.getElementById('perm_worker_status');
+    
     if (permDashboard) modulePerms.dashboard = permDashboard.checked;
     if (permSelection) modulePerms.selection = permSelection.checked;
+    if (permWorkerStatus) modulePerms.worker_status = permWorkerStatus.checked;
     
     const objectPerms = {};
     document.querySelectorAll('.object-perm-item').forEach(item => {

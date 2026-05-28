@@ -1,4 +1,4 @@
-# models.py - добавьте отладочный вывод
+# models.py
 # -*- coding: utf-8 -*-
 from flask_login import UserMixin
 from werkzeug.security import check_password_hash
@@ -104,7 +104,8 @@ class User(UserMixin):
                 if not self._module_permissions:
                     self._module_permissions = {
                         'dashboard': True,
-                        'selection': True
+                        'selection': True,
+                        'worker_status': True
                     }
                 
                 logger.debug(f"Loaded permissions for {self.username}: modules={self._module_permissions}")
@@ -115,7 +116,7 @@ class User(UserMixin):
                 self._object_permissions = {}
     
     def can_view_module(self, module_name):
-        """Проверяет доступ к модулю (dashboard или selection)"""
+        """Проверяет доступ к модулю (dashboard, selection, worker_status)"""
         try:
             if self.is_admin():
                 return True
@@ -133,6 +134,10 @@ class User(UserMixin):
     def can_view_selection(self):
         """Проверяет доступ к подбору объектов"""
         return self.can_view_module('selection')
+    
+    def can_view_worker_status(self):
+        """Проверяет доступ к модулю Вахтовики"""
+        return self.can_view_module('worker_status')
     
     def can_view_object(self, object_id, context='selection'):
         """Проверяет доступ к конкретному объекту"""
