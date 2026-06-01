@@ -230,6 +230,7 @@ def set_user_module_permission(user_id, module_name, can_view):
         ''', (user_id, module_name, 1 if can_view else 0))
         conn.commit()
         conn.close()
+        logger.info(f"✅ Установлено право {module_name}={can_view} для пользователя {user_id}")
         return True
     except Exception as e:
         logger.error(f"Ошибка при установке прав на модуль: {e}")

@@ -4,12 +4,13 @@ from flask import Blueprint, request, jsonify
 from flask_login import current_user
 from werkzeug.security import generate_password_hash
 import logging
+import sqlite3
 
 from database import (
     get_all_users, get_user_by_id, create_user, update_user, hard_delete_user,
     get_user_module_permissions, get_user_object_permissions,
     set_user_module_permission, set_user_object_permission, grant_all_objects_access,
-    log_user_action
+    log_user_action, DB_NAME
 )
 
 logger = logging.getLogger(__name__)
@@ -181,18 +182,15 @@ def get_user_module_perms(user_id):
     if current_user.role not in ['admin', 'manager']:
         return jsonify({'error': 'Forbidden'}), 403
     
-    # Разрешаем пользователю просматривать свои собственные права
     if user_id == current_user.id:
         perms = get_user_module_permissions(user_id)
         return jsonify(perms)
     
-    # Для manager: проверяем, что он запрашивает права только для viewer
     if current_user.role == 'manager':
         target_user = get_user_by_id(user_id)
         if not target_user:
             return jsonify({'error': 'User not found'}), 404
         if target_user['role'] != 'viewer':
-            logger.warning(f"Manager {current_user.id} пытается получить права модулей пользователя {user_id} с ролью {target_user['role']}")
             return jsonify({'error': 'Руководитель может управлять правами только менеджеров'}), 403
     
     perms = get_user_module_permissions(user_id)
@@ -207,7 +205,6 @@ def update_user_module_perms(user_id):
     if current_user.role not in ['admin', 'manager']:
         return jsonify({'error': 'Forbidden'}), 403
     
-    # Нельзя менять свои собственные права через этот эндпоинт
     if user_id == current_user.id:
         return jsonify({'error': 'Нельзя изменять свои собственные права'}), 403
     
@@ -217,20 +214,51 @@ def update_user_module_perms(user_id):
             return jsonify({'error': 'User not found'}), 404
         if target_user['role'] != 'viewer':
             return jsonify({'error': 'Руководитель может управлять правами только менеджеров'}), 403
-        
-        # Получаем модули, к которым сам имеет доступ руководитель
         my_module_perms = get_user_module_permissions(current_user.id)
     
     data = request.get_json()
+    logger.info(f"DEBUG: Получены права на модули для user {user_id}: {data}")
+    
+    # Убеждаемся, что таблица имеет правильный CHECK constraint
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        cursor.execute("PRAGMA table_info(user_module_permissions)")
+        columns = cursor.fetchall()
+        
+        # Проверяем constraint
+        cursor.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='user_module_permissions'")
+        create_sql = cursor.fetchone()
+        if create_sql and "worker_status" not in create_sql[0]:
+            logger.warning("Таблица user_module_permissions не имеет worker_status в CHECK, обновляем...")
+            # Пересоздаём таблицу с правильным CHECK
+            cursor.execute("CREATE TABLE user_module_permissions_new (" +
+                "id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                "user_id INTEGER NOT NULL," +
+                "module_name TEXT NOT NULL CHECK(module_name IN ('dashboard', 'selection', 'worker_status'))," +
+                "can_view INTEGER DEFAULT 0," +
+                "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP," +
+                "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE," +
+                "UNIQUE(user_id, module_name))")
+            cursor.execute("INSERT INTO user_module_permissions_new (id, user_id, module_name, can_view, created_at) " +
+                         "SELECT id, user_id, module_name, can_view, created_at FROM user_module_permissions")
+            cursor.execute("DROP TABLE user_module_permissions")
+            cursor.execute("ALTER TABLE user_module_permissions_new RENAME TO user_module_permissions")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_module_perms_user ON user_module_permissions (user_id)")
+            conn.commit()
+            logger.info("✅ Таблица user_module_permissions обновлена")
+        conn.close()
+    except Exception as e:
+        logger.error(f"Ошибка при проверке структуры таблицы: {e}")
     
     for module, can_view in data.items():
         if module in ['dashboard', 'selection', 'worker_status']:
-            # Для manager: проверяем, что он не выдаёт доступ к модулю, к которому сам не имеет доступа
             if current_user.role == 'manager':
                 if not my_module_perms.get(module, False):
-                    logger.warning(f"Manager {current_user.id} пытается выдать доступ к модулю {module}, к которому не имеет доступа")
-                    continue  # Пропускаем этот модуль
-            set_user_module_permission(user_id, module, can_view)
+                    logger.warning(f"Manager {current_user.id} пытается выдать доступ к модулю {module}")
+                    continue
+            result = set_user_module_permission(user_id, module, can_view)
+            logger.info(f"DEBUG: Установлено право {module}={can_view} для user {user_id}, результат={result}")
     
     log_user_action(current_user.id, 'update_module_perms', f"Обновлены права модулей для пользователя {user_id}", request.remote_addr)
     return jsonify({'success': True})
@@ -244,23 +272,19 @@ def get_user_object_perms(user_id):
     if current_user.role not in ['admin', 'manager']:
         return jsonify({'error': 'Forbidden'}), 403
     
-    # Разрешаем пользователю просматривать свои собственные права
     if user_id == current_user.id:
         perms = get_user_object_permissions(user_id)
         return jsonify(perms)
     
-    # Для manager: проверяем, что он запрашивает права только для viewer
     if current_user.role == 'manager':
         target_user = get_user_by_id(user_id)
         if not target_user:
             return jsonify({'error': 'User not found'}), 404
         if target_user['role'] != 'viewer':
-            logger.warning(f"Manager {current_user.id} пытается получить права объектов пользователя {user_id} с ролью {target_user['role']}")
             return jsonify({'error': 'Руководитель может управлять правами только менеджеров'}), 403
     
     perms = get_user_object_permissions(user_id)
     
-    # Если текущий пользователь manager, фильтруем объекты, которые он сам видит
     if current_user.role == 'manager':
         my_perms = get_user_object_permissions(current_user.id)
         visible_objects = [obj_id for obj_id, p in my_perms.items() if p.get('selection', False)]
@@ -271,13 +295,12 @@ def get_user_object_perms(user_id):
 
 @admin_bp.route('/permissions/objects/<int:user_id>', methods=['POST'])
 def update_user_object_perms(user_id):
-    """Обновление прав пользователя на объекты (только для подбора объектов)"""
+    """Обновление прав пользователя на объекты"""
     if not current_user.is_authenticated:
         return jsonify({'error': 'Unauthorized'}), 401
     if current_user.role not in ['admin', 'manager']:
         return jsonify({'error': 'Forbidden'}), 403
     
-    # Нельзя менять свои собственные права через этот эндпоинт
     if user_id == current_user.id:
         return jsonify({'error': 'Нельзя изменять свои собственные права'}), 403
     
@@ -287,28 +310,51 @@ def update_user_object_perms(user_id):
             return jsonify({'error': 'User not found'}), 404
         if target_user['role'] != 'viewer':
             return jsonify({'error': 'Руководитель может управлять правами только менеджеров'}), 403
-        
-        # Получаем объекты, которые сам видит руководитель
         my_perms = get_user_object_permissions(current_user.id)
         visible_objects_for_me = [obj_id for obj_id, perms in my_perms.items() if perms.get('selection', False)]
     
     data = request.get_json()
+    logger.info(f"DEBUG: Получены права на объекты для user {user_id}: {data}")
     
     for obj_id_str, perms in data.items():
         obj_id = int(obj_id_str)
         
-        # Для manager: проверяем, что он не выдаёт доступ к объекту, который сам не видит
         if current_user.role == 'manager':
             if obj_id not in visible_objects_for_me:
-                logger.warning(f"Manager {current_user.id} пытается выдать права на объект {obj_id}, к которому не имеет доступа")
-                continue  # Пропускаем этот объект
+                logger.warning(f"Manager {current_user.id} пытается выдать права на объект {obj_id}")
+                continue
         
-        # Для дашборда всегда даём True (не ограничиваем)
-        set_user_object_permission(
-            user_id, obj_id,
-            True,  # dashboard всегда доступен
-            perms.get('selection', False)
-        )
+        set_user_object_permission(user_id, obj_id, True, perms.get('selection', False))
     
     log_user_action(current_user.id, 'update_object_perms', f"Обновлены права на объекты для пользователя {user_id}", request.remote_addr)
     return jsonify({'success': True})
+
+
+# ========== ДИАГНОСТИЧЕСКИЙ ЭНДПОИНТ ==========
+
+@admin_bp.route('/debug/db-check', methods=['GET'])
+def debug_db_check():
+    """Проверка структуры БД"""
+    if not current_user.is_authenticated or current_user.role != 'admin':
+        return jsonify({'error': 'Forbidden'}), 403
+    
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    
+    cursor.execute("PRAGMA table_info(user_module_permissions)")
+    columns = cursor.fetchall()
+    
+    cursor.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='user_module_permissions'")
+    create_sql = cursor.fetchone()
+    
+    cursor.execute("SELECT DISTINCT module_name FROM user_module_permissions")
+    existing_modules = [row[0] for row in cursor.fetchall()]
+    
+    conn.close()
+    
+    return jsonify({
+        'columns': columns,
+        'create_sql': create_sql[0] if create_sql else None,
+        'existing_modules': existing_modules,
+        'expected_modules': ['dashboard', 'selection', 'worker_status']
+    })

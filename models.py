@@ -69,6 +69,20 @@ class User(UserMixin):
         """Может ли пользователь удалять пользователей"""
         return self.role == 'admin'
     
+    def _ensure_required_permissions(self):
+        """Проверяет и создаёт недостающие записи прав для пользователя"""
+        required_modules = ['dashboard', 'selection', 'worker_status']
+        
+        for module in required_modules:
+            if module not in self._module_permissions:
+                try:
+                    from database import set_user_module_permission
+                    logger.info(f"Автоматически создаю права для модуля '{module}' пользователю {self.id} ({self.username})")
+                    set_user_module_permission(self.id, module, False)
+                    self._module_permissions[module] = False
+                except Exception as e:
+                    logger.error(f"Ошибка при создании прав для модуля '{module}': {e}")
+    
     def _load_permissions(self):
         """Загружает права доступа из базы данных"""
         if self._module_permissions is None or self._object_permissions is None:
@@ -77,15 +91,19 @@ class User(UserMixin):
                 conn = sqlite3.connect(DB_NAME)
                 cursor = conn.cursor()
                 
+                # Загружаем права на модули
                 cursor.execute('''
                     SELECT module_name, can_view 
                     FROM user_module_permissions 
                     WHERE user_id = ?
                 ''', (self.id,))
-                self._module_permissions = {
-                    row[0]: bool(row[1]) for row in cursor.fetchall()
-                }
+                rows = cursor.fetchall()
                 
+                self._module_permissions = {}
+                for row in rows:
+                    self._module_permissions[row[0]] = bool(row[1])
+                
+                # Загружаем права на объекты
                 cursor.execute('''
                     SELECT object_id, can_view_dashboard, can_view_selection 
                     FROM user_object_permissions 
@@ -100,13 +118,8 @@ class User(UserMixin):
                 
                 conn.close()
                 
-                # Если прав нет, даём базовые для админа
-                if not self._module_permissions:
-                    self._module_permissions = {
-                        'dashboard': True,
-                        'selection': True,
-                        'worker_status': True
-                    }
+                # АВТОМАТИЧЕСКИ СОЗДАЁМ НЕДОСТАЮЩИЕ ЗАПИСИ ПРАВ
+                self._ensure_required_permissions()
                 
                 logger.debug(f"Loaded permissions for {self.username}: modules={self._module_permissions}")
                 

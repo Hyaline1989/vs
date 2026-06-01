@@ -31,6 +31,29 @@ function getTodayDate() {
     return `${year}-${month}-${day}`;
 }
 
+function showNotification(message, type) {
+    const notification = document.createElement('div');
+    notification.className = `notification notification-${type}`;
+    notification.textContent = message;
+    notification.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background: white;
+        padding: 12px 20px;
+        border-radius: 30px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        z-index: 10001;
+        border-left: 4px solid ${type === 'success' ? '#27ae60' : type === 'error' ? '#e74c3c' : '#A42C30'};
+        animation: slideIn 0.3s ease;
+    `;
+    document.body.appendChild(notification);
+    setTimeout(() => {
+        notification.style.opacity = '0';
+        setTimeout(() => notification.remove(), 300);
+    }, 3000);
+}
+
 // ========== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ==========
 let usersList = [];
 let currentEditUserId = null;
@@ -423,7 +446,6 @@ async function editPermissions(userId) {
         const objectsDataRes = await fetch(`/api/selection/settings?for_permissions=true`, { credentials: 'include' });
         const objectPermsRes = await fetch(`/api/admin/permissions/objects/${userId}`, { credentials: 'include' });
         
-        // Проверяем ответы
         if (!moduleRes.ok) {
             if (moduleRes.status === 403) {
                 showNotification('У вас нет прав для просмотра прав этого пользователя', 'error');
@@ -464,6 +486,8 @@ async function editPermissions(userId) {
         const objectsData = await objectsDataRes.json();
         const objectPerms = await objectPermsRes.json();
         
+        console.log('Загруженные права на модули:', modulePerms);
+        
         // Получаем модули, доступные текущему пользователю (для manager)
         let availableModules = ['dashboard', 'selection', 'worker_status'];
         let moduleLabels = {
@@ -473,7 +497,6 @@ async function editPermissions(userId) {
         };
         
         if (window.currentUser?.role === 'manager') {
-            // Получаем модули, которые сам видит manager
             try {
                 const myModulesRes = await fetch(`/api/admin/permissions/modules/${window.currentUser.id}`, { credentials: 'include' });
                 if (myModulesRes.ok) {
@@ -488,7 +511,6 @@ async function editPermissions(userId) {
         // Получаем объекты, доступные текущему пользователю (для manager)
         let availableObjects = objectsData.objects || [];
         if (window.currentUser?.role === 'manager') {
-            // Получаем объекты, которые сам видит manager
             try {
                 const myPermsRes = await fetch(`/api/admin/permissions/objects/${window.currentUser.id}`, { credentials: 'include' });
                 if (myPermsRes.ok) {
@@ -507,7 +529,6 @@ async function editPermissions(userId) {
                 <div class="modules-perms">
         `;
         
-        // Добавляем только доступные модули
         for (const module of availableModules) {
             const isChecked = modulePerms[module] === true;
             html += `
@@ -560,7 +581,6 @@ async function savePermissions() {
     const userId = window.currentPermsUserId;
     
     const modulePerms = {};
-    // Собираем только те модули, которые есть на странице
     const permDashboard = document.getElementById('perm_dashboard');
     const permSelection = document.getElementById('perm_selection');
     const permWorkerStatus = document.getElementById('perm_worker_status');
@@ -568,6 +588,8 @@ async function savePermissions() {
     if (permDashboard) modulePerms.dashboard = permDashboard.checked;
     if (permSelection) modulePerms.selection = permSelection.checked;
     if (permWorkerStatus) modulePerms.worker_status = permWorkerStatus.checked;
+    
+    console.log('Сохраняемые права на модули:', modulePerms);
     
     const objectPerms = {};
     document.querySelectorAll('.object-perm-item').forEach(item => {
@@ -580,7 +602,6 @@ async function savePermissions() {
     try {
         const promises = [];
         
-        // Отправляем права на модули только если есть что отправлять
         if (Object.keys(modulePerms).length > 0) {
             promises.push(
                 fetch(`/api/admin/permissions/modules/${userId}`, {
@@ -592,7 +613,6 @@ async function savePermissions() {
             );
         }
         
-        // Отправляем права на объекты
         promises.push(
             fetch(`/api/admin/permissions/objects/${userId}`, {
                 method: 'POST',
@@ -602,11 +622,25 @@ async function savePermissions() {
             })
         );
         
-        await Promise.all(promises);
+        const results = await Promise.all(promises);
+        let allOk = true;
         
-        showNotification('✅ Права сохранены', 'success');
-        closePermissionsModal();
+        for (const res of results) {
+            if (!res.ok) {
+                allOk = false;
+                const error = await res.json();
+                console.error('Ошибка сохранения:', error);
+            }
+        }
+        
+        if (allOk) {
+            showNotification('✅ Права сохранены', 'success');
+            closePermissionsModal();
+        } else {
+            showNotification('❌ Ошибка сохранения прав', 'error');
+        }
     } catch (error) {
+        console.error('Ошибка:', error);
         showNotification('❌ Ошибка сохранения прав', 'error');
     }
 }
@@ -640,7 +674,6 @@ function filterUsers() {
     const isMobile = window.innerWidth <= 768;
     
     if (isMobile) {
-        // Для карточек
         const cards = document.querySelectorAll('.user-card');
         cards.forEach(card => {
             const username = card.querySelector('.user-card-name strong')?.textContent.toLowerCase() || '';
@@ -668,7 +701,6 @@ function filterUsers() {
             card.style.display = matches ? '' : 'none';
         });
     } else {
-        // Для таблицы
         const rows = document.querySelectorAll('#usersTableContainer tbody tr');
         rows.forEach(row => {
             const username = row.cells[1]?.textContent.toLowerCase() || '';
@@ -736,7 +768,6 @@ window.addEventListener('resize', function() {
     resizeTimer = setTimeout(function() {
         if (usersList.length > 0) {
             renderUsersTable(usersList);
-            // После перерисовки применяем фильтры
             filterUsers();
         }
     }, 250);
@@ -744,7 +775,6 @@ window.addEventListener('resize', function() {
 
 // ========== ИНИЦИАЛИЗАЦИЯ ==========
 document.addEventListener('DOMContentLoaded', async function() {
-    // Получаем текущего пользователя
     try {
         const response = await fetch('/api/auth/me', { credentials: 'include' });
         if (response.ok) {
