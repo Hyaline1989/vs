@@ -1,4 +1,4 @@
-# config.py - полная версия с существующим источником
+# config.py - полная версия с увеличенными лимитами
 # -*- coding: utf-8 -*-
 import os
 from dotenv import load_dotenv
@@ -51,13 +51,14 @@ GOOGLE_SHEET_ID = "1M2uFFMmSHcbQHSqRW3D2oBjayfdyHuRIBC68Y64uQhI"
 GOOGLE_SHEET_GID = "1372231628"
 GOOGLE_SHEET_CSV_URL = f"https://docs.google.com/spreadsheets/d/{GOOGLE_SHEET_ID}/export?format=csv&gid={GOOGLE_SHEET_GID}"
 
-# ========== ОПТИМИЗИРОВАННЫЕ НАСТРОЙКИ RATE LIMITING ==========
-RATE_LIMIT_AUTH = "10 per minute"
-RATE_LIMIT_DEFAULT = "1000 per day;200 per hour"
-RATE_LIMIT_DASHBOARD = "300 per minute"
-RATE_LIMIT_REPORT = "30 per minute"
-RATE_LIMIT_SELECTION = "150 per minute"
-RATE_LIMIT_ADMIN = "50 per minute"
+# ========== УВЕЛИЧЕННЫЕ НАСТРОЙКИ RATE LIMITING ==========
+# Предотвращают ошибку 429 при нормальной работе
+RATE_LIMIT_AUTH = "30 per minute"           # увеличено с 10 до 30
+RATE_LIMIT_DEFAULT = "5000 per day;500 per hour"  # увеличено с 1000/200
+RATE_LIMIT_DASHBOARD = "600 per minute"     # увеличено с 300
+RATE_LIMIT_REPORT = "60 per minute"         # увеличено с 30
+RATE_LIMIT_SELECTION = "300 per minute"     # увеличено с 150
+RATE_LIMIT_ADMIN = "100 per minute"         # увеличено с 50
 
 # ========== ВРЕМЯ ОБНОВЛЕНИЯ ==========
 GOOGLE_SHEETS_UPDATE_INTERVAL_MINUTES = 15
@@ -109,7 +110,7 @@ else:
         "https://147.45.184.173",
     ]
 
-MAX_CONTENT_LENGTH = 1 * 1024 * 1024
+MAX_CONTENT_LENGTH = 30 * 1024 * 1024  # 30 MB для загрузки PDF
 BITRIX_TIMEOUT = 30
 GOOGLE_SHEETS_TIMEOUT = 30
 
