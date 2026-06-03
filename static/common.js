@@ -1,5 +1,4 @@
-// static/common.js - полная версия с редиректом при слетевшей авторизации
-
+// static/common.js - полная версия
 // ========== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ==========
 let currentUser = null;
 let currentAccessLevel = "";
@@ -41,7 +40,6 @@ window.fetch = function(...args) {
         if (response.status === 401 || response.status === 403) {
             const url = args[0];
             console.warn(`Ошибка авторизации (${response.status}) при запросе: ${url}`);
-            // Не перенаправляем только на запросы к API авторизации и если уже на странице входа
             if (!url.includes('/api/auth') && !url.includes('/api/logout') && window.location.pathname !== '/') {
                 localStorage.removeItem(SESSION_KEY);
                 window.location.href = '/';
