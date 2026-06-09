@@ -2288,24 +2288,24 @@ body {
 /* Увеличение высоты карточек в Подборе объектов на мобильных */
 @media (max-width: 1050px) {
     .flip-card {
-        min-height: 395px;  /* было 380px, увеличили на 10px */
+        min-height: 400px;  /* было 380px, увеличили на 10px */
     }
     
     .flip-card-front,
     .flip-card-back {
-        min-height: 395px;
+        min-height: 400px;
     }
 }
 
 /* Для очень маленьких экранов */
 @media (max-width: 480px) {
     .flip-card {
-        min-height: 425px;
+        min-height: 430px;
     }
     
     .flip-card-front,
     .flip-card-back {
-        min-height: 425px;
+        min-height: 430px;
     }
 }
 
@@ -2391,5 +2391,43 @@ body {
     
     .date-cell {
         font-size: 0.7rem;
+    }
+}
+
+/* Кнопка "Наверх" - показываем только на десктопе (ширина > 768px) */
+.scroll-top-btn {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    width: 50px;
+    height: 50px;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+    z-index: 999;
+    box-shadow: 0 4px 15px rgba(164, 44, 48, 0.4);
+}
+
+/* Показываем только на десктопе */
+@media (min-width: 769px) {
+    .scroll-top-btn.show {
+        opacity: 1;
+        visibility: visible;
+    }
+}
+
+/* Скрываем на мобильных (там есть браузерная) */
+@media (max-width: 768px) {
+    .scroll-top-btn {
+        display: none;
     }
 }

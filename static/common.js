@@ -1,4 +1,4 @@
-// static/common.js - полная версия
+// static/common.js - полная версия с кнопкой "Наверх"
 // ========== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ==========
 let currentUser = null;
 let currentAccessLevel = "";
@@ -390,6 +390,32 @@ function getRoleColor(role) {
     }
 }
 
+// ========== КНОПКА "НАВЕРХ" ==========
+function addScrollTopButton() {
+    if (document.querySelector('.scroll-top-btn')) return;
+    
+    const scrollBtn = document.createElement('button');
+    scrollBtn.className = 'scroll-top-btn';
+    scrollBtn.innerHTML = '<i class="fas fa-arrow-up"></i>';
+    scrollBtn.setAttribute('aria-label', 'Наверх');
+    scrollBtn.onclick = () => {
+        window.scrollTo({
+            top: 0,
+            behavior: 'smooth'
+        });
+    };
+    
+    document.body.appendChild(scrollBtn);
+    
+    window.addEventListener('scroll', () => {
+        if (window.scrollY > 300) {
+            scrollBtn.classList.add('show');
+        } else {
+            scrollBtn.classList.remove('show');
+        }
+    });
+}
+
 // ========== ИНИЦИАЛИЗАЦИЯ ПРИ ЗАГРУЗКЕ СТРАНИЦЫ ==========
 async function initPage() {
     const path = window.location.pathname;
@@ -399,6 +425,9 @@ async function initPage() {
     if (path === '/') {
         return;
     }
+    
+    // Добавляем кнопку "Наверх"
+    addScrollTopButton();
     
     const hasSession = checkSession();
     if (!hasSession) {
