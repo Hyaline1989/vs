@@ -8,7 +8,7 @@ import logging
 import sqlite3
 
 from database import get_user_module_permissions, DB_NAME
-from bitrix_api import BitrixAPI
+from bitrix_api import BitrixAPI, ShiftReportAPI
 from comparer import DataComparer
 from config import BITRIX_WEBHOOK_URL
 
@@ -502,4 +502,96 @@ def generate_snapshot_range():
         
     except Exception as e:
         logger.error(f"Ошибка при генерации диапазона снапшотов: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+# ========== ОТЧЁТЫ ПО ОТРАБОТАВШИМ 1 СМЕНУ (ИЗ ТЕЛЕГРАМ БОТА) ==========
+
+@dashboard_bp.route('/first-shift-by-object', methods=['GET'])
+def get_first_shift_by_object():
+    """
+    Отчёт: отработавшие 1 смену по объектам (группировка по компаниям)
+    Параметры: ?from=YYYY-MM-DD&to=YYYY-MM-DD
+    """
+    if not current_user.is_authenticated:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    module_perms = get_user_module_permissions(current_user.id)
+    if not module_perms.get('dashboard', False):
+        return jsonify({'error': 'Forbidden'}), 403
+    
+    try:
+        from_date = request.args.get('from')
+        to_date = request.args.get('to')
+        
+        if not from_date or not to_date:
+            return jsonify({'error': 'Не указан период'}), 400
+        
+        shift_api = ShiftReportAPI(BITRIX_WEBHOOK_URL)
+        data = shift_api.get_shift_report(from_date, to_date)
+        
+        # Подсчёт итогов
+        totals = {}
+        for cat in ['Поток', 'Комплект', 'Бишкек']:
+            cat_data = data.get(cat, {})
+            totals[cat] = sum(cat_data.values()) if cat_data else 0
+        
+        total_all = sum(totals.values())
+        
+        return jsonify({
+            'success': True,
+            'from_date': from_date,
+            'to_date': to_date,
+            'data': data,
+            'totals': totals,
+            'total_all': total_all
+        })
+        
+    except Exception as e:
+        logger.error(f"Ошибка в get_first_shift_by_object: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@dashboard_bp.route('/first-shift-by-staff', methods=['GET'])
+def get_first_shift_by_staff():
+    """
+    Отчёт: отработавшие 1 смену по сотрудникам колл-центра
+    Параметры: ?from=YYYY-MM-DD&to=YYYY-MM-DD
+    """
+    if not current_user.is_authenticated:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    module_perms = get_user_module_permissions(current_user.id)
+    if not module_perms.get('dashboard', False):
+        return jsonify({'error': 'Forbidden'}), 403
+    
+    try:
+        from_date = request.args.get('from')
+        to_date = request.args.get('to')
+        
+        if not from_date or not to_date:
+            return jsonify({'error': 'Не указан период'}), 400
+        
+        shift_api = ShiftReportAPI(BITRIX_WEBHOOK_URL)
+        data = shift_api.get_staff_report(from_date, to_date)
+        
+        # Подсчёт итогов
+        totals = {}
+        for cat in ['Поток', 'Комплект', 'Бишкек']:
+            cat_data = data.get(cat, {})
+            totals[cat] = sum(cat_data.values()) if cat_data else 0
+        
+        total_all = sum(totals.values())
+        
+        return jsonify({
+            'success': True,
+            'from_date': from_date,
+            'to_date': to_date,
+            'data': data,
+            'totals': totals,
+            'total_all': total_all
+        })
+        
+    except Exception as e:
+        logger.error(f"Ошибка в get_first_shift_by_staff: {e}", exc_info=True)
         return jsonify({'error': str(e)}), 500

@@ -21,7 +21,7 @@ def get_moscow_date():
     return (datetime.now(timezone.utc) + MOSCOW_OFFSET).strftime('%Y-%m-%d')
 
 from config import *
-from bitrix_api import BitrixAPI
+from bitrix_api import BitrixAPI, ShiftReportAPI
 from comparer import DataComparer
 from database import init_db, cleanup_old_records, init_objects_settings, init_vacancy_tables, cleanup_old_unused_avatars, init_current_requirements_table, init_passports_table, init_daily_snapshots_table
 from models import User
@@ -396,5 +396,6 @@ if __name__ == '__main__':
     logger.info("📸 Ежедневные снапшоты генерируются в 20:00")
     logger.info("❓ FAQ - руководство пользователя доступно по адресу /faq")
     logger.info("👥 Статусы вахтовиков доступны по адресу /worker-status")
+    logger.info("📊 Отчёты по 1 смене доступны в дашборде (вкладки '1 смена по объектам' и '1 смена по сотрудникам')")
     debug_mode = FLASK_ENV == 'development'
     app.run(debug=debug_mode, host='0.0.0.0', port=5001)

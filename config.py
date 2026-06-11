@@ -1,4 +1,4 @@
-# config.py - полная версия с увеличенными лимитами
+# config.py - полная версия с увеличенными лимитами и константами для отчётов
 # -*- coding: utf-8 -*-
 import os
 from dotenv import load_dotenv
@@ -24,6 +24,12 @@ if not BITRIX_WEBHOOK_URL:
 FIELD_DATE_DIRECTED = "UF_CRM_1684488775220"  # Дата направлен на объект
 FIELD_COMPANY = "UF_CRM_642A972B79B02"        # Объект (компания)
 
+# Поля для отчётов по 1 смене
+FIELD_WORKED_1_SHIFT = "UF_CRM_1685531338652"      # Дата отработал 1 смену
+FIELD_CC_OPERATOR = "UF_CRM_64819E13601C3"         # Сотрудник Колл-центра (тех)
+FIELD_CC_OPERATOR_REPORT = "UF_CRM_68F1ED4DB3EE8"  # Сотрудник Колл-центра (ОТЧЕТ)
+FIELD_AGENT_FIO = "UF_CRM_65D332164BDB2"           # ФИО агента
+
 # Источники (SOURCE_ID)
 SOURCE_POTOK = "UC_IV7KE7"                    # Поток
 SOURCE_GORKIY52 = "UC_TUXCUX"                 # Проект В2Б
@@ -46,19 +52,52 @@ ALL_OFFICES = [
 # Исключаемые источники
 EXCLUDED_SOURCES = [SOURCE_PEREVAHTOVKA, SOURCE_REFERRAL]
 
+# Эмодзи для компаний
+COMPANY_EMOJIS = {
+    "ФитнесШок": "🍫",
+    "Агама Лешково": "🐙",
+    "Мираторг": "🥩",
+    "Креветки Клинский": "🦐",
+    "Мираторг Тула": "🥕",
+    "Major": "👗",
+    "КуулКлевер": "🍀",
+    "Спортмастер": "⚽",
+    "Мяснов": "🥩",
+    "Сберлогистика Пушкино": "💼",
+    "Клинский мясокомбинат": "🐄",
+    "Цветы Раменское": "🌹",
+    "Яндекс Тарный": "❄️",
+    "Павловская Птицефабрика": "🐔",
+    "Тамбовский бекон": "🥓",
+    "Индейка Калуга": "🦃",
+    "Спортмастер СПБ": "🏃",
+    "СДТ": "📎",
+    "БелГранКорм Новгород": "🐥",
+    "METRO MGL": "🍾",
+    "АртПак": "🍽️",
+    "Невский Кондитер": "🍫"
+}
+DEFAULT_EMOJI = "🏢"
+
+# Функция для проверки, является ли сотрудник оперативником (начинается с "Опер")
+def is_operator(staff_name):
+    """Проверяет, начинается ли имя сотрудника с 'Опер'"""
+    if not staff_name:
+        return False
+    return staff_name.strip().startswith('Опер')
+
 # ========== ПРОЕКТ 1: Google Sheets (только для справки, не используется) ==========
 GOOGLE_SHEET_ID = "1M2uFFMmSHcbQHSqRW3D2oBjayfdyHuRIBC68Y64uQhI"
 GOOGLE_SHEET_GID = "1372231628"
 GOOGLE_SHEET_CSV_URL = f"https://docs.google.com/spreadsheets/d/{GOOGLE_SHEET_ID}/export?format=csv&gid={GOOGLE_SHEET_GID}"
 
 # ========== УВЕЛИЧЕННЫЕ НАСТРОЙКИ RATE LIMITING ==========
-# Предотвращают ошибку 429 при нормальной работе
-RATE_LIMIT_AUTH = "30 per minute"           # увеличено с 10 до 30
-RATE_LIMIT_DEFAULT = "5000 per day;500 per hour"  # увеличено с 1000/200
-RATE_LIMIT_DASHBOARD = "600 per minute"     # увеличено с 300
-RATE_LIMIT_REPORT = "60 per minute"         # увеличено с 30
-RATE_LIMIT_SELECTION = "300 per minute"     # увеличено с 150
-RATE_LIMIT_ADMIN = "100 per minute"         # увеличено с 50
+RATE_LIMIT_AUTH = "30 per minute"
+RATE_LIMIT_DEFAULT = "5000 per day;500 per hour"
+RATE_LIMIT_DASHBOARD = "600 per minute"
+RATE_LIMIT_REPORT = "60 per minute"
+RATE_LIMIT_SELECTION = "300 per minute"
+RATE_LIMIT_ADMIN = "100 per minute"
 
 # ========== ВРЕМЯ ОБНОВЛЕНИЯ ==========
 GOOGLE_SHEETS_UPDATE_INTERVAL_MINUTES = 15
@@ -115,7 +154,6 @@ BITRIX_TIMEOUT = 30
 GOOGLE_SHEETS_TIMEOUT = 30
 
 # ========== ПРОЕКТ 2: База объектов ==========
-# Базовая структура объектов с разделением на РФ и СНГ
 OBJECTS_BASE = [
     {"id": 1, "name": "Сберлогистика Пушкино", "ageMin": 18, "ageMax": 45, 
      "allowedGenders": ["мужчина", "женщина"], "allowedNationalities": ["РФ"], 

@@ -1,4 +1,4 @@
-// static/dashboard.js - исправленная версия с оптимизированным отчётом (без прогресс-бара)
+// static/dashboard.js - исправленная версия с оптимизированным отчётом и отчётами по 1 смене
 
 // ========== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ==========
 let currentDashboardData = {
@@ -89,7 +89,6 @@ function updateOffices(offices) {
     const officesConfig = [
         { key: 'agent', name: 'Агент' },
         { key: 'potok', name: 'Поток' },
-        // { key: 'gorkiy52', name: 'Горький52' },
         { key: 'bishkek', name: 'Бишкек' },
         { key: 'complect', name: 'Комплект' }
     ];
@@ -308,7 +307,6 @@ function getBadgeClass(plan, fact) {
     return 'badge-neutral';
 }
 
-// ========== ОПТИМИЗИРОВАННАЯ ФУНКЦИЯ ВЫГРУЗКИ ОТЧЁТА ==========
 async function exportFullReport() {
     const { fromDate, toDate } = getReportDateRange();
     
@@ -430,9 +428,397 @@ function updatePeriodDisplay() {
     }
 }
 
+// ========== ПЕРЕКЛЮЧЕНИЕ ВНУТРЕННИХ ВКЛАДОК ДАШБОРДА ==========
+function switchDashboardInnerTab(tabName) {
+    // Скрываем все контейнеры
+    const containers = ['planFactContainer', 'firstShiftObjectContainer', 'firstShiftStaffContainer'];
+    containers.forEach(containerId => {
+        const el = document.getElementById(containerId);
+        if (el) {
+            el.classList.remove('active');
+            el.style.display = 'none';
+        }
+    });
+    
+    // Показываем выбранный контейнер
+    let selectedContainer = null;
+    if (tabName === 'plan-fact') {
+        selectedContainer = document.getElementById('planFactContainer');
+        if (selectedContainer) {
+            selectedContainer.style.display = 'block';
+            selectedContainer.classList.add('active');
+        }
+        // Обновляем данные план/факт
+        const date = document.getElementById('date-picker')?.value || getTodayDate();
+        loadDashboardForDate(date);
+    } else if (tabName === 'first-shift-object') {
+        selectedContainer = document.getElementById('firstShiftObjectContainer');
+        if (selectedContainer) {
+            selectedContainer.style.display = 'block';
+            selectedContainer.classList.add('active');
+        }
+        loadFirstShiftByObject();
+    } else if (tabName === 'first-shift-staff') {
+        selectedContainer = document.getElementById('firstShiftStaffContainer');
+        if (selectedContainer) {
+            selectedContainer.style.display = 'block';
+            selectedContainer.classList.add('active');
+        }
+        loadFirstShiftByStaff();
+    }
+    
+    // Обновляем активный класс внутренних кнопок
+    document.querySelectorAll('.dashboard-inner-tab').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.getAttribute('data-inner-tab') === tabName) {
+            btn.classList.add('active');
+        }
+    });
+}
+
+// ========== ОТЧЁТ: ОТРАБОТАВШИЕ 1 СМЕНУ ПО ОБЪЕКТАМ ==========
+async function loadFirstShiftByObject() {
+    const contentDiv = document.getElementById('fsObjectContent');
+    const summaryDiv = document.getElementById('fsObjectSummary');
+    
+    let fromDate = document.getElementById('fsObjectFrom')?.value;
+    let toDate = document.getElementById('fsObjectTo')?.value;
+    
+    if (!fromDate || !toDate) {
+        const today = getTodayDate();
+        fromDate = fromDate || today;
+        toDate = toDate || today;
+        if (document.getElementById('fsObjectFrom')) document.getElementById('fsObjectFrom').value = fromDate;
+        if (document.getElementById('fsObjectTo')) document.getElementById('fsObjectTo').value = toDate;
+    }
+    
+    contentDiv.innerHTML = '<div class="loading">Загрузка данных...</div>';
+    if (summaryDiv) summaryDiv.innerHTML = '<div class="loading">Загрузка...</div>';
+    
+    try {
+        const response = await fetch(`/api/first-shift-by-object?from=${fromDate}&to=${toDate}`, {
+            credentials: 'include'
+        });
+        const data = await response.json();
+        
+        if (data.error) {
+            contentDiv.innerHTML = `<div class="error-state">❌ ${data.error}</div>`;
+            return;
+        }
+        
+        // Обновляем сводку
+        if (summaryDiv) {
+            summaryDiv.innerHTML = `
+                <div class="summary-row">
+                    <span>Период:</span>
+                    <span class="summary-value">${formatDateForDisplay(fromDate)} - ${formatDateForDisplay(toDate)}</span>
+                </div>
+                <div class="summary-row">
+                    <span>Всего сделок:</span>
+                    <span class="summary-value" style="background: #ffd700; color: #2c3e50;">${data.total_all || 0}</span>
+                </div>
+            `;
+        }
+        
+        renderFirstShiftByObject(data.data, data.totals);
+        
+    } catch (error) {
+        console.error('Ошибка:', error);
+        contentDiv.innerHTML = '<div class="error-state">❌ Ошибка загрузки данных</div>';
+    }
+}
+
+function renderFirstShiftByObject(data, totals) {
+    const container = document.getElementById('fsObjectContent');
+    if (!container) return;
+    
+    const categories = ['Поток', 'Комплект', 'Бишкек'];
+    let html = '';
+    
+    for (const cat of categories) {
+        const catData = data[cat] || {};
+        const catTotal = totals[cat] || 0;
+        const items = Object.entries(catData).sort((a, b) => b[1] - a[1]);
+        
+        html += `
+            <div class="office-item" style="margin-bottom: 20px;">
+                <div class="office-header">
+                    <span class="toggle">▼</span>
+                    <span class="office-name">${escapeHtml(cat)}</span>
+                    <span class="office-count">${catTotal}</span>
+                </div>
+                <div class="office-objects">
+        `;
+        
+        if (items.length === 0) {
+            html += `<div class="empty-objects">✘ Нет сделок</div>`;
+        } else {
+            for (const [company, count] of items) {
+                const emoji = getCompanyEmoji(company);
+                html += `
+                    <div class="object-row">
+                        <span class="object-name">${emoji} ${escapeHtml(company)}</span>
+                        <span class="object-value">${count}</span>
+                    </div>
+                `;
+            }
+        }
+        
+        html += `</div></div>`;
+    }
+    
+    container.innerHTML = html;
+    
+    // Добавляем обработчики для сворачивания/разворачивания
+    document.querySelectorAll('#fsObjectContent .office-header').forEach(header => {
+        header.addEventListener('click', function() {
+            const objectsDiv = this.nextElementSibling;
+            const toggle = this.querySelector('.toggle');
+            if (objectsDiv.style.display === 'none') {
+                objectsDiv.style.display = 'block';
+                toggle.textContent = '▼';
+            } else {
+                objectsDiv.style.display = 'none';
+                toggle.textContent = '▶';
+            }
+        });
+    });
+}
+
+// ========== ОТЧЁТ: ОТРАБОТАВШИЕ 1 СМЕНУ ПО СОТРУДНИКАМ ==========
+async function loadFirstShiftByStaff() {
+    const contentDiv = document.getElementById('fsStaffContent');
+    const summaryDiv = document.getElementById('fsStaffSummary');
+    
+    let fromDate = document.getElementById('fsStaffFrom')?.value;
+    let toDate = document.getElementById('fsStaffTo')?.value;
+    
+    if (!fromDate || !toDate) {
+        const today = getTodayDate();
+        fromDate = fromDate || today;
+        toDate = toDate || today;
+        if (document.getElementById('fsStaffFrom')) document.getElementById('fsStaffFrom').value = fromDate;
+        if (document.getElementById('fsStaffTo')) document.getElementById('fsStaffTo').value = toDate;
+    }
+    
+    contentDiv.innerHTML = '<div class="loading">Загрузка данных...</div>';
+    if (summaryDiv) summaryDiv.innerHTML = '<div class="loading">Загрузка...</div>';
+    
+    try {
+        const response = await fetch(`/api/first-shift-by-staff?from=${fromDate}&to=${toDate}`, {
+            credentials: 'include'
+        });
+        const data = await response.json();
+        
+        if (data.error) {
+            contentDiv.innerHTML = `<div class="error-state">❌ ${data.error}</div>`;
+            return;
+        }
+        
+        if (summaryDiv) {
+            summaryDiv.innerHTML = `
+                <div class="summary-row">
+                    <span>Период:</span>
+                    <span class="summary-value">${formatDateForDisplay(fromDate)} - ${formatDateForDisplay(toDate)}</span>
+                </div>
+                <div class="summary-row">
+                    <span>Всего сделок:</span>
+                    <span class="summary-value" style="background: #ffd700; color: #2c3e50;">${data.total_all || 0}</span>
+                </div>
+            `;
+        }
+        
+        renderFirstShiftByStaff(data.data, data.totals);
+        
+    } catch (error) {
+        console.error('Ошибка:', error);
+        contentDiv.innerHTML = '<div class="error-state">❌ Ошибка загрузки данных</div>';
+    }
+}
+
+function renderFirstShiftByStaff(data, totals) {
+    const container = document.getElementById('fsStaffContent');
+    if (!container) return;
+    
+    const categories = ['Поток', 'Комплект', 'Бишкек'];
+    let html = '';
+    
+    for (const cat of categories) {
+        const catData = data[cat] || {};
+        const catTotal = totals[cat] || 0;
+        const items = Object.entries(catData).sort((a, b) => b[1] - a[1]);
+        
+        html += `
+            <div class="office-item" style="margin-bottom: 20px;">
+                <div class="office-header">
+                    <span class="toggle">▼</span>
+                    <span class="office-name">${escapeHtml(cat)}</span>
+                    <span class="office-count">${catTotal}</span>
+                </div>
+                <div class="office-objects">
+        `;
+        
+        if (items.length === 0) {
+            html += `<div class="empty-objects">✘ Нет сделок</div>`;
+        } else {
+            for (const [staff, count] of items) {
+                html += `
+                    <div class="object-row">
+                        <span class="object-name"><i class="fas fa-user"></i> ${escapeHtml(staff)}</span>
+                        <span class="object-value">${count}</span>
+                    </div>
+                `;
+            }
+        }
+        
+        html += `</div></div>`;
+    }
+    
+    container.innerHTML = html;
+    
+    // Добавляем обработчики для сворачивания/разворачивания
+    document.querySelectorAll('#fsStaffContent .office-header').forEach(header => {
+        header.addEventListener('click', function() {
+            const objectsDiv = this.nextElementSibling;
+            const toggle = this.querySelector('.toggle');
+            if (objectsDiv.style.display === 'none') {
+                objectsDiv.style.display = 'block';
+                toggle.textContent = '▼';
+            } else {
+                objectsDiv.style.display = 'none';
+                toggle.textContent = '▶';
+            }
+        });
+    });
+}
+
+// ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
+function formatDateForDisplay(dateStr) {
+    if (!dateStr) return '';
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+        return `${parts[2]}.${parts[1]}.${parts[0]}`;
+    }
+    return dateStr;
+}
+
+function getCompanyEmoji(companyName) {
+    const emojis = {
+        "ФитнесШок": "🍫",
+        "Агама Лешково": "🐙",
+        "Мираторг": "🥩",
+        "Креветки Клинский": "🦐",
+        "Мираторг Тула": "🥕",
+        "Major": "👗",
+        "КуулКлевер": "🍀",
+        "Спортмастер": "⚽",
+        "Мяснов": "🥩",
+        "Сберлогистика Пушкино": "💼",
+        "Клинский мясокомбинат": "🐄",
+        "Цветы Раменское": "🌹",
+        "Яндекс Тарный": "❄️",
+        "Павловская Птицефабрика": "🐔",
+        "Тамбовский бекон": "🥓",
+        "Индейка Калуга": "🦃",
+        "Спортмастер СПБ": "🏃",
+        "СДТ": "📎",
+        "БелГранКорм Новгород": "🐥",
+        "METRO MGL": "🍾",
+        "АртПак": "🍽️",
+        "Невский Кондитер": "🍫"
+    };
+    for (const [key, emoji] of Object.entries(emojis)) {
+        if (companyName.includes(key)) return emoji;
+    }
+    return "🏢";
+}
+
+// ========== ЭКСПОРТ В CSV ==========
+async function exportFirstShiftByObject() {
+    const fromDate = document.getElementById('fsObjectFrom')?.value || getTodayDate();
+    const toDate = document.getElementById('fsObjectTo')?.value || getTodayDate();
+    
+    try {
+        const response = await fetch(`/api/first-shift-by-object?from=${fromDate}&to=${toDate}`, {
+            credentials: 'include'
+        });
+        const data = await response.json();
+        
+        if (data.error) throw new Error(data.error);
+        
+        const rows = [];
+        rows.push(['Категория', 'Объект', 'Количество']);
+        
+        for (const [cat, objects] of Object.entries(data.data)) {
+            for (const [obj, count] of Object.entries(objects)) {
+                rows.push([cat, obj, count]);
+            }
+        }
+        
+        rows.push([], ['ИТОГО:', '', data.total_all]);
+        
+        const csvContent = rows.map(row => row.join(';')).join('\n');
+        const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `first_shift_by_object_${fromDate}_${toDate}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+        
+        showNotification(`✅ Отчёт выгружен`, 'success');
+    } catch (error) {
+        showNotification('❌ Ошибка выгрузки', 'error');
+    }
+}
+
+async function exportFirstShiftByStaff() {
+    const fromDate = document.getElementById('fsStaffFrom')?.value || getTodayDate();
+    const toDate = document.getElementById('fsStaffTo')?.value || getTodayDate();
+    
+    try {
+        const response = await fetch(`/api/first-shift-by-staff?from=${fromDate}&to=${toDate}`, {
+            credentials: 'include'
+        });
+        const data = await response.json();
+        
+        if (data.error) throw new Error(data.error);
+        
+        const rows = [];
+        rows.push(['Категория', 'Сотрудник', 'Количество']);
+        
+        for (const [cat, staffList] of Object.entries(data.data)) {
+            for (const [staff, count] of Object.entries(staffList)) {
+                rows.push([cat, staff, count]);
+            }
+        }
+        
+        rows.push([], ['ИТОГО:', '', data.total_all]);
+        
+        const csvContent = rows.map(row => row.join(';')).join('\n');
+        const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `first_shift_by_staff_${fromDate}_${toDate}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+        
+        showNotification(`✅ Отчёт выгружен`, 'success');
+    } catch (error) {
+        showNotification('❌ Ошибка выгрузки', 'error');
+    }
+}
+
+// Делаем функции глобальными
 window.manualRefresh = manualRefresh;
 window.exportFullReport = exportFullReport;
 window.updatePeriodDisplay = updatePeriodDisplay;
 window.getReportDateRange = getReportDateRange;
 window.formatPeriodDisplay = formatPeriodDisplay;
 window.loadDashboardForDate = loadDashboardForDate;
+window.switchDashboardInnerTab = switchDashboardInnerTab;
+window.loadFirstShiftByObject = loadFirstShiftByObject;
+window.loadFirstShiftByStaff = loadFirstShiftByStaff;
+window.exportFirstShiftByObject = exportFirstShiftByObject;
+window.exportFirstShiftByStaff = exportFirstShiftByStaff;

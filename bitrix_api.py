@@ -1,4 +1,4 @@
-# bitrix_api.py - полная версия с получением данных из сделки
+# bitrix_api.py - полная версия с получением данных из сделки и отчётами по 1 смене
 # -*- coding: utf-8 -*-
 import requests
 import re
@@ -654,3 +654,166 @@ class BitrixAPI:
         except Exception as e:
             logger.error(f"Ошибка: {e}")
             return None
+
+
+# ========== КЛАСС ДЛЯ ОТЧЁТОВ ПО 1 СМЕНЕ (ИЗ ТЕЛЕГРАМ БОТА) ==========
+
+class ShiftReportAPI:
+    """API для отчётов по отработавшим 1 смену"""
+    
+    def __init__(self, webhook_url=BITRIX_WEBHOOK_URL):
+        self.webhook_url = webhook_url
+    
+    def _get_filtered_deals(self, start_date_str, end_date_str):
+        """Возвращает сделки, прошедшие все фильтры, но без группировки."""
+        deals = self._get_deals_by_date(start_date_str, end_date_str)
+        
+        # Оставляем только с отработанной сменой (заполненное и не 'N')
+        worked = [d for d in deals if d.get(FIELD_WORKED_1_SHIFT) and d.get(FIELD_WORKED_1_SHIFT) != 'N']
+        
+        # Без заполненного ФИО агента
+        no_agent = [d for d in worked if not d.get(FIELD_AGENT_FIO)]
+        
+        # Исключаем операторов (всех, чьё имя начинается с "Опер")
+        clean = [
+            d for d in no_agent
+            if not is_operator(d.get(FIELD_CC_OPERATOR, ''))
+            and not is_operator(d.get(FIELD_CC_OPERATOR_REPORT, ''))
+        ]
+        return clean
+    
+    def _get_deals_by_date(self, start_date_str, end_date_str):
+        """Загружает сделки за период только с фильтром по дате направления."""
+        all_deals = []
+        start = 0
+        limit = 50
+        filter_params = {
+            f'>={FIELD_DATE_DIRECTED}': start_date_str,
+            f'<={FIELD_DATE_DIRECTED}': end_date_str
+        }
+        while True:
+            params = {
+                'filter': filter_params,
+                'select': [
+                    'ID', 'TITLE',
+                    FIELD_DATE_DIRECTED,
+                    FIELD_COMPANY,
+                    'SOURCE_ID',
+                    FIELD_CC_OPERATOR,
+                    FIELD_CC_OPERATOR_REPORT,
+                    FIELD_WORKED_1_SHIFT,
+                    FIELD_AGENT_FIO
+                ],
+                'start': start
+            }
+            try:
+                resp = requests.post(f"{self.webhook_url}crm.deal.list", json=params, timeout=30)
+                result = resp.json()
+                if 'result' in result and result['result']:
+                    batch = result['result']
+                    all_deals.extend(batch)
+                    if len(batch) < limit:
+                        break
+                    start += limit
+                else:
+                    break
+            except Exception as e:
+                logger.error(f"Ошибка запроса к Bitrix24: {e}")
+                break
+        logger.info(f"Получено {len(all_deals)} сделок для отчёта по 1 смене")
+        return all_deals
+    
+    def get_shift_report(self, start_date_str, end_date_str):
+        """Отчёт по отработавшим 1 смену с разбивкой по компаниям."""
+        deals = self._get_filtered_deals(start_date_str, end_date_str)
+        return self._group_by_companies(deals)
+    
+    def _group_by_companies(self, deals):
+        """Группировка по компаниям (для отчёта по объектам)."""
+        categories = {'Поток': [], 'Бишкек': [], 'Комплект': []}
+        exclude = {SOURCE_AGENT}
+        
+        for d in deals:
+            src = d.get('SOURCE_ID')
+            if src in exclude:
+                continue
+            if src == SOURCE_POTOK:
+                categories['Поток'].append(d)
+            elif src == SOURCE_BISHKEK:
+                categories['Бишкек'].append(d)
+            else:
+                categories['Комплект'].append(d)
+        
+        report = {}
+        for cat_name, deal_list in categories.items():
+            if not deal_list:
+                report[cat_name] = {}
+                continue
+            company_ids = list({d.get(FIELD_COMPANY) for d in deal_list if d.get(FIELD_COMPANY)})
+            companies_info = self._get_companies_info(company_ids)
+            
+            grouped = {}
+            for d in deal_list:
+                cid = d.get(FIELD_COMPANY)
+                if cid and cid in companies_info:
+                    cname = companies_info[cid]
+                    grouped[cname] = grouped.get(cname, 0) + 1
+            report[cat_name] = grouped
+        return report
+    
+    def get_staff_report(self, start_date_str, end_date_str):
+        """Отчёт по отработавшим 1 смену с разбивкой по сотрудникам."""
+        deals = self._get_filtered_deals(start_date_str, end_date_str)
+        return self._group_by_staff(deals)
+    
+    def _group_by_staff(self, deals):
+        """Группировка по полю Сотрудник Колл-центра (ОТЧЕТ)."""
+        categories = {'Поток': [], 'Бишкек': [], 'Комплект': []}
+        exclude = {SOURCE_AGENT}
+        
+        for d in deals:
+            src = d.get('SOURCE_ID')
+            if src in exclude:
+                continue
+            if src == SOURCE_POTOK:
+                categories['Поток'].append(d)
+            elif src == SOURCE_BISHKEK:
+                categories['Бишкек'].append(d)
+            else:
+                categories['Комплект'].append(d)
+        
+        report = {}
+        for cat_name, deal_list in categories.items():
+            if not deal_list:
+                report[cat_name] = {}
+                continue
+            grouped = {}
+            for d in deal_list:
+                staff = d.get(FIELD_CC_OPERATOR_REPORT)
+                if staff and not is_operator(staff):
+                    grouped[staff] = grouped.get(staff, 0) + 1
+            report[cat_name] = grouped
+        return report
+    
+    def _get_companies_info(self, company_ids):
+        """Получает названия компаний по ID"""
+        if not company_ids:
+            return {}
+        info = {}
+        for cid in company_ids:
+            try:
+                resp = requests.post(f"{self.webhook_url}crm.company.get", json={'id': cid}, timeout=10)
+                data = resp.json()
+                if 'result' in data:
+                    info[cid] = data['result'].get('TITLE', 'Неизвестная компания')
+            except Exception as e:
+                logger.error(f"Ошибка компании {cid}: {e}")
+                info[cid] = 'Ошибка загрузки'
+        return info
+    
+    def add_emoji(self, company_name):
+        """Добавляет эмодзи к названию компании"""
+        for key, emoji in COMPANY_EMOJIS.items():
+            if key in company_name:
+                return f"{emoji} {company_name}"
+        return f"{DEFAULT_EMOJI} {company_name}"
