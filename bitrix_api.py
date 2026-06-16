@@ -120,6 +120,118 @@ class BitrixAPI:
         
         return result
     
+    def get_report_facts_range(self, start_date, end_date):
+        """
+        Получает факт направлений за период одним проходом по Bitrix.
+
+        Возвращает структуру для отчёта:
+        {
+            'YYYY-MM-DD': {
+                'Название объекта': {
+                    'complect': 0,
+                    'potok': 0,
+                    'gorkiy': 0,
+                    'agent': 0,
+                    'bishkek': 0
+                }
+            }
+        }
+        """
+        start_date_str = self._format_date_param(start_date)
+        end_date_str = self._format_date_param(end_date)
+
+        logger.info(
+            "Получение факта для отчёта одним запросом за период %s - %s",
+            start_date_str,
+            end_date_str
+        )
+
+        deals = self._get_all_deals_raw({
+            f'>={FIELD_DATE_DIRECTED}': start_date_str,
+            f'<={FIELD_DATE_DIRECTED}': end_date_str
+        })
+
+        if not deals:
+            return {}
+
+        filtered_deals = [
+            deal for deal in deals
+            if deal.get('SOURCE_ID') not in EXCLUDED_SOURCES
+        ]
+
+        company_ids = []
+        for deal in filtered_deals:
+            company_id = deal.get(FIELD_COMPANY)
+            if company_id and company_id not in company_ids:
+                company_ids.append(company_id)
+
+        companies_info = self._get_companies_info(company_ids)
+        facts_by_date = {}
+
+        for deal in filtered_deals:
+            date_key = self._extract_date_key(deal.get(FIELD_DATE_DIRECTED))
+            if not date_key:
+                continue
+
+            company_id = deal.get(FIELD_COMPANY)
+            if not company_id:
+                continue
+
+            object_name = companies_info.get(company_id, 'Неизвестная компания')
+            object_name = self._remove_emoji_only(object_name)
+            if not object_name:
+                object_name = 'Неизвестная компания'
+
+            office_key = self._get_report_office_key(deal.get('SOURCE_ID'))
+
+            if date_key not in facts_by_date:
+                facts_by_date[date_key] = {}
+
+            if object_name not in facts_by_date[date_key]:
+                facts_by_date[date_key][object_name] = {
+                    'complect': 0,
+                    'potok': 0,
+                    'gorkiy': 0,
+                    'agent': 0,
+                    'bishkek': 0
+                }
+
+            facts_by_date[date_key][object_name][office_key] += 1
+
+        logger.info(
+            "Факт для отчёта сгруппирован: %s дат, %s сделок",
+            len(facts_by_date),
+            len(filtered_deals)
+        )
+        return facts_by_date
+
+    def _format_date_param(self, value):
+        """Возвращает дату в формате YYYY-MM-DD для фильтров Bitrix."""
+        if isinstance(value, datetime):
+            return value.strftime('%Y-%m-%d')
+        return str(value)[:10]
+
+    def _extract_date_key(self, value):
+        """Извлекает YYYY-MM-DD из значения даты Bitrix."""
+        if not value:
+            return ''
+        value_str = str(value)
+        if len(value_str) >= 10:
+            return value_str[:10]
+        return value_str
+
+    def _get_report_office_key(self, source_id):
+        """Преобразует SOURCE_ID Bitrix в ключ офиса отчёта."""
+        if source_id == SOURCE_AGENT:
+            return 'agent'
+        if source_id == SOURCE_POTOK:
+            return 'potok'
+        if source_id == SOURCE_GORKIY52:
+            return 'gorkiy'
+        if source_id == SOURCE_BISHKEK:
+            return 'bishkek'
+        return 'complect'
+    
     def _get_all_deals_raw(self, filter_params):
         all_deals = []
         start = 0

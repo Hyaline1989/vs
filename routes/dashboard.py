@@ -26,7 +26,7 @@ CACHE_DURATION = 60
 def get_cached_data(cache_key, fetch_func, *args, **kwargs):
     now = datetime.now()
     if cache_key in _data_cache and cache_key in _cache_timestamps:
-        if (now - _cache_timestamps[cache_key]).seconds < CACHE_DURATION:
+        if (now - _cache_timestamps[cache_key]).total_seconds() < CACHE_DURATION:
             return _data_cache[cache_key]
     
     data = fetch_func(*args, **kwargs)
@@ -44,6 +44,167 @@ def init_dashboard_apis(bitrix, comp):
     global bitrix_api, comparer
     bitrix_api = bitrix
     comparer = comp
+
+
+def get_date_range(start, end):
+    """Возвращает список дат в формате YYYY-MM-DD для закрытого периода."""
+    dates = []
+    current = start
+    while current <= end:
+        dates.append(current.strftime('%Y-%m-%d'))
+        current += timedelta(days=1)
+    return dates
+
+
+def load_plans_by_date(from_date, to_date):
+    """Загружает плановые потребности из БД за период."""
+    plans_by_date = {}
+
+    with sqlite3.connect(DB_NAME) as conn:
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT vr.date, vo.name,
+                   SUM(vr.rf_men + vr.rf_women + vr.rf_family +
+                       vr.cis_men + vr.cis_women + vr.cis_family) as total_plan,
+                   MAX(vr.is_high) as is_high
+            FROM vacancy_requirements vr
+            JOIN vacancy_positions vp ON vp.id = vr.position_id
+            JOIN vacancy_objects vo ON vo.id = vp.object_id
+            WHERE vr.date BETWEEN ? AND ?
+            GROUP BY vr.date, vo.id, vo.name
+            ORDER BY vr.date, vo.name
+        ''', (from_date, to_date))
+        plan_rows = cursor.fetchall()
+
+    for row in plan_rows:
+        date_key = row['date']
+        obj_name = row['name']
+
+        if date_key not in plans_by_date:
+            plans_by_date[date_key] = {}
+
+        plans_by_date[date_key][obj_name] = {
+            'plan': row['total_plan'] or 0,
+            'is_high': bool(row['is_high'])
+        }
+
+    return plans_by_date
+
+
+def build_report_result(dates_list, plans_by_date, facts_by_date):
+    """Собирает итоговый JSON отчёта из планов и факта."""
+    result = []
+
+    for date_key in dates_list:
+        date_plans = plans_by_date.get(date_key, {})
+        date_facts = facts_by_date.get(date_key, {})
+        all_objects = set(date_plans.keys()) | set(date_facts.keys())
+
+        day_data = {
+            'date': datetime.strptime(date_key, '%Y-%m-%d').strftime('%d.%m.%Y'),
+            'objects': {}
+        }
+
+        has_any_data = False
+        for obj_name in sorted(all_objects):
+            plan_info = date_plans.get(obj_name, {'plan': 0, 'is_high': False})
+            fact_info = date_facts.get(obj_name, {})
+
+            total_sent = (
+                fact_info.get('complect', 0) +
+                fact_info.get('potok', 0) +
+                fact_info.get('gorkiy', 0) +
+                fact_info.get('agent', 0) +
+                fact_info.get('bishkek', 0)
+            )
+
+            if plan_info['plan'] == 0 and total_sent == 0:
+                continue
+
+            day_data['objects'][obj_name] = {
+                'plan': plan_info['plan'],
+                'is_high': plan_info['is_high'],
+                'complect': fact_info.get('complect', 0),
+                'potok': fact_info.get('potok', 0),
+                'gorkiy': fact_info.get('gorkiy', 0),
+                'agent': fact_info.get('agent', 0),
+                'bishkek': fact_info.get('bishkek', 0)
+            }
+            has_any_data = True
+
+        if has_any_data:
+            result.append(day_data)
+
+    return result
+
+
+def build_report_from_snapshots(from_date, to_date):
+    """Формирует отчёт из ежедневных снапшотов."""
+    from database import get_snapshot_report
+
+    snapshots_data = get_snapshot_report(from_date, to_date)
+    result = []
+
+    for date_key, objects in snapshots_data.items():
+        day_data = {
+            'date': datetime.strptime(date_key, '%Y-%m-%d').strftime('%d.%m.%Y'),
+            'objects': {}
+        }
+
+        for obj in objects:
+            day_data['objects'][obj['object_name']] = {
+                'plan': obj['plan'],
+                'is_high': obj['is_high'],
+                'complect': obj['complect'],
+                'potok': obj['potok'],
+                'gorkiy': obj['gorkiy'],
+                'agent': obj['agent'],
+                'bishkek': obj['bishkek']
+            }
+
+        result.append(day_data)
+
+    return result
+
+
+def all_snapshots_exist(dates_list):
+    """Проверяет наличие снапшотов за все даты периода."""
+    from database import check_snapshot_exists
+
+    for date_key in dates_list:
+        if not check_snapshot_exists(date_key):
+            return False
+    return True
+
+
+def convert_report_facts_to_offices(facts_for_date):
+    """Преобразует факт отчёта в структуру офисов для генерации снапшота."""
+    offices = {
+        'complect': {'count': 0, 'objects': {}},
+        'potok': {'count': 0, 'objects': {}},
+        'gorkiy52': {'count': 0, 'objects': {}},
+        'agent': {'count': 0, 'objects': {}},
+        'bishkek': {'count': 0, 'objects': {}}
+    }
+
+    office_mapping = {
+        'complect': 'complect',
+        'potok': 'potok',
+        'gorkiy': 'gorkiy52',
+        'agent': 'agent',
+        'bishkek': 'bishkek'
+    }
+
+    for object_name, counts in facts_for_date.items():
+        for report_key, office_name in office_mapping.items():
+            count = counts.get(report_key, 0)
+            if not count:
+                continue
+            offices[office_name]['objects'][object_name] = count
+            offices[office_name]['count'] += count
+
+    return offices
 
 
 @dashboard_bp.route('/dashboard')
@@ -122,178 +283,65 @@ def update_requirements():
 
 @dashboard_bp.route('/report')
 def report():
-    """ОПТИМИЗИРОВАННЫЙ отчёт - сначала из снапшотов, при отсутствии - из Bitrix"""
+    """
+    Оптимизированный отчёт по плану/факту.
+
+    Если за весь период есть снапшоты — отдаём данные из БД.
+    Если снапшотов нет или они неполные — забираем факт из Bitrix
+    одним диапазонным запросом вместо цикла по дням и офисам.
+    """
     if not current_user.is_authenticated:
         return jsonify({'error': 'Unauthorized'}), 401
-    
+
     module_perms = get_user_module_permissions(current_user.id)
     if not module_perms.get('dashboard', False):
         return jsonify({'error': 'Forbidden'}), 403
-    
+
     try:
         from_date = request.args.get('from')
         to_date = request.args.get('to')
-        
+
         if not from_date or not to_date:
             return jsonify({'error': 'Не указан период'}), 400
-        
-        from database import check_snapshot_exists, get_snapshot_report
-        
-        start = datetime.strptime(from_date, '%Y-%m-%d')
-        end = datetime.strptime(to_date, '%Y-%m-%d')
-        
-        # Проверяем, все ли даты есть в снапшотах
-        all_dates_exist = True
-        current = start
-        while current <= end:
-            date_str = current.strftime('%Y-%m-%d')
-            if not check_snapshot_exists(date_str):
-                all_dates_exist = False
-                break
-            current += timedelta(days=1)
-        
-        if all_dates_exist:
-            # Быстрый путь - из снапшотов
-            logger.info(f"Отчёт из снапшотов за {from_date} - {to_date}")
-            snapshots_data = get_snapshot_report(from_date, to_date)
-            
-            result = []
-            for date_str, objects in snapshots_data.items():
-                day_data = {
-                    'date': datetime.strptime(date_str, '%Y-%m-%d').strftime('%d.%m.%Y'),
-                    'objects': {}
-                }
-                for obj in objects:
-                    day_data['objects'][obj['object_name']] = {
-                        'plan': obj['plan'],
-                        'is_high': obj['is_high'],
-                        'complect': obj['complect'],
-                        'potok': obj['potok'],
-                        'gorkiy': obj['gorkiy'],
-                        'agent': obj['agent'],
-                        'bishkek': obj['bishkek']
-                    }
-                result.append(day_data)
-            
-            return jsonify(result)
-        
-        # Если снапшотов нет - используем старый метод
-        logger.warning(f"Снапшоты отсутствуют за некоторые даты, используем прямой запрос к Bitrix")
-        
-        conn = sqlite3.connect(DB_NAME)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        
-        cursor.execute('''
-            SELECT vr.date, vo.name, 
-                   SUM(vr.rf_men + vr.rf_women + vr.rf_family + 
-                       vr.cis_men + vr.cis_women + vr.cis_family) as total_plan,
-                   MAX(vr.is_high) as is_high
-            FROM vacancy_requirements vr
-            JOIN vacancy_positions vp ON vp.id = vr.position_id
-            JOIN vacancy_objects vo ON vo.id = vp.object_id
-            WHERE vr.date BETWEEN ? AND ?
-            GROUP BY vr.date, vo.id, vo.name
-            ORDER BY vr.date, vo.name
-        ''', (from_date, to_date))
-        
-        plan_rows = cursor.fetchall()
-        
-        plans_by_date = {}
-        for row in plan_rows:
-            date = row['date']
-            obj_name = row['name']
-            plan = row['total_plan'] or 0
-            is_high = bool(row['is_high'])
-            
-            if date not in plans_by_date:
-                plans_by_date[date] = {}
-            plans_by_date[date][obj_name] = {
-                'plan': plan,
-                'is_high': is_high
-            }
-        
-        dates_list = []
-        current = start
-        while current <= end:
-            dates_list.append(current.strftime('%Y-%m-%d'))
-            current += timedelta(days=1)
-        
-        def get_all_offices_stats_batch(dates):
-            result = {}
-            for target_date in dates:
-                date_obj = datetime.strptime(target_date, '%Y-%m-%d')
-                try:
-                    cache_key = f"report_{target_date}"
-                    offices = get_cached_data(cache_key, bitrix_api.get_all_offices_stats, date_obj)
-                    
-                    if target_date not in result:
-                        result[target_date] = {}
-                    
-                    for office_name, office_data in offices.items():
-                        for obj_name, count in office_data.get('objects', {}).items():
-                            if obj_name not in result[target_date]:
-                                result[target_date][obj_name] = {
-                                    'complect': 0, 'potok': 0, 'gorkiy': 0, 'agent': 0, 'bishkek': 0
-                                }
-                            if office_name == 'complect':
-                                result[target_date][obj_name]['complect'] += count
-                            elif office_name == 'potok':
-                                result[target_date][obj_name]['potok'] += count
-                            elif office_name == 'gorkiy52':
-                                result[target_date][obj_name]['gorkiy'] += count
-                            elif office_name == 'agent':
-                                result[target_date][obj_name]['agent'] += count
-                            elif office_name == 'bishkek':
-                                result[target_date][obj_name]['bishkek'] += count
-                except Exception as e:
-                    logger.error(f"Ошибка получения данных за {target_date}: {e}")
-                    if target_date not in result:
-                        result[target_date] = {}
-            return result
-        
-        facts_by_date = get_all_offices_stats_batch(dates_list)
-        
-        result = []
-        for date in dates_list:
-            date_plans = plans_by_date.get(date, {})
-            date_facts = facts_by_date.get(date, {})
-            all_objects = set(date_plans.keys()) | set(date_facts.keys())
-            
-            day_data = {
-                'date': datetime.strptime(date, '%Y-%m-%d').strftime('%d.%m.%Y'),
-                'objects': {}
-            }
-            
-            has_any_data = False
-            for obj in all_objects:
-                plan_info = date_plans.get(obj, {'plan': 0, 'is_high': False})
-                fact_info = date_facts.get(obj, {})
-                
-                total_sent = (fact_info.get('complect', 0) + fact_info.get('potok', 0) + 
-                             fact_info.get('gorkiy', 0) + fact_info.get('agent', 0) + 
-                             fact_info.get('bishkek', 0))
-                
-                if plan_info['plan'] == 0 and total_sent == 0:
-                    continue
-                
-                day_data['objects'][obj] = {
-                    'plan': plan_info['plan'],
-                    'is_high': plan_info['is_high'],
-                    'complect': fact_info.get('complect', 0),
-                    'potok': fact_info.get('potok', 0),
-                    'gorkiy': fact_info.get('gorkiy', 0),
-                    'agent': fact_info.get('agent', 0),
-                    'bishkek': fact_info.get('bishkek', 0)
-                }
-                has_any_data = True
-            
-            if has_any_data:
-                result.append(day_data)
-        
-        conn.close()
+
+        try:
+            start = datetime.strptime(from_date, '%Y-%m-%d')
+            end = datetime.strptime(to_date, '%Y-%m-%d')
+        except ValueError:
+            return jsonify({'error': 'Неверный формат даты'}), 400
+
+        if start > end:
+            return jsonify({'error': 'Дата начала не может быть позже даты окончания'}), 400
+
+        dates_list = get_date_range(start, end)
+
+        if all_snapshots_exist(dates_list):
+            logger.info("Отчёт из снапшотов за %s - %s", from_date, to_date)
+            return jsonify(build_report_from_snapshots(from_date, to_date))
+
+        if bitrix_api is None:
+            logger.error("Bitrix API не инициализирован")
+            return jsonify({'error': 'Bitrix API не инициализирован'}), 500
+
+        logger.warning(
+            "Снапшоты отсутствуют не за все даты периода %s - %s. "
+            "Используем диапазонный запрос к Bitrix.",
+            from_date,
+            to_date
+        )
+
+        plans_by_date = load_plans_by_date(from_date, to_date)
+        cache_key = f"report_range_{from_date}_{to_date}"
+        facts_by_date = get_cached_data(
+            cache_key,
+            bitrix_api.get_report_facts_range,
+            from_date,
+            to_date
+        )
+
+        result = build_report_result(dates_list, plans_by_date, facts_by_date)
         return jsonify(result)
-        
+
     except Exception as e:
         logger.error(f"Ошибка при формировании отчёта: {e}", exc_info=True)
         return jsonify({'error': str(e)}), 500
@@ -415,91 +463,130 @@ def snapshot_status():
 
 @dashboard_bp.route('/snapshot/generate-range', methods=['POST'])
 def generate_snapshot_range():
-    """Генерирует снапшоты за диапазон дат"""
+    """Генерирует снапшоты за диапазон дат одним диапазонным запросом к Bitrix."""
     if not current_user.is_authenticated:
         return jsonify({'error': 'Unauthorized'}), 401
-    
+
     if current_user.role != 'admin':
         return jsonify({'error': 'Forbidden'}), 403
-    
+
     try:
-        data = request.get_json()
+        data = request.get_json() or {}
         from_date = data.get('from')
         to_date = data.get('to')
-        
+
         if not from_date or not to_date:
             return jsonify({'error': 'Не указан период'}), 400
-        
-        from database import get_plan_requirements_for_date, save_daily_snapshots_batch, delete_snapshots_for_date
-        
-        start = datetime.strptime(from_date, '%Y-%m-%d')
-        end = datetime.strptime(to_date, '%Y-%m-%d')
-        
+
+        try:
+            start = datetime.strptime(from_date, '%Y-%m-%d')
+            end = datetime.strptime(to_date, '%Y-%m-%d')
+        except ValueError:
+            return jsonify({'error': 'Неверный формат даты'}), 400
+
+        if start > end:
+            return jsonify({'error': 'Дата начала не может быть позже даты окончания'}), 400
+
+        if bitrix_api is None:
+            logger.error("Bitrix API не инициализирован")
+            return jsonify({'error': 'Bitrix API не инициализирован'}), 500
+
+        from database import (
+            get_plan_requirements_for_date,
+            save_daily_snapshots_batch,
+            delete_snapshots_for_date
+        )
+
+        now = datetime.now()
+        fact_end = min(end, now)
+        facts_by_date = {}
+
+        if start <= fact_end:
+            facts_by_date = bitrix_api.get_report_facts_range(
+                start.strftime('%Y-%m-%d'),
+                fact_end.strftime('%Y-%m-%d')
+            )
+
         results = []
         current = start
+
         while current <= end:
             date_str = current.strftime('%Y-%m-%d')
-            
-            if current > datetime.now():
+
+            if current > now:
                 results.append({
                     'date': date_str,
                     'status': 'skipped',
                     'message': 'Будущая дата'
                 })
-            else:
-                try:
-                    offices_stats = bitrix_api.get_all_offices_stats(current)
-                    plans = get_plan_requirements_for_date(current)
-                    
-                    delete_snapshots_for_date(date_str)
-                    
-                    snapshots = []
-                    for office_name, office_data in offices_stats.items():
-                        for obj_name, count in office_data.get('objects', {}).items():
-                            plan_info = plans.get(obj_name, {})
-                            snapshots.append({
-                                'object_name': obj_name,
-                                'office_name': office_name,
-                                'count': count,
-                                'plan': plan_info.get('count', 0),
-                                'is_high': plan_info.get('is_high', False)
-                            })
-                    
-                    for obj_name, plan_info in plans.items():
-                        already_added = any(s['object_name'] == obj_name for s in snapshots)
-                        if not already_added:
-                            snapshots.append({
-                                'object_name': obj_name,
-                                'office_name': 'complect',
-                                'count': 0,
-                                'plan': plan_info.get('count', 0),
-                                'is_high': plan_info.get('is_high', False)
-                            })
-                    
-                    if snapshots:
-                        save_daily_snapshots_batch(date_str, snapshots)
-                    
-                    results.append({
-                        'date': date_str,
-                        'status': 'success',
-                        'snapshots_count': len(snapshots)
+                current += timedelta(days=1)
+                continue
+
+            try:
+                plans = get_plan_requirements_for_date(current)
+                facts_for_date = facts_by_date.get(date_str, {})
+                offices_stats = convert_report_facts_to_offices(facts_for_date)
+
+                delete_snapshots_for_date(date_str)
+
+                snapshots = []
+                for office_name, office_data in offices_stats.items():
+                    for obj_name, count in office_data.get('objects', {}).items():
+                        plan_info = plans.get(obj_name, {})
+                        snapshots.append({
+                            'object_name': obj_name,
+                            'office_name': office_name,
+                            'count': count,
+                            'plan': plan_info.get('count', 0),
+                            'is_high': plan_info.get('is_high', False)
+                        })
+
+                for obj_name, plan_info in plans.items():
+                    already_added = any(
+                        snapshot['object_name'] == obj_name
+                        for snapshot in snapshots
+                    )
+                    if already_added:
+                        continue
+
+                    snapshots.append({
+                        'object_name': obj_name,
+                        'office_name': 'complect',
+                        'count': 0,
+                        'plan': plan_info.get('count', 0),
+                        'is_high': plan_info.get('is_high', False)
                     })
-                except Exception as e:
-                    results.append({
-                        'date': date_str,
-                        'status': 'error',
-                        'message': str(e)
-                    })
-            
+
+                if snapshots:
+                    save_daily_snapshots_batch(date_str, snapshots)
+
+                results.append({
+                    'date': date_str,
+                    'status': 'success',
+                    'snapshots_count': len(snapshots)
+                })
+            except Exception as e:
+                logger.error(
+                    "Ошибка при генерации снапшота за %s: %s",
+                    date_str,
+                    e,
+                    exc_info=True
+                )
+                results.append({
+                    'date': date_str,
+                    'status': 'error',
+                    'message': str(e)
+                })
+
             current += timedelta(days=1)
-        
+
         return jsonify({
             'success': True,
             'results': results,
             'total': len(results),
             'success_count': len([r for r in results if r['status'] == 'success'])
         })
-        
+
     except Exception as e:
         logger.error(f"Ошибка при генерации диапазона снапшотов: {e}", exc_info=True)
         return jsonify({'error': str(e)}), 500
