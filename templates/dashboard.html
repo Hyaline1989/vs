@@ -80,6 +80,67 @@
             background: var(--primary);
             border-radius: 3px;
         }
+
+        /* Стили для кнопки фиксации дня */
+        .fix-day-btn {
+            background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+            color: white;
+            border: none;
+            padding: 8px 18px;
+            border-radius: 30px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .fix-day-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(243, 156, 18, 0.4);
+        }
+
+        .fix-day-btn:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .fix-day-btn i {
+            font-size: 0.9rem;
+        }
+
+        @media (max-width: 768px) {
+            .fix-day-btn {
+                padding: 6px 14px;
+                font-size: 0.8rem;
+                width: 100%;
+                justify-content: center;
+            }
+            
+            .date-controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .date-field {
+                width: 100%;
+            }
+            
+            .date-picker {
+                width: 100%;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .fix-day-btn {
+                font-size: 0.7rem;
+                padding: 6px 10px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -137,6 +198,12 @@
                         <label for="date-picker">Дата просмотра:</label>
                         <input type="date" id="date-picker" class="date-picker" value="">
                     </div>
+                    <!-- Кнопка "Зафиксировать день в отчёте" (только для администратора) -->
+                    {% if current_user.is_authenticated and current_user.role == 'admin' %}
+                    <button class="fix-day-btn" id="fixDayBtn" onclick="fixDayInReport()">
+                        <i class="fas fa-save"></i> Зафиксировать день в отчёте
+                    </button>
+                    {% endif %}
                 </div>
                 <div class="header-actions">
                     <div class="refresh-container">

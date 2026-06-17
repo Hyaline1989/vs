@@ -777,14 +777,20 @@ class ShiftReportAPI:
         self.webhook_url = webhook_url
     
     def _get_filtered_deals(self, start_date_str, end_date_str):
-        """Возвращает сделки, прошедшие все фильтры, но без группировки."""
+        """
+        Возвращает сделки, прошедшие все фильтры, но без группировки.
+        ДОБАВЛЕНА ОТЛАДКА: логирует каждый этап фильтрации.
+        """
         deals = self._get_deals_by_date(start_date_str, end_date_str)
+        logger.info(f"📊 [1 смена] Всего сделок за период: {len(deals)}")
         
         # Оставляем только с отработанной сменой (заполненное и не 'N')
         worked = [d for d in deals if d.get(FIELD_WORKED_1_SHIFT) and d.get(FIELD_WORKED_1_SHIFT) != 'N']
+        logger.info(f"📊 [1 смена] После фильтра 'отработал 1 смену': {len(worked)}")
         
         # Без заполненного ФИО агента
         no_agent = [d for d in worked if not d.get(FIELD_AGENT_FIO)]
+        logger.info(f"📊 [1 смена] После фильтра 'без агента': {len(no_agent)}")
         
         # Исключаем операторов (всех, чьё имя начинается с "Опер")
         clean = [
@@ -792,6 +798,14 @@ class ShiftReportAPI:
             if not is_operator(d.get(FIELD_CC_OPERATOR, ''))
             and not is_operator(d.get(FIELD_CC_OPERATOR_REPORT, ''))
         ]
+        logger.info(f"📊 [1 смена] После фильтра 'не оператор': {len(clean)}")
+        
+        # ДОПОЛНИТЕЛЬНАЯ ОТЛАДКА: показываем первые 5 сделок для проверки
+        if clean:
+            sample = clean[:5]
+            for i, d in enumerate(sample):
+                logger.info(f"📊 [1 смена] Пример сделки {i+1}: SOURCE_ID={d.get('SOURCE_ID')}, FIELD_COMPANY={d.get(FIELD_COMPANY)}")
+        
         return clean
     
     def _get_deals_by_date(self, start_date_str, end_date_str):
@@ -838,7 +852,9 @@ class ShiftReportAPI:
     def get_shift_report(self, start_date_str, end_date_str):
         """Отчёт по отработавшим 1 смену с разбивкой по компаниям."""
         deals = self._get_filtered_deals(start_date_str, end_date_str)
-        return self._group_by_companies(deals)
+        result = self._group_by_companies(deals)
+        logger.info(f"📊 [1 смена] Итоговый отчёт по объектам: {sum(sum(v.values()) for v in result.values()) if result else 0} записей")
+        return result
     
     def _group_by_companies(self, deals):
         """Группировка по компаниям (для отчёта по объектам)."""
@@ -876,7 +892,9 @@ class ShiftReportAPI:
     def get_staff_report(self, start_date_str, end_date_str):
         """Отчёт по отработавшим 1 смену с разбивкой по сотрудникам."""
         deals = self._get_filtered_deals(start_date_str, end_date_str)
-        return self._group_by_staff(deals)
+        result = self._group_by_staff(deals)
+        logger.info(f"📊 [1 смена] Итоговый отчёт по сотрудникам: {sum(sum(v.values()) for v in result.values()) if result else 0} записей")
+        return result
     
     def _group_by_staff(self, deals):
         """Группировка по полю Сотрудник Колл-центра (ОТЧЕТ)."""

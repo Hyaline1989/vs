@@ -260,7 +260,14 @@ def delete_position():
 @requirements_admin_bp.route('/save-all', methods=['POST'])
 @login_required
 def save_all_requirements():
-    """Сохранение ТЕКУЩИХ потребностей с сохранением МАКСИМАЛЬНОЙ потребности для дашборда"""
+    """
+    Сохранение ТЕКУЩИХ потребностей.
+    
+    Что делает:
+    1. Сохраняет данные в current_requirements (для Подбора объектов)
+    2. Синхронизирует ЦИФРЫ потребности с vacancy_requirements (для Дашборда)
+    3. НЕ синхронизирует приоритеты (is_high) — они фиксируются только через кнопку "Зафиксировать день"
+    """
     if not current_user.is_authenticated:
         return jsonify({'error': 'Unauthorized'}), 401
     
@@ -270,17 +277,19 @@ def save_all_requirements():
     data = request.get_json()
     objects_data = data.get('objects', {})
     
-    # Сохраняем в current_requirements (для подбора объектов)
-    if save_current_requirements(objects_data):
-        # Синхронизируем с vacancy_requirements для дашборда с сохранением МАКСИМУМА
-        today = datetime.now().strftime('%Y-%m-%d')
-        
-        conn = sqlite3.connect(DB_NAME)
-        cursor = conn.cursor()
-        
+    # 1. Сохраняем в current_requirements (для подбора объектов)
+    if not save_current_requirements(objects_data):
+        return jsonify({'error': 'Ошибка при сохранении потребностей'}), 500
+    
+    # 2. Синхронизируем с vacancy_requirements для дашборда
+    #    НО синхронизируем ТОЛЬКО цифры, НЕ синхронизируем is_high
+    today = datetime.now().strftime('%Y-%m-%d')
+    
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    
+    try:
         for obj_name, obj_data in objects_data.items():
-            is_high = obj_data.get('is_high', False)
-            
             for pos in obj_data.get('positions', []):
                 pos_name = pos.get('name', '')
                 if not pos_name:
@@ -312,27 +321,30 @@ def save_all_requirements():
                     existing = cursor.fetchone()
                     
                     if existing:
-                        # Сохраняем МАКСИМАЛЬНОЕ значение
+                        # Сохраняем МАКСИМАЛЬНОЕ значение для ЦИФР
                         final_men = max(existing[0], new_men)
                         final_women = max(existing[1], new_women)
                         final_family = max(existing[2], new_family)
                         final_cis_men = max(existing[3], new_cis_men)
                         final_cis_women = max(existing[4], new_cis_women)
                         final_cis_family = max(existing[5], new_cis_family)
-                        final_is_high = existing[6] or is_high
+                        
+                        # ВАЖНО: is_high НЕ МЕНЯЕМ! Оставляем существующее значение.
+                        # Приоритет фиксируется только через кнопку "Зафиксировать день"
+                        final_is_high = existing[6]  # БЕРЁМ СУЩЕСТВУЮЩЕЕ, НЕ МЕНЯЕМ!
                         
                         cursor.execute('''
                             UPDATE vacancy_requirements 
                             SET rf_men = ?, rf_women = ?, rf_family = ?,
                                 cis_men = ?, cis_women = ?, cis_family = ?,
-                                is_high = ?, updated_at = CURRENT_TIMESTAMP
+                                updated_at = CURRENT_TIMESTAMP
                             WHERE position_id = ? AND date = ?
                         ''', (final_men, final_women, final_family,
                               final_cis_men, final_cis_women, final_cis_family,
-                              1 if final_is_high else 0,
                               pos_id, today))
                     else:
                         # Вставляем новую запись
+                        # is_high ставим False по умолчанию (приоритет будет установлен позже через кнопку)
                         cursor.execute('''
                             INSERT INTO vacancy_requirements 
                             (position_id, date, rf_men, rf_women, rf_family, cis_men, cis_women, cis_family, is_high)
@@ -340,17 +352,22 @@ def save_all_requirements():
                         ''', (pos_id, today,
                               new_men, new_women, new_family,
                               new_cis_men, new_cis_women, new_cis_family,
-                              1 if is_high else 0))
+                              0))  # is_high = 0 (не приоритетный)
             
-            logger.info(f"✅ Синхронизирован объект {obj_name} для дашборда на {today} (сохранён максимум)")
+            logger.info(f"✅ Синхронизированы ЦИФРЫ потребности для дашборда на {today} (приоритеты НЕ затронуты)")
         
         conn.commit()
-        conn.close()
         
-        from database import log_user_action
-        log_user_action(current_user.id, 'save_current_requirements', 
-                       f"Сохранены текущие потребности для {len(objects_data)} объектов (максимумы сохранены)", 
-                       request.remote_addr)
-        return jsonify({'success': True, 'message': f'Сохранено {len(objects_data)} объектов'})
-    else:
-        return jsonify({'error': 'Ошибка при сохранении потребностей'}), 500
+    except Exception as e:
+        conn.rollback()
+        logger.error(f"Ошибка при синхронизации с vacancy_requirements: {e}")
+        return jsonify({'error': f'Ошибка синхронизации: {str(e)}'}), 500
+    finally:
+        conn.close()
+    
+    from database import log_user_action
+    log_user_action(current_user.id, 'save_current_requirements', 
+                   f"Сохранены текущие потребности для {len(objects_data)} объектов (цифры синхронизированы, приоритеты НЕ затронуты)", 
+                   request.remote_addr)
+    
+    return jsonify({'success': True, 'message': f'Сохранено {len(objects_data)} объектов'})

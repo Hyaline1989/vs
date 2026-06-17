@@ -810,6 +810,82 @@ async function exportFirstShiftByStaff() {
     }
 }
 
+// ========== ФИКСАЦИЯ ДНЯ В ОТЧЁТЕ ==========
+
+async function fixDayInReport() {
+    const datePicker = document.getElementById('date-picker');
+    if (!datePicker) {
+        showNotification('❌ Ошибка: не найден календарь', 'error');
+        return;
+    }
+    
+    const date = datePicker.value;
+    if (!date) {
+        showNotification('❌ Выберите дату для фиксации', 'error');
+        return;
+    }
+    
+    // Проверяем, есть ли уже снапшот за эту дату
+    try {
+        const statusResponse = await fetch(`/api/snapshot/status?from=${date}&to=${date}`, {
+            credentials: 'include'
+        });
+        const statusData = await statusResponse.json();
+        
+        if (statusData.existing_count > 0) {
+            if (!confirm(`Дата ${formatDateForDisplay(date)} уже зафиксирована. Перезаписать?`)) {
+                return;
+            }
+        }
+    } catch (e) {
+        console.warn('Не удалось проверить статус снапшота:', e);
+    }
+    
+    const fixBtn = document.getElementById('fixDayBtn');
+    if (!fixBtn) {
+        showNotification('❌ Кнопка фиксации не найдена', 'error');
+        return;
+    }
+    
+    const originalText = fixBtn.innerHTML;
+    fixBtn.disabled = true;
+    fixBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Фиксация...';
+    fixBtn.style.opacity = '0.7';
+    
+    try {
+        const response = await fetch('/api/fix-day', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ date: date })
+        });
+        
+        const data = await response.json();
+        
+        // ВОССТАНАВЛИВАЕМ КНОПКУ ДО ПОКАЗА УВЕДОМЛЕНИЯ
+        fixBtn.disabled = false;
+        fixBtn.innerHTML = originalText;
+        fixBtn.style.opacity = '1';
+        
+        if (data.success) {
+            showNotification(`✅ День ${formatDateForDisplay(date)} зафиксирован! (${data.snapshots_count} записей, ${data.priority_count} приоритетных)`, 'success');
+            // Обновляем данные дашборда
+            await loadDashboardForDate(date);
+        } else {
+            showNotification(`❌ ${data.error || 'Ошибка фиксации'}`, 'error');
+        }
+    } catch (error) {
+        console.error('Ошибка:', error);
+        
+        // ВОССТАНАВЛИВАЕМ КНОПКУ ДАЖЕ ПРИ ОШИБКЕ
+        fixBtn.disabled = false;
+        fixBtn.innerHTML = originalText;
+        fixBtn.style.opacity = '1';
+        
+        showNotification('❌ Ошибка при фиксации дня', 'error');
+    }
+}
+
 // Делаем функции глобальными
 window.manualRefresh = manualRefresh;
 window.exportFullReport = exportFullReport;
@@ -822,3 +898,4 @@ window.loadFirstShiftByObject = loadFirstShiftByObject;
 window.loadFirstShiftByStaff = loadFirstShiftByStaff;
 window.exportFirstShiftByObject = exportFirstShiftByObject;
 window.exportFirstShiftByStaff = exportFirstShiftByStaff;
+window.fixDayInReport = fixDayInReport;

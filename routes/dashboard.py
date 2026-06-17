@@ -1,7 +1,7 @@
-# routes/dashboard.py
+# routes/dashboard.py - добавлен эндпоинт для фиксации дня
 # -*- coding: utf-8 -*-
 from flask import Blueprint, request, jsonify, redirect
-from flask_login import current_user
+from flask_login import current_user, login_required
 from datetime import datetime, timedelta
 import re
 import logging
@@ -347,9 +347,202 @@ def report():
         return jsonify({'error': str(e)}), 500
 
 
+# ========== НОВЫЙ ЭНДПОИНТ: ФИКСАЦИЯ ДНЯ В ОТЧЁТЕ ==========
+
+@dashboard_bp.route('/fix-day', methods=['POST'])
+@login_required
+def fix_day():
+    """
+    Фиксирует день в отчёте:
+    1. Обновляет приоритеты (is_high) в vacancy_requirements для выбранной даты
+    2. Берёт текущие приоритеты из current_requirements
+    3. Генерирует снапшот за указанную дату с этими приоритетами
+    4. Сохраняет снапшот в БД
+    """
+    if not current_user.is_authenticated:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    # Только администратор может фиксировать дни
+    if current_user.role != 'admin':
+        return jsonify({'error': 'Forbidden', 'message': 'Только администратор может фиксировать дни'}), 403
+    
+    try:
+        data = request.get_json() or {}
+        date_str = data.get('date')
+        
+        if not date_str:
+            return jsonify({'error': 'Не указана дата'}), 400
+        
+        if not re.match(r'^\d{4}-\d{2}-\d{2}$', date_str):
+            return jsonify({'error': 'Неверный формат даты'}), 400
+        
+        target_date = datetime.strptime(date_str, '%Y-%m-%d')
+        date_key = target_date.strftime('%Y-%m-%d')
+        
+        logger.info(f"🔄 Фиксация дня {date_key} пользователем {current_user.username}")
+        
+        from database import (
+            get_current_requirements,
+            get_plan_requirements_for_date,
+            save_daily_snapshots_batch,
+            delete_snapshots_for_date,
+            DB_NAME
+        )
+        
+        # 1. Получаем текущие приоритеты из current_requirements
+        current_req = get_current_requirements()
+        priorities = {}
+        for obj_name, obj_data in current_req.items():
+            if obj_data.get('is_high', False):
+                priorities[obj_name] = True
+                logger.info(f"🔴 Приоритетный объект: {obj_name}")
+        
+        # 2. ОБНОВЛЯЕМ ПРИОРИТЕТЫ В vacancy_requirements ДЛЯ ДАШБОРДА
+        #    Это нужно, чтобы в Дашборде (план/факт) отображался приоритет
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        
+        try:
+            # Для каждого приоритетного объекта обновляем is_high в vacancy_requirements
+            for obj_name, is_high in priorities.items():
+                if is_high:
+                    # Находим все position_id для этого объекта
+                    cursor.execute('''
+                        SELECT vp.id FROM vacancy_positions vp
+                        JOIN vacancy_objects vo ON vo.id = vp.object_id
+                        WHERE vo.name = ?
+                    ''', (obj_name,))
+                    position_ids = [row[0] for row in cursor.fetchall()]
+                    
+                    if position_ids:
+                        # Обновляем is_high для всех позиций этого объекта на указанную дату
+                        placeholders = ','.join(['?'] * len(position_ids))
+                        cursor.execute(f'''
+                            UPDATE vacancy_requirements 
+                            SET is_high = 1, updated_at = CURRENT_TIMESTAMP
+                            WHERE position_id IN ({placeholders}) AND date = ?
+                        ''', position_ids + [date_key])
+                        logger.info(f"✅ Обновлён приоритет для объекта {obj_name} в vacancy_requirements на дату {date_key}")
+            
+            # Также сбрасываем приоритеты для объектов, у которых нет приоритета в current_requirements
+            # Находим все объекты, у которых есть записи в vacancy_requirements за эту дату
+            cursor.execute('''
+                SELECT DISTINCT vo.name 
+                FROM vacancy_requirements vr
+                JOIN vacancy_positions vp ON vp.id = vr.position_id
+                JOIN vacancy_objects vo ON vo.id = vp.object_id
+                WHERE vr.date = ?
+            ''', (date_key,))
+            all_objects_in_db = [row[0] for row in cursor.fetchall()]
+            
+            for obj_name in all_objects_in_db:
+                if obj_name not in priorities or not priorities[obj_name]:
+                    # Сбрасываем приоритет для этого объекта
+                    cursor.execute('''
+                        SELECT vp.id FROM vacancy_positions vp
+                        JOIN vacancy_objects vo ON vo.id = vp.object_id
+                        WHERE vo.name = ?
+                    ''', (obj_name,))
+                    position_ids = [row[0] for row in cursor.fetchall()]
+                    
+                    if position_ids:
+                        placeholders = ','.join(['?'] * len(position_ids))
+                        cursor.execute(f'''
+                            UPDATE vacancy_requirements 
+                            SET is_high = 0, updated_at = CURRENT_TIMESTAMP
+                            WHERE position_id IN ({placeholders}) AND date = ?
+                        ''', position_ids + [date_key])
+                        logger.info(f"✅ Сброшен приоритет для объекта {obj_name} в vacancy_requirements на дату {date_key}")
+            
+            conn.commit()
+            logger.info(f"✅ Приоритеты обновлены в vacancy_requirements для даты {date_key}")
+            
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"Ошибка при обновлении приоритетов в vacancy_requirements: {e}")
+            return jsonify({'error': f'Ошибка обновления приоритетов: {str(e)}'}), 500
+        finally:
+            conn.close()
+        
+        # 3. Получаем план (потребности) за указанную дату
+        plans = get_plan_requirements_for_date(target_date)
+        
+        # 4. Получаем фактические данные из Bitrix за указанную дату
+        offices_stats = bitrix_api.get_all_offices_stats(target_date)
+        
+        # 5. Удаляем старый снапшот за эту дату (если есть)
+        delete_snapshots_for_date(date_key)
+        
+        # 6. Формируем новые снапшоты (используем обновлённые приоритеты)
+        snapshots = []
+        
+        # Добавляем данные по офисам
+        for office_name, office_data in offices_stats.items():
+            for obj_name, count in office_data.get('objects', {}).items():
+                plan_info = plans.get(obj_name, {})
+                # Проверяем, есть ли у объекта приоритет
+                is_high = priorities.get(obj_name, False)
+                
+                snapshots.append({
+                    'object_name': obj_name,
+                    'office_name': office_name,
+                    'count': count,
+                    'plan': plan_info.get('count', 0),
+                    'is_high': is_high
+                })
+        
+        # Добавляем объекты из плана, которых нет в факте
+        for obj_name, plan_info in plans.items():
+            already_added = any(s['object_name'] == obj_name for s in snapshots)
+            if not already_added:
+                is_high = priorities.get(obj_name, False)
+                snapshots.append({
+                    'object_name': obj_name,
+                    'office_name': 'complect',
+                    'count': 0,
+                    'plan': plan_info.get('count', 0),
+                    'is_high': is_high
+                })
+        
+        # 7. Сохраняем снапшоты
+        if snapshots:
+            save_daily_snapshots_batch(date_key, snapshots)
+            logger.info(f"✅ Снапшот за {date_key} сохранён ({len(snapshots)} записей)")
+            
+            # Логируем действие
+            from database import log_user_action
+            log_user_action(
+                current_user.id,
+                'fix_day_in_report',
+                f"Зафиксирован день {date_key} в отчёте (приоритетов: {len([s for s in snapshots if s['is_high']])})",
+                request.remote_addr
+            )
+            
+            # Очищаем кэш, чтобы Дашборд показал обновлённые данные
+            clear_cache()
+            
+            return jsonify({
+                'success': True,
+                'date': date_key,
+                'snapshots_count': len(snapshots),
+                'priority_count': len([s for s in snapshots if s['is_high']]),
+                'message': f'День {date_key} зафиксирован в отчёте. Приоритеты обновлены в Дашборде.'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Нет данных для сохранения'
+            }), 400
+        
+    except Exception as e:
+        logger.error(f"Ошибка при фиксации дня: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
 # ========== ЭНДПОИНТЫ ДЛЯ УПРАВЛЕНИЯ СНАПШОТАМИ ==========
 
 @dashboard_bp.route('/snapshot/generate', methods=['POST'])
+@login_required
 def generate_snapshot():
     """Генерирует снапшот для указанной даты (или сегодня)"""
     if not current_user.is_authenticated:
@@ -419,6 +612,7 @@ def generate_snapshot():
 
 
 @dashboard_bp.route('/snapshot/status', methods=['GET'])
+@login_required
 def snapshot_status():
     """Проверяет, есть ли снапшоты за указанный период"""
     if not current_user.is_authenticated:
@@ -462,6 +656,7 @@ def snapshot_status():
 
 
 @dashboard_bp.route('/snapshot/generate-range', methods=['POST'])
+@login_required
 def generate_snapshot_range():
     """Генерирует снапшоты за диапазон дат одним диапазонным запросом к Bitrix."""
     if not current_user.is_authenticated:
@@ -595,6 +790,7 @@ def generate_snapshot_range():
 # ========== ОТЧЁТЫ ПО ОТРАБОТАВШИМ 1 СМЕНУ (ИЗ ТЕЛЕГРАМ БОТА) ==========
 
 @dashboard_bp.route('/first-shift-by-object', methods=['GET'])
+@login_required
 def get_first_shift_by_object():
     """
     Отчёт: отработавшие 1 смену по объектам (группировка по компаниям)
@@ -640,6 +836,7 @@ def get_first_shift_by_object():
 
 
 @dashboard_bp.route('/first-shift-by-staff', methods=['GET'])
+@login_required
 def get_first_shift_by_staff():
     """
     Отчёт: отработавшие 1 смену по сотрудникам колл-центра
