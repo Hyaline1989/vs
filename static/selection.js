@@ -1,4 +1,4 @@
-// static/selection.js - ПОЛНАЯ ВЕРСИЯ С АВТОЗАПОЛНЕНИЕМ ИЗ ПРОФИЛЯ (ОБНОВЛЕНА: раздельные Имя/Фамилия/Отчество)
+// static/selection.js - ПОЛНАЯ ВЕРСИЯ С КНОПКОЙ ОБНУЛЕНИЯ ПОТРЕБНОСТИ ⭕️
 // ========== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ==========
 let objects = [];
 let vacancyData = {};
@@ -66,6 +66,8 @@ async function loadSelectionData() {
             currentUserRole = userData.role;
             window.currentUserRole = userData.role;
             window.isAdmin = (userData.role === 'admin' || userData.is_system_admin);
+            window.isSystemAdmin = userData.is_system_admin === true;  // <-- ДОБАВЛЕНО
+            console.log('isSystemAdmin:', window.isSystemAdmin);
         }
         
         const resultsContainer = document.getElementById('results');
@@ -639,6 +641,7 @@ function renderRequirementsTable() {
             tableHtml += `<tr data-obj="${escapeHtml(objName)}" data-pos="${escapeHtml(pos.name)}">
                 ${i === 0 ? `<td rowspan="${rowCount}" style="vertical-align:middle; background:#f9f9f9;">
                     ${escapeHtml(objName)}
+                    ${window.isSystemAdmin ? `<button onclick="resetObjectRequirements('${safeObjNameForJs}')" style="display:block; margin-top:5px; background:#f39c12; color:white; border:none; padding:3px 8px; border-radius:3px; font-size:11px; cursor:pointer;" title="Обнулить потребность в БД (страховка от случайных ошибок)">⭕️ Обнулить потребность</button>` : ''}
                     <button onclick="deleteObject('${safeObjNameForJs}')" style="display:block; margin-top:8px; background:#e74c3c; color:white; border:none; padding:3px 8px; border-radius:3px; font-size:11px; cursor:pointer;">🗑 Удалить объект</button>
                     <button onclick="showAddPositionModal('${safeObjNameForJs}')" style="display:block; margin-top:5px; background:#3498db; color:white; border:none; padding:3px 8px; border-radius:3px; font-size:11px; cursor:pointer;">+ Добавить должность</button>
                     </td>` : ''}
@@ -825,6 +828,45 @@ async function saveAllData() {
     } catch (error) {
         console.error('Ошибка сохранения:', error);
         showToast('❌ Ошибка сохранения', 'error');
+    }
+}
+
+// ========== ОБНУЛЕНИЕ ПОТРЕБНОСТИ ОБЪЕКТА ==========
+
+/**
+ * Обнуляет потребность объекта в БД (только для системного администратора)
+ * Кнопка ⭕️ — страховка от случайных ошибок
+ */
+async function resetObjectRequirements(objectName) {
+    if (!window.isSystemAdmin) {
+        showToast('Только системный администратор может обнулять потребности', 'error');
+        return;
+    }
+    
+    if (!confirm(`⭕️ Вы уверены, что хотите обнулить потребность для объекта "${objectName}"?\n\nЭто сбросит максимальную потребность в БД. После сохранения запишется текущее значение.`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/requirements/reset-object', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ object_name: objectName })
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok && result.success) {
+            showToast(`✅ ${result.message}`, 'success');
+            // Перезагружаем таблицу
+            renderRequirementsTable();
+        } else {
+            showToast(`❌ ${result.error || 'Ошибка обнуления'}`, 'error');
+        }
+    } catch (error) {
+        console.error('Ошибка:', error);
+        showToast('❌ Ошибка обнуления', 'error');
     }
 }
 
@@ -1201,3 +1243,4 @@ window.openDirectionForm = openDirectionForm;
 window.closeDirectionModal = closeDirectionModal;
 window.addFileInput = addFileInput;
 window.submitDirection = submitDirection;
+window.resetObjectRequirements = resetObjectRequirements;  // <-- ДОБАВЛЕНО

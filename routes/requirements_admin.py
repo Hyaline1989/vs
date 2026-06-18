@@ -1,4 +1,4 @@
-# routes/requirements_admin.py - ФИНАЛЬНАЯ ВЕРСИЯ
+# routes/requirements_admin.py - ФИНАЛЬНАЯ ВЕРСИЯ С КНОПКОЙ ОБНУЛЕНИЯ
 # -*- coding: utf-8 -*-
 from flask import Blueprint, request, jsonify
 from flask_login import login_required, current_user
@@ -16,7 +16,9 @@ from database import (
     init_vacancy_tables,
     get_current_requirements,
     save_current_requirements,
-    DB_NAME
+    DB_NAME,
+    is_system_admin,
+    log_user_action
 )
 
 logger = logging.getLogger(__name__)
@@ -106,7 +108,6 @@ def create_object():
     except Exception as e:
         logger.error(f"Ошибка при добавлении объекта в current_requirements: {e}")
     
-    from database import log_user_action
     log_user_action(current_user.id, 'create_vacancy_object', f"Создан объект вакансии: {name}", request.remote_addr)
     
     return jsonify({'success': True, 'id': obj_id, 'message': f'Объект "{name}" создан'})
@@ -151,7 +152,6 @@ def delete_object(name):
     
     # 3. Результат
     if deleted_from_current or deleted_from_vacancy:
-        from database import log_user_action
         log_user_action(current_user.id, 'delete_vacancy_object', 
                        f"Удалён объект: {decoded_name} (current:{deleted_from_current}, vacancy:{deleted_from_vacancy})", 
                        request.remote_addr)
@@ -209,7 +209,6 @@ def create_position():
         except Exception as e:
             logger.error(f"Ошибка при добавлении должности в current_requirements: {e}")
         
-        from database import log_user_action
         log_user_action(current_user.id, 'create_vacancy_position', 
                        f"Добавлена должность {position_name} к объекту {object_name}", 
                        request.remote_addr)
@@ -248,7 +247,6 @@ def delete_position():
         except Exception as e:
             logger.error(f"Ошибка при удалении должности из current_requirements: {e}")
         
-        from database import log_user_action
         log_user_action(current_user.id, 'delete_vacancy_position', 
                        f"Удалена должность {position_name} из объекта {object_name}", 
                        request.remote_addr)
@@ -365,9 +363,96 @@ def save_all_requirements():
     finally:
         conn.close()
     
-    from database import log_user_action
     log_user_action(current_user.id, 'save_current_requirements', 
                    f"Сохранены текущие потребности для {len(objects_data)} объектов (цифры синхронизированы, приоритеты НЕ затронуты)", 
                    request.remote_addr)
     
     return jsonify({'success': True, 'message': f'Сохранено {len(objects_data)} объектов'})
+
+
+# ========== НОВЫЙ ЭНДПОИНТ: ОБНУЛЕНИЕ ПОТРЕБНОСТИ ОБЪЕКТА ==========
+
+@requirements_admin_bp.route('/reset-object', methods=['POST'])
+@login_required
+def reset_object_requirements():
+    """
+    Сбрасывает максимальную потребность объекта в БД (только для системного администратора)
+    Кнопка ⭕️ "Обнулить потребность в БД" — страховка от случайных ошибок
+    """
+    if not current_user.is_authenticated:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    # Только системный администратор (id=1)
+    if not is_system_admin(current_user.id):
+        return jsonify({'error': 'Только системный администратор может обнулять потребности'}), 403
+    
+    data = request.get_json()
+    object_name = data.get('object_name', '').strip()
+    
+    if not object_name:
+        return jsonify({'error': 'Не указан объект'}), 400
+    
+    today = datetime.now().strftime('%Y-%m-%d')
+    
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        
+        # 1. Находим все position_id для этого объекта в vacancy_positions
+        cursor.execute('''
+            SELECT vp.id FROM vacancy_positions vp
+            JOIN vacancy_objects vo ON vo.id = vp.object_id
+            WHERE vo.name = ?
+        ''', (object_name,))
+        
+        position_ids = [row[0] for row in cursor.fetchall()]
+        
+        if not position_ids:
+            conn.close()
+            return jsonify({'error': f'Объект "{object_name}" не найден в vacancy_objects'}), 404
+        
+        # 2. Обновляем записи за сегодня: обнуляем ВСЕ числа (rf_*, cis_*)
+        placeholders = ','.join(['?'] * len(position_ids))
+        cursor.execute(f'''
+            UPDATE vacancy_requirements 
+            SET rf_men = 0, rf_women = 0, rf_family = 0,
+                cis_men = 0, cis_women = 0, cis_family = 0,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE position_id IN ({placeholders}) AND date = ?
+        ''', position_ids + [today])
+        
+        updated_count = cursor.rowcount
+        logger.info(f"Обнулено {updated_count} записей в vacancy_requirements для объекта {object_name} за {today}")
+        
+        # 3. Также обнуляем в current_requirements для этого объекта
+        cursor.execute('''
+            UPDATE current_requirements 
+            SET rf_men = 0, rf_women = 0, rf_family = 0,
+                cis_men = 0, cis_women = 0, cis_family = 0,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE object_name = ?
+        ''', (object_name,))
+        
+        current_updated = cursor.rowcount
+        logger.info(f"Обнулено {current_updated} записей в current_requirements для объекта {object_name}")
+        
+        conn.commit()
+        conn.close()
+        
+        log_user_action(
+            current_user.id,
+            'reset_object_requirements',
+            f"Обнулены потребности для объекта {object_name} (vacancy: {updated_count} записей, current: {current_updated} записей)",
+            request.remote_addr
+        )
+        
+        return jsonify({
+            'success': True,
+            'message': f'Потребности объекта "{object_name}" обнулены',
+            'updated_count': updated_count,
+            'current_updated': current_updated
+        })
+        
+    except Exception as e:
+        logger.error(f"Ошибка при обнулении потребностей объекта {object_name}: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
