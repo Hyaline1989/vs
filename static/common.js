@@ -1,4 +1,4 @@
-// static/common.js - полная версия с кнопкой "Наверх"
+// static/common.js - полная версия с кнопкой "Наверх" и имперсонацией
 // ========== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ==========
 let currentUser = null;
 let currentAccessLevel = "";
@@ -416,6 +416,51 @@ function addScrollTopButton() {
     });
 }
 
+// ========== ПРОВЕРКА СТАТУСА ИМПЕРСОНАЦИИ ==========
+
+async function checkImpersonationStatus() {
+    try {
+        const response = await fetch('/api/admin/impersonate/status', { credentials: 'include' });
+        if (response.ok) {
+            const data = await response.json();
+            if (data.is_impersonating) {
+                sessionStorage.setItem('is_impersonating', 'true');
+                sessionStorage.setItem('original_user_id', data.original_user_id || '');
+            } else {
+                sessionStorage.removeItem('is_impersonating');
+                sessionStorage.removeItem('original_user_id');
+            }
+        }
+    } catch (error) {
+        console.error('Ошибка проверки статуса имперсонации:', error);
+    }
+}
+
+// ========== ВОЗВРАТ К СВОЕМУ АККАУНТУ ==========
+
+async function stopImpersonation() {
+    try {
+        const response = await fetch('/api/admin/impersonate/stop', {
+            method: 'POST',
+            credentials: 'include'
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+            sessionStorage.removeItem('is_impersonating');
+            sessionStorage.removeItem('original_user_id');
+            showNotification(`✅ ${data.message}`, 'success');
+            window.location.href = '/welcome';
+        } else {
+            showNotification(`❌ ${data.error || 'Ошибка'}`, 'error');
+        }
+    } catch (error) {
+        console.error('Ошибка:', error);
+        showNotification('❌ Ошибка при возврате к своему аккаунту', 'error');
+    }
+}
+
 // ========== ИНИЦИАЛИЗАЦИЯ ПРИ ЗАГРУЗКЕ СТРАНИЦЫ ==========
 async function initPage() {
     const path = window.location.pathname;
@@ -439,6 +484,9 @@ async function initPage() {
         return;
     }
     
+    // Проверяем статус имперсонации
+    await checkImpersonationStatus();
+    
     const userInfo = document.getElementById('userInfo');
     if (userInfo && currentUser) {
         let roleClass = 'viewer';
@@ -455,14 +503,21 @@ async function initPage() {
             roleIcon = '📋';
         }
         
+        // Проверяем, есть ли активная имперсонация
+        const isImpersonating = sessionStorage.getItem('is_impersonating') === 'true';
+        
         userInfo.innerHTML = `
             <div class="user-info-container">
                 <a href="/profile" class="user-badge-link" style="text-decoration: none;">
                     <div class="user-badge ${roleClass}">
                         ${roleIcon} ${escapeHtml(currentUser.full_name || currentUser.username)}
                         <span class="user-role">${escapeHtml(currentUser.role_display)}</span>
+                        ${isImpersonating ? '<span style="background: #e67e22; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.65rem; margin-left: 5px;">🔓 ИМПЕРСОНАЦИЯ</span>' : ''}
                     </div>
                 </a>
+                ${isImpersonating ? `<button class="logout-button" onclick="stopImpersonation()" style="background: #e67e22; border-color: #e67e22; color: white;">
+                    <i class="fas fa-undo-alt"></i> Вернуться
+                </button>` : ''}
                 <button class="logout-button" onclick="logout()">
                     <i class="fas fa-sign-out-alt"></i> Выйти
                 </button>
@@ -489,5 +544,6 @@ window.sanitizeAttribute = sanitizeAttribute;
 window.formatDate = formatDate;
 window.formatDateTime = formatDateTime;
 window.getRoleColor = getRoleColor;
+window.stopImpersonation = stopImpersonation;
 
 document.addEventListener('DOMContentLoaded', initPage);

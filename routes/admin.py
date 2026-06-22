@@ -1,7 +1,7 @@
 # routes/admin.py
 # -*- coding: utf-8 -*-
-from flask import Blueprint, request, jsonify
-from flask_login import current_user
+from flask import Blueprint, request, jsonify, session
+from flask_login import current_user, login_user
 from werkzeug.security import generate_password_hash
 import logging
 import sqlite3
@@ -10,8 +10,9 @@ from database import (
     get_all_users, get_user_by_id, create_user, update_user, hard_delete_user,
     get_user_module_permissions, get_user_object_permissions,
     set_user_module_permission, set_user_object_permission, grant_all_objects_access,
-    log_user_action, DB_NAME
+    log_user_action, DB_NAME, is_system_admin
 )
+from models import User
 
 logger = logging.getLogger(__name__)
 
@@ -357,4 +358,117 @@ def debug_db_check():
         'create_sql': create_sql[0] if create_sql else None,
         'existing_modules': existing_modules,
         'expected_modules': ['dashboard', 'selection', 'worker_status']
+    })
+
+
+# ========== ИМПЕРСОНАЦИЯ (ВХОД КАК ПОЛЬЗОВАТЕЛЬ) ==========
+
+@admin_bp.route('/impersonate/status', methods=['GET'])
+def impersonation_status():
+    """Проверка статуса имперсонации"""
+    if not current_user.is_authenticated:
+        return jsonify({'is_impersonating': False}), 401
+    
+    is_impersonating = session.get('is_impersonating', False)
+    original_user_id = session.get('original_user_id')
+    
+    return jsonify({
+        'is_impersonating': is_impersonating,
+        'original_user_id': original_user_id
+    })
+
+
+@admin_bp.route('/impersonate/<int:user_id>', methods=['POST'])
+def impersonate_user(user_id):
+    """
+    Вход под другим пользователем (только для системного администратора)
+    """
+    if not current_user.is_authenticated:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    # Только системный администратор (id=1)
+    if not is_system_admin(current_user.id):
+        return jsonify({'error': 'Только системный администратор может входить как другой пользователь'}), 403
+    
+    # Нельзя войти как сам себя
+    if user_id == current_user.id:
+        return jsonify({'error': 'Вы уже вошли как этот пользователь'}), 400
+    
+    # Получаем данные пользователя
+    target_user_data = get_user_by_id(user_id)
+    if not target_user_data:
+        return jsonify({'error': 'Пользователь не найден'}), 404
+    
+    if not target_user_data.get('is_active', True):
+        return jsonify({'error': 'Пользователь заблокирован'}), 400
+    
+    from datetime import datetime
+    
+    # Сохраняем ID оригинального пользователя в сессии
+    session['original_user_id'] = current_user.id
+    session['is_impersonating'] = True
+    
+    # Создаём объект пользователя и выполняем вход
+    target_user = User(target_user_data)
+    login_user(target_user, remember=True)
+    
+    # Обновляем время последнего входа
+    from database import update_user
+    update_user(user_id, {'last_login': datetime.now().isoformat()})
+    
+    # Логируем действие
+    log_user_action(
+        current_user.id, 
+        'impersonate', 
+        f"Системный администратор вошёл как пользователь {target_user_data['username']} (ID: {user_id})",
+        request.remote_addr
+    )
+    
+    return jsonify({
+        'success': True,
+        'message': f'Вы вошли как {target_user_data["username"]}',
+        'username': target_user_data['username']
+    })
+
+
+@admin_bp.route('/impersonate/stop', methods=['POST'])
+def stop_impersonation():
+    """
+    Возврат к своему аккаунту (выход из имперсонации)
+    """
+    if not current_user.is_authenticated:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    # Проверяем, что мы в режиме имперсонации
+    if not session.get('is_impersonating', False):
+        return jsonify({'error': 'Вы не в режиме имперсонации'}), 400
+    
+    original_user_id = session.get('original_user_id')
+    if not original_user_id:
+        return jsonify({'error': 'Оригинальный пользователь не найден'}), 400
+    
+    # Получаем данные оригинального пользователя
+    original_user_data = get_user_by_id(original_user_id)
+    if not original_user_data:
+        return jsonify({'error': 'Оригинальный пользователь не найден'}), 404
+    
+    # Выходим из имперсонации
+    session.pop('is_impersonating', None)
+    session.pop('original_user_id', None)
+    
+    # Возвращаемся к оригинальному пользователю
+    original_user = User(original_user_data)
+    login_user(original_user, remember=True)
+    
+    # Логируем действие
+    log_user_action(
+        original_user_id, 
+        'stop_impersonation', 
+        f"Системный администратор вернулся к своему аккаунту",
+        request.remote_addr
+    )
+    
+    return jsonify({
+        'success': True,
+        'message': f'Вы вернулись к своему аккаунту ({original_user_data["username"]})'
     })

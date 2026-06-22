@@ -1,4 +1,4 @@
-// static/admin.js - полная версия с мобильной адаптацией и правами для руководителя
+// static/admin.js - полная версия с мобильной адаптацией, правами для руководителя и имперсонацией
 
 // ========== ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ ДЛЯ БЕЗОПАСНОГО HTML ==========
 function escapeHtml(unsafe) {
@@ -227,6 +227,13 @@ function renderUsersTable(users) {
                 html += `<button class="action-btn perms-btn" onclick="editPermissions(${user.id})" title="Права доступа"><i class="fas fa-lock"></i> Права</button>`;
             }
             
+            // Кнопка "Войти как" - только для системного администратора
+            if (isSystemAdmin && user.id !== window.currentUser?.id) {
+                html += `<button class="action-btn impersonate-btn" onclick="impersonateUser(${user.id})" title="Войти как пользователь">
+                    <i class="fas fa-user-astronaut"></i> Войти как
+                </button>`;
+            }
+            
             html += `</div></div>`;
         }
         
@@ -312,6 +319,11 @@ function renderUsersTable(users) {
         
         if (canManagePermissions) {
             html += `<button class="action-btn perms-btn" onclick="editPermissions(${user.id})" title="Права доступа"><i class="fas fa-lock"></i></button>`;
+        }
+        
+        // Кнопка "Войти как" - только для системного администратора
+        if (isSystemAdmin && user.id !== window.currentUser?.id) {
+            html += `<button class="action-btn impersonate-btn" onclick="impersonateUser(${user.id})" title="Войти как пользователь"><i class="fas fa-user-astronaut"></i></button>`;
         }
         
         html += `</td></tr>`;
@@ -761,6 +773,46 @@ async function generateSnapshots() {
     }
 }
 
+// ========== ИМПЕРСОНАЦИЯ (ВХОД КАК ПОЛЬЗОВАТЕЛЬ) ==========
+
+async function impersonateUser(userId) {
+    if (!window.currentUser?.is_system_admin) {
+        showNotification('❌ Только системный администратор может входить как другой пользователь', 'error');
+        return;
+    }
+    
+    // Получаем информацию о пользователе
+    const user = usersList.find(u => u.id === userId);
+    if (!user) {
+        showNotification('❌ Пользователь не найден', 'error');
+        return;
+    }
+    
+    if (!confirm(`Вы уверены, что хотите войти как пользователь "${user.username}"?\n\nВы сможете вернуться к своему аккаунту через кнопку в шапке.`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/admin/impersonate/${userId}`, {
+            method: 'POST',
+            credentials: 'include'
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+            showNotification(`✅ Вы вошли как ${data.username}`, 'success');
+            // Перезагружаем страницу для обновления состояния
+            window.location.href = '/welcome';
+        } else {
+            showNotification(`❌ ${data.error || 'Ошибка'}`, 'error');
+        }
+    } catch (error) {
+        console.error('Ошибка:', error);
+        showNotification('❌ Ошибка при входе как пользователь', 'error');
+    }
+}
+
 // ========== СЛЕДИМ ЗА ИЗМЕНЕНИЕМ РАЗМЕРА ОКНА ==========
 let resizeTimer;
 window.addEventListener('resize', function() {
@@ -804,3 +856,4 @@ window.openAddUserModal = openAddUserModal;
 window.saveUser = saveUser;
 window.loadUsers = loadUsers;
 window.generateSnapshots = generateSnapshots;
+window.impersonateUser = impersonateUser;

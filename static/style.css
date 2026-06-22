@@ -2432,3 +2432,23 @@ body {
     }
 }
 
+/* static/style.css - добавляем стили для кнопки имперсонации */
+
+.action-btn.impersonate-btn {
+    color: #e67e22;
+}
+
+.action-btn.impersonate-btn:hover {
+    background: #fff3e0;
+    color: #d35400;
+}
+
+/* Стиль для бейджа имперсонации в шапке */
+.user-badge .impersonation-badge {
+    background: #e67e22;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.65rem;
+    margin-left: 5px;
+}
