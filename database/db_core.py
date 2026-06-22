@@ -193,6 +193,21 @@ def init_db():
             )
         ''')
         
+        # ========== НОВАЯ ТАБЛИЦА ДЛЯ МНОЖЕСТВЕННЫХ МАРШРУТНЫХ ЛИСТОВ ==========
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS object_route_sheets (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                object_id INTEGER NOT NULL,
+                filename TEXT NOT NULL,
+                original_name TEXT NOT NULL,
+                file_size INTEGER,
+                uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                uploaded_by INTEGER,
+                FOREIGN KEY (object_id) REFERENCES objects_settings(id) ON DELETE CASCADE,
+                FOREIGN KEY (uploaded_by) REFERENCES users(id) ON DELETE SET NULL
+            )
+        ''')
+        
         # ========== ТАБЛИЦА ЕЖЕДНЕВНЫХ СНИПШОТОВ ==========
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS daily_snapshots (
@@ -241,6 +256,7 @@ def init_db():
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_worker_agent ON worker_statuses (agent_full_name)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_worker_deal_date ON worker_statuses (deal_date)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_worker_lead_id ON worker_statuses (lead_id)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_route_sheets_object ON object_route_sheets (object_id)')
         
         conn.commit()
         

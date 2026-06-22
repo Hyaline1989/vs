@@ -1,8 +1,8 @@
-// static/passport_editor.js - редактор паспорта для админ-панели
+// static/passport_editor.js - редактор паспорта для админ-панели с поддержкой нескольких маршрутных листов
 
 // ========== УПРАВЛЕНИЕ ПАСПОРТОМ ОБЪЕКТА ==========
 let currentPassportObjectId = null;
-let currentRouteSheetFile = null;
+let routeSheetsList = [];
 
 // Функция для показа уведомлений (если нет глобальной)
 function showNotification(message, type) {
@@ -51,21 +51,13 @@ async function initPassportEditor(objectId) {
         if (response.ok) {
             const data = await response.json();
             fillPassportForm(data);
-            
-            // Обновляем статус маршрутного листа
-            if (data.route_sheet_filename) {
-                currentRouteSheetFile = data.route_sheet_filename;
-                updateRouteSheetUI(true);
-            } else {
-                updateRouteSheetUI(false);
-            }
-        } else {
-            updateRouteSheetUI(false);
         }
+        
+        // Загружаем список маршрутных листов
+        await loadRouteSheets();
         
     } catch (error) {
         console.error('Ошибка загрузки паспорта:', error);
-        updateRouteSheetUI(false);
     }
 }
 
@@ -108,6 +100,205 @@ function fillPassportForm(data) {
         if (features) features.value = data.features || '';
     }
 }
+
+// ========== УПРАВЛЕНИЕ МАРШРУТНЫМИ ЛИСТАМИ ==========
+
+async function loadRouteSheets() {
+    if (!currentPassportObjectId) return;
+    
+    try {
+        const response = await fetch(`/api/admin/objects/${currentPassportObjectId}/route-sheets`, {
+            credentials: 'include'
+        });
+        
+        if (response.ok) {
+            routeSheetsList = await response.json();
+            renderRouteSheetsList();
+        } else {
+            routeSheetsList = [];
+            renderRouteSheetsList();
+        }
+    } catch (error) {
+        console.error('Ошибка загрузки маршрутных листов:', error);
+        routeSheetsList = [];
+        renderRouteSheetsList();
+    }
+}
+
+function renderRouteSheetsList() {
+    const container = document.getElementById('routeSheetsContainer');
+    if (!container) return;
+    
+    const maxFiles = 5;
+    const currentCount = routeSheetsList.length;
+    const canUpload = currentCount < maxFiles;
+    
+    let html = `
+        <div style="margin-bottom: 10px;">
+            <span style="color: var(--gray); font-size: 0.8rem;">
+                <i class="fas fa-info-circle"></i> 
+                Загружено: ${currentCount} из ${maxFiles} файлов
+            </span>
+        </div>
+    `;
+    
+    if (routeSheetsList.length === 0) {
+        html += `
+            <div style="padding: 15px; background: #f8f9fa; border-radius: 8px; text-align: center; color: var(--gray);">
+                <i class="fas fa-file-pdf" style="font-size: 24px; display: block; margin-bottom: 8px;"></i>
+                Маршрутные листы не загружены
+            </div>
+        `;
+    } else {
+        html += `<div style="display: flex; flex-direction: column; gap: 8px;">`;
+        
+        for (const sheet of routeSheetsList) {
+            const uploadDate = sheet.uploaded_at ? new Date(sheet.uploaded_at).toLocaleDateString('ru-RU') : '';
+            const fileSize = sheet.file_size ? (sheet.file_size / 1024).toFixed(1) + ' KB' : '';
+            
+            html += `
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: #f8f9fa; border-radius: 8px; border-left: 3px solid var(--primary);">
+                    <div style="display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0;">
+                        <i class="fas fa-file-pdf" style="color: #e74c3c; font-size: 20px;"></i>
+                        <div style="flex: 1; min-width: 0;">
+                            <div style="font-weight: 500; font-size: 0.9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(sheet.original_name)}">
+                                ${escapeHtml(sheet.original_name)}
+                            </div>
+                            <div style="font-size: 0.7rem; color: var(--gray);">
+                                ${uploadDate ? `📅 ${uploadDate}` : ''}
+                                ${fileSize ? ` • 📄 ${fileSize}` : ''}
+                                ${sheet.uploaded_by ? ` • 👤 ID: ${sheet.uploaded_by}` : ''}
+                            </div>
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 6px; flex-shrink: 0;">
+                        <button type="button" class="btn-small" onclick="downloadRouteSheetById(${sheet.id})" style="background: #3498db; padding: 4px 10px; font-size: 0.7rem;">
+                            <i class="fas fa-download"></i>
+                        </button>
+                        <button type="button" class="btn-small" onclick="deleteRouteSheetById(${sheet.id})" style="background: #e74c3c; padding: 4px 10px; font-size: 0.7rem;">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+        
+        html += `</div>`;
+    }
+    
+    // Кнопка загрузки нового файла
+    if (canUpload) {
+        html += `
+            <div style="margin-top: 12px;">
+                <input type="file" id="routeSheetInput" accept=".pdf" style="display: none;" onchange="uploadRouteSheet(this)">
+                <button type="button" class="btn-small" onclick="document.getElementById('routeSheetInput').click()" style="background: #27ae60; padding: 8px 16px;">
+                    <i class="fas fa-upload"></i> Загрузить PDF (${currentCount}/${maxFiles})
+                </button>
+                <span style="font-size: 0.7rem; color: var(--gray); margin-left: 10px;">
+                    Только PDF, максимум 30 MB
+                </span>
+            </div>
+        `;
+    } else {
+        html += `
+            <div style="margin-top: 12px; padding: 8px 12px; background: #fff3cd; border-radius: 6px; font-size: 0.8rem; color: #856404;">
+                <i class="fas fa-exclamation-triangle"></i> 
+                Достигнут лимит (${maxFiles} файлов). Удалите один из файлов, чтобы загрузить новый.
+            </div>
+        `;
+    }
+    
+    container.innerHTML = html;
+}
+
+async function uploadRouteSheet(input) {
+    if (!input.files || input.files.length === 0) return;
+    
+    const file = input.files[0];
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+        showNotification('❌ Можно загружать только PDF файлы', 'error');
+        return;
+    }
+    
+    // Проверка размера файла (30 MB)
+    const maxSize = 30 * 1024 * 1024; // 30 MB
+    if (file.size > maxSize) {
+        showNotification(`❌ Файл слишком большой. Максимум 30 MB`, 'error');
+        return;
+    }
+    
+    // Проверка количества файлов
+    if (routeSheetsList.length >= 5) {
+        showNotification('❌ Достигнут лимит 5 файлов', 'error');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('route_sheet', file);
+    
+    // Показываем индикатор загрузки
+    const uploadBtn = document.querySelector('#routeSheetsContainer .btn-small');
+    if (uploadBtn) {
+        uploadBtn.disabled = true;
+        uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Загрузка...';
+    }
+    
+    try {
+        const response = await fetch(`/api/admin/objects/${currentPassportObjectId}/route-sheets`, {
+            method: 'POST',
+            credentials: 'include',
+            body: formData
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok && result.success) {
+            showNotification(`✅ Файл "${file.name}" загружен`, 'success');
+            await loadRouteSheets();
+        } else {
+            showNotification(`❌ ${result.error || 'Ошибка загрузки'}`, 'error');
+        }
+    } catch (error) {
+        console.error('Ошибка:', error);
+        showNotification('❌ Ошибка загрузки', 'error');
+    } finally {
+        if (uploadBtn) {
+            uploadBtn.disabled = false;
+            uploadBtn.innerHTML = '<i class="fas fa-upload"></i> Загрузить PDF';
+        }
+    }
+    
+    input.value = '';
+}
+
+async function deleteRouteSheetById(sheetId) {
+    if (!confirm('Удалить этот маршрутный лист?')) return;
+    
+    try {
+        const response = await fetch(`/api/admin/objects/route-sheets/${sheetId}`, {
+            method: 'DELETE',
+            credentials: 'include'
+        });
+        
+        if (response.ok) {
+            showNotification('✅ Маршрутный лист удалён', 'success');
+            await loadRouteSheets();
+        } else {
+            const error = await response.json();
+            showNotification(`❌ ${error.error || 'Ошибка удаления'}`, 'error');
+        }
+    } catch (error) {
+        console.error('Ошибка:', error);
+        showNotification('❌ Ошибка удаления', 'error');
+    }
+}
+
+function downloadRouteSheetById(sheetId) {
+    // URL: /api/admin/objects/route-sheets/{sheet_id}/download
+    window.open(`/api/admin/objects/route-sheets/${sheetId}/download`, '_blank');
+}
+
+// ========== СОХРАНЕНИЕ ПАСПОРТА ==========
 
 async function savePassport() {
     // Собираем данные из обычных полей
@@ -157,104 +348,7 @@ async function savePassport() {
     }
 }
 
-async function uploadRouteSheet(input) {
-    if (!input.files || input.files.length === 0) return;
-    
-    const file = input.files[0];
-    if (!file.name.toLowerCase().endsWith('.pdf')) {
-        showNotification('❌ Можно загружать только PDF файлы', 'error');
-        return;
-    }
-    
-    // Проверка размера файла (30 MB)
-    const maxSize = 30 * 1024 * 1024; // 30 MB
-    if (file.size > maxSize) {
-        showNotification(`❌ Файл слишком большой. Максимум 30 MB`, 'error');
-        return;
-    }
-    
-    const formData = new FormData();
-    formData.append('route_sheet', file);
-    
-    try {
-        const response = await fetch(`/api/admin/objects/${currentPassportObjectId}/route-sheet`, {
-            method: 'POST',
-            credentials: 'include',
-            body: formData
-        });
-        
-        if (response.ok) {
-            currentRouteSheetFile = true;
-            updateRouteSheetUI(true);
-            showNotification('✅ Маршрутный лист загружен', 'success');
-        } else {
-            const error = await response.json();
-            showNotification('❌ ' + (error.error || 'Ошибка загрузки'), 'error');
-        }
-    } catch (error) {
-        console.error('Ошибка:', error);
-        showNotification('❌ Ошибка загрузки', 'error');
-    }
-    
-    input.value = '';
-}
-
-async function deleteRouteSheet() {
-    if (!confirm('Удалить маршрутный лист?')) return;
-    
-    try {
-        const response = await fetch(`/api/admin/objects/${currentPassportObjectId}/route-sheet`, {
-            method: 'DELETE',
-            credentials: 'include'
-        });
-        
-        if (response.ok) {
-            currentRouteSheetFile = null;
-            updateRouteSheetUI(false);
-            showNotification('✅ Маршрутный лист удалён', 'success');
-        } else {
-            showNotification('❌ Ошибка удаления', 'error');
-        }
-    } catch (error) {
-        console.error('Ошибка:', error);
-        showNotification('❌ Ошибка удаления', 'error');
-    }
-}
-
-function updateRouteSheetUI(hasFile) {
-    const container = document.getElementById('routeSheetContainer');
-    if (!container) return;
-    
-    if (hasFile) {
-        container.innerHTML = `
-            <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                <span style="color: #27ae60;"><i class="fas fa-check-circle"></i> PDF загружен</span>
-                <button type="button" class="btn-small" onclick="downloadRouteSheet()" style="background: #3498db;">
-                    <i class="fas fa-download"></i> Скачать
-                </button>
-                <button type="button" class="btn-small" onclick="deleteRouteSheet()" style="background: #e74c3c;">
-                    <i class="fas fa-trash"></i> Удалить
-                </button>
-            </div>
-        `;
-    } else {
-        container.innerHTML = `
-            <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                <input type="file" id="routeSheetInput" accept=".pdf" style="display: none;" onchange="uploadRouteSheet(this)">
-                <button type="button" class="btn-small" onclick="document.getElementById('routeSheetInput').click()" style="background: #27ae60;">
-                    <i class="fas fa-upload"></i> Загрузить PDF
-                </button>
-                <span class="info-text">Только PDF, максимум 30 MB</span>
-            </div>
-        `;
-    }
-}
-
-async function downloadRouteSheet() {
-    if (!currentPassportObjectId) return;
-    
-    window.open(`/api/admin/objects/${currentPassportObjectId}/route-sheet/download`, '_blank');
-}
+// ========== ОТКРЫТИЕ И ЗАКРЫТИЕ РЕДАКТОРА ==========
 
 function openPassportEditor(objectId, objectName) {
     currentPassportObjectId = objectId;
@@ -270,7 +364,7 @@ function openPassportEditor(objectId, objectName) {
     
     modal.innerHTML = `
         <div class="modal-content" style="max-width: 950px; width: 95%; max-height: 90vh;">
-            <div class="modal-header">
+            <div class="modal-header" style="background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);">
                 <h3><i class="fas fa-id-card"></i> Паспорт объекта: ${escapeHtml(objectName)}</h3>
                 <button class="modal-close" onclick="closePassportEditor()">&times;</button>
             </div>
@@ -358,10 +452,10 @@ function openPassportEditor(objectId, objectName) {
                         <textarea id="passport_documents_required" rows="3" class="form-control" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;"></textarea>
                     </div>
                     
-                    <!-- Маршрутный лист -->
+                    <!-- Маршрутные листы -->
                     <div class="form-section">
-                        <h4><i class="fas fa-map"></i> Маршрутный лист (PDF)</h4>
-                        <div id="routeSheetContainer"></div>
+                        <h4><i class="fas fa-map"></i> Маршрутные листы (PDF, максимум 5)</h4>
+                        <div id="routeSheetsContainer"></div>
                     </div>
                     
                     <div class="form-actions" style="display: flex; justify-content: flex-end; gap: 15px; margin-top: 25px; padding-top: 20px; border-top: 1px solid #eee;">
@@ -422,5 +516,6 @@ window.openPassportEditor = openPassportEditor;
 window.closePassportEditor = closePassportEditor;
 window.savePassport = savePassport;
 window.uploadRouteSheet = uploadRouteSheet;
-window.deleteRouteSheet = deleteRouteSheet;
-window.downloadRouteSheet = downloadRouteSheet;
+window.deleteRouteSheetById = deleteRouteSheetById;
+window.downloadRouteSheetById = downloadRouteSheetById;
+window.loadRouteSheets = loadRouteSheets;

@@ -56,7 +56,13 @@ from database.objects import (
     save_object_passport,
     update_route_sheet,
     get_route_sheet_filename,
-    delete_route_sheet
+    delete_route_sheet,
+    # НОВЫЕ ФУНКЦИИ ДЛЯ МНОЖЕСТВЕННЫХ МАРШРУТНЫХ ЛИСТОВ
+    get_route_sheets,
+    add_route_sheet,
+    delete_route_sheet_by_id,
+    delete_all_route_sheets,
+    get_route_sheet_by_id
 )
 
 # Текущие потребности (для подбора объектов)
@@ -119,6 +125,9 @@ __all__ = [
     'delete_object', 'get_global_order', 'save_global_order',
     'get_object_passport', 'save_object_passport',
     'update_route_sheet', 'get_route_sheet_filename', 'delete_route_sheet',
+    # НОВЫЕ ФУНКЦИИ ДЛЯ МАРШРУТНЫХ ЛИСТОВ
+    'get_route_sheets', 'add_route_sheet', 'delete_route_sheet_by_id',
+    'delete_all_route_sheets', 'get_route_sheet_by_id',
     
     # requirements
     'get_current_requirements', 'get_current_requirements_for_object',

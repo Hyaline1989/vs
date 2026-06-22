@@ -331,7 +331,7 @@ def save_object_passport(object_id, passport_data):
 
 
 def update_route_sheet(object_id, filename):
-    """Обновляет имя файла маршрутного листа для объекта"""
+    """Обновляет имя файла маршрутного листа для объекта (для обратной совместимости)"""
     try:
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
@@ -361,28 +361,174 @@ def update_route_sheet(object_id, filename):
 
 
 def get_route_sheet_filename(object_id):
-    """Получает имя файла маршрутного листа"""
-    try:
-        conn = sqlite3.connect(DB_NAME)
-        cursor = conn.cursor()
-        cursor.execute('SELECT route_sheet_filename FROM object_passports WHERE object_id = ?', (object_id,))
-        row = cursor.fetchone()
-        conn.close()
-        return row[0] if row else None
-    except Exception as e:
-        logger.error(f"Ошибка при получении маршрутного листа: {e}")
-        return None
+    """Получает имя файла маршрутного листа (для обратной совместимости - возвращает первый)"""
+    sheets = get_route_sheets(object_id)
+    if sheets:
+        return sheets[0]['filename']
+    return None
 
 
 def delete_route_sheet(object_id):
-    """Удаляет информацию о маршрутном листе"""
+    """Удаляет информацию о маршрутном листе (для обратной совместимости)"""
+    return delete_all_route_sheets(object_id)
+
+
+# ========== НОВЫЕ ФУНКЦИИ ДЛЯ МНОЖЕСТВЕННЫХ МАРШРУТНЫХ ЛИСТОВ ==========
+
+def get_route_sheets(object_id):
+    """Получает список всех маршрутных листов для объекта"""
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT id, object_id, filename, original_name, file_size, uploaded_at, uploaded_by
+            FROM object_route_sheets
+            WHERE object_id = ?
+            ORDER BY uploaded_at DESC
+        ''', (object_id,))
+        
+        rows = cursor.fetchall()
+        conn.close()
+        
+        return [dict(row) for row in rows]
+    except Exception as e:
+        logger.error(f"Ошибка при получении маршрутных листов для объекта {object_id}: {e}")
+        return []
+
+
+def add_route_sheet(object_id, filename, original_name, file_size, uploaded_by=None):
+    """Добавляет новый маршрутный лист для объекта"""
     try:
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
-        cursor.execute('UPDATE object_passports SET route_sheet_filename = NULL WHERE object_id = ?', (object_id,))
+        
+        # Проверяем, не превышен ли лимит (5 файлов)
+        cursor.execute('SELECT COUNT(*) FROM object_route_sheets WHERE object_id = ?', (object_id,))
+        count = cursor.fetchone()[0]
+        
+        if count >= 5:
+            conn.close()
+            logger.warning(f"Превышен лимит маршрутных листов для объекта {object_id}")
+            return None
+        
+        cursor.execute('''
+            INSERT INTO object_route_sheets (object_id, filename, original_name, file_size, uploaded_by)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (object_id, filename, original_name, file_size, uploaded_by))
+        
+        sheet_id = cursor.lastrowid
         conn.commit()
         conn.close()
-        return True
+        
+        logger.info(f"✅ Добавлен маршрутный лист для объекта {object_id}: {original_name}")
+        return sheet_id
+        
+    except Exception as e:
+        logger.error(f"Ошибка при добавлении маршрутного листа: {e}")
+        return None
+
+
+def delete_route_sheet_by_id(sheet_id):
+    """Удаляет маршрутный лист по ID"""
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        
+        # Получаем имя файла перед удалением
+        cursor.execute('SELECT filename FROM object_route_sheets WHERE id = ?', (sheet_id,))
+        row = cursor.fetchone()
+        if not row:
+            conn.close()
+            return False
+        
+        filename = row[0]
+        
+        # Удаляем запись из БД
+        cursor.execute('DELETE FROM object_route_sheets WHERE id = ?', (sheet_id,))
+        deleted = cursor.rowcount
+        
+        conn.commit()
+        conn.close()
+        
+        if deleted:
+            # Удаляем физический файл
+            try:
+                from flask import current_app
+                import os
+                filepath = os.path.join(current_app.root_path, 'static', 'uploads', 'route_sheets', filename)
+                if os.path.exists(filepath):
+                    os.remove(filepath)
+                    logger.info(f"Удалён файл маршрутного листа: {filename}")
+            except Exception as e:
+                logger.error(f"Ошибка при удалении файла: {e}")
+            
+            logger.info(f"✅ Удалён маршрутный лист ID {sheet_id}")
+        
+        return deleted > 0
+        
     except Exception as e:
         logger.error(f"Ошибка при удалении маршрутного листа: {e}")
         return False
+
+
+def delete_all_route_sheets(object_id):
+    """Удаляет все маршрутные листы для объекта"""
+    try:
+        # Получаем список файлов
+        sheets = get_route_sheets(object_id)
+        
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        
+        # Удаляем записи из БД
+        cursor.execute('DELETE FROM object_route_sheets WHERE object_id = ?', (object_id,))
+        deleted = cursor.rowcount
+        
+        conn.commit()
+        conn.close()
+        
+        # Удаляем физические файлы
+        if deleted:
+            from flask import current_app
+            import os
+            route_sheets_dir = os.path.join(current_app.root_path, 'static', 'uploads', 'route_sheets')
+            for sheet in sheets:
+                filepath = os.path.join(route_sheets_dir, sheet['filename'])
+                if os.path.exists(filepath):
+                    try:
+                        os.remove(filepath)
+                    except Exception as e:
+                        logger.error(f"Ошибка при удалении файла {sheet['filename']}: {e}")
+            
+            logger.info(f"✅ Удалены все маршрутные листы для объекта {object_id}")
+        
+        return deleted > 0
+        
+    except Exception as e:
+        logger.error(f"Ошибка при удалении всех маршрутных листов: {e}")
+        return False
+
+
+def get_route_sheet_by_id(sheet_id):
+    """Получает информацию о маршрутном листе по ID"""
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT id, object_id, filename, original_name, file_size, uploaded_at, uploaded_by
+            FROM object_route_sheets
+            WHERE id = ?
+        ''', (sheet_id,))
+        
+        row = cursor.fetchone()
+        conn.close()
+        
+        return dict(row) if row else None
+        
+    except Exception as e:
+        logger.error(f"Ошибка при получении маршрутного листа ID {sheet_id}: {e}")
+        return None

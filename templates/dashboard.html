@@ -81,7 +81,7 @@
             border-radius: 3px;
         }
 
-        /* Стили для кнопки фиксации дня */
+        /* Стили для кнопки фиксации приоритета */
         .fix-day-btn {
             background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
             color: white;
@@ -198,10 +198,10 @@
                         <label for="date-picker">Дата просмотра:</label>
                         <input type="date" id="date-picker" class="date-picker" value="">
                     </div>
-                    <!-- Кнопка "Зафиксировать день в отчёте" (только для администратора) -->
+                    <!-- Кнопка "Зафиксировать приоритет на день" (только для администратора) -->
                     {% if current_user.is_authenticated and current_user.role == 'admin' %}
                     <button class="fix-day-btn" id="fixDayBtn" onclick="fixDayInReport()">
-                        <i class="fas fa-save"></i> Зафиксировать день в отчёте
+                        <i class="fas fa-save"></i> Зафиксировать приоритет на день
                     </button>
                     {% endif %}
                 </div>
