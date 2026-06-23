@@ -122,6 +122,11 @@
             background: #219a52;
         }
         
+        .btn-sync:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
+        
         .status-table-container {
             overflow-x: auto;
         }
@@ -372,6 +377,49 @@
             border-radius: 8px;
             font-size: 0.85rem;
         }
+        
+        /* Стили для уведомлений */
+        .notification {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 12px 20px;
+            border-radius: 30px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            z-index: 10001;
+            animation: slideIn 0.3s ease;
+            max-width: 400px;
+            white-space: pre-line;
+        }
+        
+        .notification-success {
+            background: white;
+            border-left: 4px solid #27ae60;
+            color: #2c3e50;
+        }
+        
+        .notification-error {
+            background: white;
+            border-left: 4px solid #e74c3c;
+            color: #2c3e50;
+        }
+        
+        .notification-info {
+            background: white;
+            border-left: 4px solid #A42C30;
+            color: #2c3e50;
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
     </style>
 </head>
 <body>
@@ -487,6 +535,7 @@
         let currentAgentName = '';
         let videoPlayer = null;
         
+        // ========== ЗАГРУЗКА СТАТУСОВ ==========
         async function loadWorkerStatuses() {
             const container = document.getElementById('statusTableContainer');
             if (!container) return;
@@ -523,6 +572,7 @@
             }
         }
         
+        // ========== ОТОБРАЖЕНИЕ ТАБЛИЦЫ ==========
         function renderStatusTable(statuses) {
             const container = document.getElementById('statusTableContainer');
             
@@ -595,6 +645,7 @@
             container.innerHTML = html;
         }
         
+        // ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
         function formatDateForDisplay(dateStr) {
             if (!dateStr) return '—';
             if (dateStr.includes('-')) {
@@ -612,6 +663,7 @@
             loadWorkerStatuses();
         }
         
+        // ========== СИНХРОНИЗАЦИЯ С BITRIX (С АВТОМАТИЧЕСКИМ ИСПРАВЛЕНИЕМ ИМЕНИ) ==========
         async function syncWithBitrix() {
             const dateFrom = document.getElementById('filterDateFrom')?.value || '';
             const dateTo = document.getElementById('filterDateTo')?.value || '';
@@ -632,7 +684,11 @@
                 const data = await response.json();
                 
                 if (response.ok && data.success) {
-                    showNotification(`✅ Синхронизировано ${data.synced_count} записей`, 'success');
+                    let message = `✅ ${data.message}`;
+                    if (data.fixed_names_count > 0) {
+                        message = `✅ Синхронизировано ${data.synced_count} записей\n🔧 Исправлено имён агентов: ${data.fixed_names_count}`;
+                    }
+                    showNotification(message, 'success');
                     await loadWorkerStatuses();
                 } else {
                     showNotification(`❌ ${data.error || 'Ошибка синхронизации'}`, 'error');
@@ -646,6 +702,7 @@
             }
         }
         
+        // ========== УВЕДОМЛЕНИЯ ==========
         function showNotification(message, type) {
             const notification = document.createElement('div');
             notification.className = `notification notification-${type}`;
@@ -661,12 +718,14 @@
                 z-index: 10001;
                 border-left: 4px solid ${type === 'success' ? '#27ae60' : type === 'error' ? '#e74c3c' : '#A42C30'};
                 animation: slideIn 0.3s ease;
+                max-width: 400px;
+                white-space: pre-line;
             `;
             document.body.appendChild(notification);
             setTimeout(() => {
                 notification.style.opacity = '0';
                 setTimeout(() => notification.remove(), 300);
-            }, 3000);
+            }, 4000);
         }
         
         function escapeHtml(str) {
@@ -679,7 +738,7 @@
             });
         }
         
-        // Функции для управления видео-модальным окном
+        // ========== ВИДЕО-МОДАЛЬНОЕ ОКНО ==========
         function openVideoModal() {
             const modal = document.getElementById('videoInstructionModal');
             if (modal) {
@@ -718,6 +777,7 @@
             }
         });
         
+        // ========== ИНИЦИАЛИЗАЦИЯ ==========
         document.addEventListener('DOMContentLoaded', function() {
             const today = new Date();
             const monthAgo = new Date();
