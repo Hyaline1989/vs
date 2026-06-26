@@ -30,7 +30,7 @@ def get_objects_settings_extended():
         cursor = conn.cursor()
         cursor.execute('''
             SELECT id, name, visible, priority, age_min, age_max, 
-                   allowed_genders, allowed_nationalities, allows_conviction, link
+                   allowed_genders, allowed_nationalities, allows_conviction, link, region
             FROM objects_settings ORDER BY id
         ''')
         rows = cursor.fetchall()
@@ -51,7 +51,8 @@ def get_objects_settings_extended():
                 'allowedGenders': [g.strip() for g in genders_str.split(',') if g.strip()],
                 'allowedNationalities': [n.strip() for n in nationalities_str.split(',') if n.strip()],
                 'allowsConviction': bool(row[8]),
-                'link': row[9] or ''
+                'link': row[9] or '',
+                'region': row[10] or ''
             })
         return objects
     except Exception as e:
@@ -66,7 +67,7 @@ def get_object_by_id(object_id):
         cursor = conn.cursor()
         cursor.execute('''
             SELECT id, name, visible, priority, age_min, age_max, 
-                   allowed_genders, allowed_nationalities, allows_conviction, link
+                   allowed_genders, allowed_nationalities, allows_conviction, link, region
             FROM objects_settings WHERE id = ?
         ''', (object_id,))
         row = cursor.fetchone()
@@ -86,7 +87,8 @@ def get_object_by_id(object_id):
                 'allowedGenders': [g.strip() for g in genders_str.split(',') if g.strip()],
                 'allowedNationalities': [n.strip() for n in nationalities_str.split(',') if n.strip()],
                 'allowsConviction': bool(row[8]),
-                'link': row[9] or ''
+                'link': row[9] or '',
+                'region': row[10] or ''
             }
         return None
     except Exception as e:
@@ -130,7 +132,8 @@ def update_object_settings_full(object_id, updates):
             'allowed_genders': 'allowed_genders',
             'allowed_nationalities': 'allowed_nationalities',
             'allows_conviction': 'allows_conviction',
-            'link': 'link'
+            'link': 'link',
+            'region': 'region'
         }
         
         for key, db_field in field_mapping.items():
@@ -161,7 +164,7 @@ def update_object_settings_full(object_id, updates):
 
 
 def create_object_extended(name, age_min, age_max, allowed_genders, allowed_nationalities, 
-                           allows_conviction, link='', visible=True, priority=False):
+                           allows_conviction, link='', visible=True, priority=False, region=''):
     """Создаёт новый объект"""
     try:
         conn = sqlite3.connect(DB_NAME)
@@ -176,11 +179,11 @@ def create_object_extended(name, age_min, age_max, allowed_genders, allowed_nati
         
         cursor.execute('''
             INSERT INTO objects_settings (id, name, visible, priority, age_min, age_max, 
-                                         allowed_genders, allowed_nationalities, allows_conviction, link)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                         allowed_genders, allowed_nationalities, allows_conviction, link, region)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (new_id, name, 1 if visible else 0, 1 if priority else 0,
               age_min, age_max, genders_str, nationalities_str, 
-              1 if allows_conviction else 0, link))
+              1 if allows_conviction else 0, link, region))
         
         conn.commit()
         conn.close()

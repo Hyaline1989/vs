@@ -32,9 +32,17 @@ def init_db():
                 allowed_nationalities TEXT DEFAULT 'РФ',
                 allows_conviction INTEGER DEFAULT 0,
                 link TEXT,
+                region TEXT DEFAULT '',
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
+        
+        # Добавляем колонку region для существующих таблиц
+        try:
+            cursor.execute('ALTER TABLE objects_settings ADD COLUMN region TEXT DEFAULT ""')
+        except sqlite3.OperationalError:
+            # Колонка уже существует
+            pass
         
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS global_objects_order (
@@ -334,17 +342,18 @@ def init_objects_settings():
             
             allows_conviction = 1 if obj.get('allowsConviction', False) else 0
             link = obj.get('link', '')
+            region = obj.get('region', '')
             
             cursor.execute('''
                 INSERT OR IGNORE INTO objects_settings 
                 (id, name, visible, priority, age_min, age_max, 
-                 allowed_genders, allowed_nationalities, allows_conviction, link)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 allowed_genders, allowed_nationalities, allows_conviction, link, region)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 obj_id, obj_name, 1, 0,
                 age_min, age_max, 
                 genders_str, nationalities_str, 
-                allows_conviction, link
+                allows_conviction, link, region
             ))
         
         conn.commit()

@@ -105,6 +105,7 @@ def create_object_api():
     link = data.get('link', '')
     visible = bool(data.get('visible', True))
     priority = bool(data.get('priority', False))
+    region = data.get('region', '')
     
     object_id = create_object_extended(
         name=data['name'],
@@ -115,7 +116,8 @@ def create_object_api():
         allows_conviction=allows_conviction,
         link=link,
         visible=visible,
-        priority=priority
+        priority=priority,
+        region=region
     )
     
     if not object_id:
@@ -179,6 +181,9 @@ def update_object_api(object_id):
     
     if 'priority' in data:
         updates['priority'] = bool(data['priority'])
+    
+    if 'region' in data:
+        updates['region'] = data['region']
     
     if not updates:
         return jsonify({'error': 'Нет данных для обновления'}), 400
@@ -298,7 +303,135 @@ def save_passport(object_id):
         return jsonify({'error': 'Ошибка при сохранении паспорта'}), 500
 
 
-# ========== НОВЫЕ ЭНДПОИНТЫ ДЛЯ МАРШРУТНЫХ ЛИСТОВ ==========
+# ========== СТАРЫЕ ЭНДПОИНТЫ ДЛЯ ОДНОГО МАРШРУТНОГО ЛИСТА (ДЛЯ ОБРАТНОЙ СОВМЕСТИМОСТИ) ==========
+
+@objects_admin_bp.route('/<int:object_id>/route-sheet', methods=['POST'])
+def upload_route_sheet(object_id):
+    """Загрузка маршрутного листа (только админ) - устаревший, используйте /route-sheets"""
+    if not current_user.is_authenticated:
+        return jsonify({'error': 'Unauthorized'}), 401
+    if current_user.role != 'admin':
+        return jsonify({'error': 'Forbidden'}), 403
+    
+    if 'route_sheet' not in request.files:
+        return jsonify({'error': 'Файл не выбран'}), 400
+    
+    file = request.files['route_sheet']
+    if file.filename == '':
+        return jsonify({'error': 'Файл не выбран'}), 400
+    
+    # Проверяем расширение
+    if not file.filename.lower().endswith('.pdf'):
+        return jsonify({'error': 'Можно загружать только PDF файлы'}), 400
+    
+    # Проверяем размер файла (30 MB)
+    file.seek(0, os.SEEK_END)
+    file_size = file.tell()
+    file.seek(0)
+    
+    max_size = 30 * 1024 * 1024  # 30 MB
+    if file_size > max_size:
+        return jsonify({'error': f'Файл слишком большой. Максимум 30 MB'}), 400
+    
+    # Проверяем количество уже загруженных файлов
+    existing_sheets = get_route_sheets(object_id)
+    if len(existing_sheets) >= 5:
+        return jsonify({'error': 'Максимум 5 маршрутных листов на объект'}), 400
+    
+    # Создаём директорию для маршрутных листов
+    from flask import current_app
+    route_sheets_dir = os.path.join(current_app.root_path, 'static', 'uploads', 'route_sheets')
+    os.makedirs(route_sheets_dir, exist_ok=True)
+    
+    # Генерируем уникальное имя файла
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    safe_original = file.filename.replace(' ', '_')
+    filename = f"route_sheet_{object_id}_{timestamp}_{safe_original}"
+    filepath = os.path.join(route_sheets_dir, filename)
+    
+    file.save(filepath)
+    
+    # Сохраняем оригинальное название
+    original_name = file.filename
+    
+    # Добавляем запись в БД
+    sheet_id = add_route_sheet(
+        object_id=object_id,
+        filename=filename,
+        original_name=original_name,
+        file_size=file_size,
+        uploaded_by=current_user.id
+    )
+    
+    if not sheet_id:
+        # Если не удалось добавить в БД, удаляем файл
+        if os.path.exists(filepath):
+            os.remove(filepath)
+        return jsonify({'error': 'Ошибка при сохранении в БД'}), 500
+    
+    # Для обратной совместимости сохраняем также в старую таблицу
+    update_route_sheet(object_id, filename)
+    
+    log_user_action(
+        current_user.id, 
+        'upload_route_sheet', 
+        f"Загружен маршрутный лист для объекта ID {object_id}: {original_name}", 
+        request.remote_addr
+    )
+    
+    return jsonify({
+        'success': True, 
+        'sheet_id': sheet_id,
+        'filename': filename,
+        'original_name': original_name
+    })
+
+
+@objects_admin_bp.route('/<int:object_id>/route-sheet', methods=['DELETE'])
+def delete_route_sheet_file(object_id):
+    """Удаление маршрутного листа (только админ) - устаревший, используйте /route-sheets/{id}"""
+    if not current_user.is_authenticated:
+        return jsonify({'error': 'Unauthorized'}), 401
+    if current_user.role != 'admin':
+        return jsonify({'error': 'Forbidden'}), 403
+    
+    # Удаляем все маршрутные листы для обратной совместимости
+    success = delete_all_route_sheets(object_id)
+    
+    if success:
+        log_user_action(current_user.id, 'delete_route_sheet', f"Удалены все маршрутные листы для объекта ID {object_id}", request.remote_addr)
+    
+    return jsonify({'success': True})
+
+
+@objects_admin_bp.route('/<int:object_id>/route-sheet/download', methods=['GET'])
+def download_route_sheet(object_id):
+    """Скачивание маршрутного листа - устаревший, используйте /route-sheets/{id}/download"""
+    if not current_user.is_authenticated:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    # Проверяем права доступа к объекту
+    if current_user.role != 'admin':
+        if not current_user.can_view_object(object_id, 'selection'):
+            return jsonify({'error': 'Forbidden'}), 403
+    
+    from flask import current_app
+    
+    # Получаем список маршрутных листов
+    sheets = get_route_sheets(object_id)
+    if not sheets:
+        return jsonify({'error': 'Маршрутные листы не найдены'}), 404
+    
+    # Скачиваем первый файл (для обратной совместимости)
+    sheet = sheets[0]
+    filepath = os.path.join(current_app.root_path, 'static', 'uploads', 'route_sheets', sheet['filename'])
+    if not os.path.exists(filepath):
+        return jsonify({'error': 'Файл не найден'}), 404
+    
+    return send_file(filepath, as_attachment=True, download_name=sheet['original_name'])
+
+
+# ========== НОВЫЕ ЭНДПОИНТЫ ДЛЯ МНОЖЕСТВЕННЫХ МАРШРУТНЫХ ЛИСТОВ ==========
 
 @objects_admin_bp.route('/<int:object_id>/route-sheets', methods=['GET'])
 def get_route_sheets_api(object_id):
@@ -381,6 +514,9 @@ def upload_route_sheet_api(object_id):
             os.remove(filepath)
         return jsonify({'error': 'Ошибка при сохранении в БД'}), 500
     
+    # Для обратной совместимости сохраняем также в старую таблицу (первый файл)
+    update_route_sheet(object_id, filename)
+    
     log_user_action(
         current_user.id, 
         'upload_route_sheet', 
@@ -396,64 +532,6 @@ def upload_route_sheet_api(object_id):
     })
 
 
-@objects_admin_bp.route('/<int:object_id>/route-sheets/all', methods=['DELETE'])
-def delete_all_route_sheets_api(object_id):
-    """Удаление всех маршрутных листов объекта"""
-    if not current_user.is_authenticated:
-        return jsonify({'error': 'Unauthorized'}), 401
-    if current_user.role != 'admin':
-        return jsonify({'error': 'Forbidden'}), 403
-    
-    success = delete_all_route_sheets(object_id)
-    
-    if success:
-        log_user_action(
-            current_user.id, 
-            'delete_all_route_sheets', 
-            f"Удалены все маршрутные листы для объекта ID {object_id}", 
-            request.remote_addr
-        )
-        return jsonify({'success': True})
-    else:
-        return jsonify({'error': 'Ошибка при удалении'}), 500
-
-
-# ========== ЭНДПОИНТЫ ДЛЯ РАБОТЫ С КОНКРЕТНЫМ ЛИСТОМ ПО ID (ВНЕ /objects/) ==========
-# ВАЖНО: эти эндпоинты должны быть зарегистрированы на уровне /api/admin/route-sheets,
-# а не /api/admin/objects/<id>/route-sheets
-
-# Создаём отдельный Blueprint для этих эндпоинтов или регистрируем их напрямую
-# Но проще всего - добавить их в этот же blueprint с другим префиксом
-
-# Эндпоинт для скачивания по ID
-@objects_admin_bp.route('/route-sheets/<int:sheet_id>/download', methods=['GET'])
-def download_route_sheet_by_id(sheet_id):
-    """Скачивание конкретного маршрутного листа по ID"""
-    if not current_user.is_authenticated:
-        return jsonify({'error': 'Unauthorized'}), 401
-    
-    sheet = get_route_sheet_by_id(sheet_id)
-    if not sheet:
-        return jsonify({'error': 'Маршрутный лист не найден'}), 404
-    
-    object_id = sheet['object_id']
-    
-    # Проверяем права доступа к объекту
-    if current_user.role != 'admin':
-        if not current_user.can_view_object(object_id, 'selection'):
-            return jsonify({'error': 'Forbidden'}), 403
-    
-    from flask import current_app
-    filepath = os.path.join(current_app.root_path, 'static', 'uploads', 'route_sheets', sheet['filename'])
-    if not os.path.exists(filepath):
-        return jsonify({'error': 'Файл не найден'}), 404
-    
-    # Используем оригинальное имя для скачивания
-    download_name = sheet['original_name']
-    return send_file(filepath, as_attachment=True, download_name=download_name)
-
-
-# Эндпоинт для удаления по ID
 @objects_admin_bp.route('/route-sheets/<int:sheet_id>', methods=['DELETE'])
 def delete_route_sheet_by_id_api(sheet_id):
     """Удаление конкретного маршрутного листа по ID"""
@@ -482,3 +560,52 @@ def delete_route_sheet_by_id_api(sheet_id):
         return jsonify({'success': True})
     else:
         return jsonify({'error': 'Ошибка при удалении'}), 500
+
+
+@objects_admin_bp.route('/<int:object_id>/route-sheets/all', methods=['DELETE'])
+def delete_all_route_sheets_api(object_id):
+    """Удаление всех маршрутных листов объекта"""
+    if not current_user.is_authenticated:
+        return jsonify({'error': 'Unauthorized'}), 401
+    if current_user.role != 'admin':
+        return jsonify({'error': 'Forbidden'}), 403
+    
+    success = delete_all_route_sheets(object_id)
+    
+    if success:
+        log_user_action(
+            current_user.id, 
+            'delete_all_route_sheets', 
+            f"Удалены все маршрутные листы для объекта ID {object_id}", 
+            request.remote_addr
+        )
+        return jsonify({'success': True})
+    else:
+        return jsonify({'error': 'Ошибка при удалении'}), 500
+
+
+@objects_admin_bp.route('/route-sheets/<int:sheet_id>/download', methods=['GET'])
+def download_route_sheet_by_id(sheet_id):
+    """Скачивание конкретного маршрутного листа по ID"""
+    if not current_user.is_authenticated:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    sheet = get_route_sheet_by_id(sheet_id)
+    if not sheet:
+        return jsonify({'error': 'Маршрутный лист не найден'}), 404
+    
+    object_id = sheet['object_id']
+    
+    # Проверяем права доступа к объекту
+    if current_user.role != 'admin':
+        if not current_user.can_view_object(object_id, 'selection'):
+            return jsonify({'error': 'Forbidden'}), 403
+    
+    from flask import current_app
+    filepath = os.path.join(current_app.root_path, 'static', 'uploads', 'route_sheets', sheet['filename'])
+    if not os.path.exists(filepath):
+        return jsonify({'error': 'Файл не найден'}), 404
+    
+    # Используем оригинальное имя для скачивания
+    download_name = sheet['original_name']
+    return send_file(filepath, as_attachment=True, download_name=download_name)

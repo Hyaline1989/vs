@@ -108,6 +108,7 @@ function renderObjectsTable(objects) {
                         <div><i class="fas fa-venus-mars"></i> Пол: ${obj.allowedGenders?.join(', ') || '-'}</div>
                         <div><i class="fas fa-globe"></i> Гражданство: ${obj.allowedNationalities?.join(', ') || '-'}</div>
                         <div><i class="fas fa-gavel"></i> Судимость: ${obj.allowsConviction ? 'Разрешена' : 'Запрещена'}</div>
+                        ${obj.region ? `<div><i class="fas fa-map-marker-alt"></i> Регион: ${escapeHtml(obj.region)}</div>` : ''}
                     </div>
                     <div class="object-card-actions">
                         <button class="action-btn edit-btn" onclick="editObject(${obj.id})" title="Редактировать">
@@ -140,6 +141,7 @@ function renderObjectsTable(objects) {
                     <th>Пол</th>
                     <th>Гражданство</th>
                     <th>Судимость</th>
+                    <th>Регион</th>
                     <th>Видимость</th>
                     <th>Действия</th>
                 </tr>
@@ -159,6 +161,7 @@ function renderObjectsTable(objects) {
                 <td>${obj.allowedGenders?.join(', ') || '-'}</td>
                 <td>${obj.allowedNationalities?.join(', ') || '-'}</td>
                 <td>${obj.allowsConviction ? '<span class="allowed">Разрешена</span>' : '<span class="forbidden">Запрещена</span>'}</td>
+                <td>${escapeHtml(obj.region || '-')}</td>
                 <td><span class="visibility-badge ${visibleClass}"><i class="fas ${visibleIcon}"></i> ${obj.visible ? 'Видим' : 'Скрыт'}</span></td>
                 <td class="actions-cell">
                     <button class="action-btn edit-btn" onclick="editObject(${obj.id})" title="Редактировать"><i class="fas fa-edit"></i></button>
@@ -189,6 +192,7 @@ function openAddObjectModal() {
     document.getElementById('objAllowedNationalities').value = 'РФ';
     document.getElementById('objAllowsConviction').checked = false;
     document.getElementById('objVisible').checked = true;
+    document.getElementById('objRegion').value = '';
     
     document.getElementById('objectModal').style.display = 'flex';
 }
@@ -210,6 +214,7 @@ async function editObject(objectId) {
     document.getElementById('objAllowedNationalities').value = (obj.allowedNationalities || []).join(',');
     document.getElementById('objAllowsConviction').checked = obj.allowsConviction || false;
     document.getElementById('objVisible').checked = obj.visible !== false;
+    document.getElementById('objRegion').value = obj.region || '';
     
     document.getElementById('objectModal').style.display = 'flex';
 }
@@ -235,6 +240,7 @@ async function saveObject() {
     const allowedNationalitiesStr = document.getElementById('objAllowedNationalities').value;
     const allowsConviction = document.getElementById('objAllowsConviction').checked;
     const visible = document.getElementById('objVisible').checked;
+    const region = document.getElementById('objRegion').value.trim();
     
     // Валидация
     if (!name) {
@@ -271,7 +277,8 @@ async function saveObject() {
         allowedGenders,
         allowedNationalities,
         allowsConviction,
-        visible
+        visible,
+        region
     };
     
     try {
@@ -365,7 +372,7 @@ function filterObjects() {
         const rows = document.querySelectorAll('#objectsTableContainer tbody tr');
         rows.forEach(row => {
             const name = row.cells[1]?.textContent.toLowerCase() || '';
-            const visibilityCell = row.cells[6]?.textContent.toLowerCase() || '';
+            const visibilityCell = row.cells[7]?.textContent.toLowerCase() || '';
             
             let matches = true;
             

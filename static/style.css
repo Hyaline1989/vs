@@ -2452,3 +2452,35 @@ body {
     font-size: 0.65rem;
     margin-left: 5px;
 }
+
+/* ========== РАЗМЕР ШРИФТА ДЛЯ ИНФОРМАЦИИ В КАРТОЧКАХ ========== */
+.flip-card-front > p {
+    font-size: 1rem;
+    margin: 6px 0;
+    line-height: 1.5;
+    color: #444;
+}
+
+.flip-card-front > p strong {
+    font-size: 1rem;
+    color: #333;
+}
+
+.flip-card-front .vacancy-stats {
+    margin: 14px 0;
+    padding: 10px 12px;
+}
+
+.flip-card-front .vacancy-stat .vacancy-value {
+    font-size: 1.5rem;
+}
+
+.flip-card-front .vacancy-stat .vacancy-label {
+    font-size: 0.75rem;
+}
+
+.flip-card-front .card-buttons .direction-btn,
+.flip-card-front .card-buttons .flip-btn {
+    font-size: 0.85rem;
+    padding: 8px 14px;
+}

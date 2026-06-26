@@ -1,4 +1,4 @@
-// static/selection.js - ПОЛНАЯ ВЕРСИЯ С КНОПКОЙ ОБНУЛЕНИЯ ПОТРЕБНОСТИ ⭕️
+// static/selection.js - ПОЛНАЯ ВЕРСИЯ С РЕГИОНОМ
 // ========== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ==========
 let objects = [];
 let vacancyData = {};
@@ -66,7 +66,7 @@ async function loadSelectionData() {
             currentUserRole = userData.role;
             window.currentUserRole = userData.role;
             window.isAdmin = (userData.role === 'admin' || userData.is_system_admin);
-            window.isSystemAdmin = userData.is_system_admin === true;  // <-- ДОБАВЛЕНО
+            window.isSystemAdmin = userData.is_system_admin === true;
             console.log('isSystemAdmin:', window.isSystemAdmin);
         }
         
@@ -211,7 +211,8 @@ function getVacancyStats(objectName) {
     return vacancyData[objectName];
 }
 
-// ========== ОТОБРАЖЕНИЕ РЕЗУЛЬТАТОВ ==========
+// static/selection.js - ОБНОВЛЁННАЯ ФУНКЦИЯ displayResults() С РЕГИОНОМ
+
 function displayResults(objectsToDisplay) {
     const container = document.getElementById('results');
     const countDisplay = document.getElementById('resultsCount');
@@ -259,6 +260,9 @@ function displayResults(objectsToDisplay) {
             else nationalityText = obj.allowedNationalities.join(', ');
         }
         
+        // РЕГИОН
+        const regionText = obj.region ? ` Регион: ${escapeHtml(obj.region)}` : '';
+        
         card.innerHTML = `
             <div class="flip-card-inner">
                 <div class="flip-card-front">
@@ -270,6 +274,7 @@ function displayResults(objectsToDisplay) {
                         <div class="vacancy-stat"><div class="vacancy-value vacancy-family">${totalFamily}</div><div class="vacancy-label">Семьи</div></div>
                     </div>
                     <p><strong>Возраст:</strong> ${obj.ageMin} - ${obj.ageMax} лет</p>
+                    ${regionText ? `<p><strong> Регион:</strong> ${escapeHtml(obj.region)}</p>` : ''}
                     <p><strong>Гражданство:</strong> ${nationalityText}</p>
                     <p><strong>Судимость:</strong> ${obj.allowsConviction ? 'Принимают' : 'Не принимают'}</p>
                     <div class="card-buttons">
@@ -1243,4 +1248,4 @@ window.openDirectionForm = openDirectionForm;
 window.closeDirectionModal = closeDirectionModal;
 window.addFileInput = addFileInput;
 window.submitDirection = submitDirection;
-window.resetObjectRequirements = resetObjectRequirements;  // <-- ДОБАВЛЕНО
+window.resetObjectRequirements = resetObjectRequirements;

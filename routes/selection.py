@@ -1,4 +1,4 @@
-# routes/selection.py - полная версия с поддержкой email (ОБНОВЛЕНА: раздельные Имя/Фамилия/Отчество)
+# routes/selection.py - полная версия с поддержкой email и региона
 # -*- coding: utf-8 -*-
 from flask import Blueprint, request, jsonify, send_file
 from flask_login import current_user, login_required
@@ -89,7 +89,8 @@ def selection_settings():
                 'link': db_obj.get('link', ''),
                 'visible': setting['visible'] if setting else True,
                 'priority': priority_from_req,
-                'requirement': total_count
+                'requirement': total_count,
+                'region': db_obj.get('region', '')  # <-- ДОБАВЛЕНО ПОЛЕ РЕГИОН
             })
         
         if not for_permissions and current_user.role != 'admin':
