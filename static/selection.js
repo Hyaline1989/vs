@@ -618,6 +618,7 @@ function renderRequirementsTable() {
     for (const objName of objectNames) {
         const objData = vacancyData[objName];
         const positions = objData?.positions || [];
+        const totalPositions = positions.length; // <-- ОПРЕДЕЛЯЕМ КОЛИЧЕСТВО ДОЛЖНОСТЕЙ
         const rowCount = positions.length + 1;
         
         let totals = { rfMen: 0, rfWomen: 0, rfFamily: 0, cisMen: 0, cisWomen: 0, cisFamily: 0 };
@@ -633,7 +634,6 @@ function renderRequirementsTable() {
         grandTotal += totalAll;
         
         const isPriority = objData?.is_high || false;
-        
         const safeObjNameForJs = objName.replace(/'/g, "\\'");
         
         for (let i = 0; i < positions.length; i++) {
@@ -643,6 +643,14 @@ function renderRequirementsTable() {
             
             const safePosName = pos.name.replace(/'/g, "\\'");
             
+            // ========== НОВАЯ ЛОГИКА: определяем, показывать ли кнопку удаления ==========
+            // Если это единственная должность — кнопка удаления скрыта (заменена на иконку 🔒)
+            const isLastPosition = totalPositions <= 1;
+            const deleteButtonHtml = isLastPosition 
+                ? `<span style="color: #999; font-size: 0.7rem; margin-left: 8px;" title="Нельзя удалить последнюю должность">🔒</span>`
+                : `<button onclick="deletePosition('${safeObjNameForJs}','${safePosName}')" style="margin-left:8px; background:#e74c3c; color:white; border:none; padding:2px 6px; border-radius:3px; font-size:10px; cursor:pointer;" title="Удалить должность">✕</button>`;
+            // ===========================================================
+            
             tableHtml += `<tr data-obj="${escapeHtml(objName)}" data-pos="${escapeHtml(pos.name)}">
                 ${i === 0 ? `<td rowspan="${rowCount}" style="vertical-align:middle; background:#f9f9f9;">
                     ${escapeHtml(objName)}
@@ -650,7 +658,7 @@ function renderRequirementsTable() {
                     <button onclick="deleteObject('${safeObjNameForJs}')" style="display:block; margin-top:8px; background:#e74c3c; color:white; border:none; padding:3px 8px; border-radius:3px; font-size:11px; cursor:pointer;">🗑 Удалить объект</button>
                     <button onclick="showAddPositionModal('${safeObjNameForJs}')" style="display:block; margin-top:5px; background:#3498db; color:white; border:none; padding:3px 8px; border-radius:3px; font-size:11px; cursor:pointer;">+ Добавить должность</button>
                     </td>` : ''}
-                <td>${escapeHtml(pos.name)} <button onclick="deletePosition('${safeObjNameForJs}','${safePosName}')" style="margin-left:8px; background:#e74c3c; color:white; border:none; padding:2px 6px; border-radius:3px; font-size:10px; cursor:pointer;">✕</button></td>
+                <td>${escapeHtml(pos.name)} ${deleteButtonHtml}</td>
                 <td><input type="number" class="editable rf-men" data-obj="${escapeHtml(objName)}" data-pos="${escapeHtml(pos.name)}" value="${pos.rf?.men||0}" min="0" style="width:60px; text-align:center;"></td>
                 <td><input type="number" class="editable rf-women" data-obj="${escapeHtml(objName)}" data-pos="${escapeHtml(pos.name)}" value="${pos.rf?.women||0}" min="0" style="width:60px; text-align:center;"></td>
                 <td><input type="number" class="editable rf-family" data-obj="${escapeHtml(objName)}" data-pos="${escapeHtml(pos.name)}" value="${pos.rf?.family||0}" min="0" style="width:60px; text-align:center;"></td>
