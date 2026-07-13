@@ -9,6 +9,10 @@ from database.db_core import DB_NAME
 logger = logging.getLogger(__name__)
 
 
+def _agent_name_key(agent_full_name):
+    return tuple(sorted((agent_full_name or '').lower().split()))
+
+
 def get_worker_statuses(agent_full_name, date_from=None, date_to=None):
     """
     Получает статусы вахтовиков для конкретного агента
@@ -19,21 +23,35 @@ def get_worker_statuses(agent_full_name, date_from=None, date_to=None):
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
+        if isinstance(agent_full_name, (list, tuple, set)):
+            agent_names = [name for name in agent_full_name if name]
+        else:
+            agent_names = [agent_full_name]
+
+        agent_name_keys = {_agent_name_key(name) for name in agent_names}
+
+        if not agent_name_keys:
+            conn.close()
+            return []
+
         query = '''
             SELECT id, lead_id, worker_full_name, agent_full_name, deal_date,
                    check_in_date, shift_1_date, shift_5_date, last_synced
             FROM worker_statuses
-            WHERE agent_full_name = ?
         '''
-        params = [agent_full_name]
+        conditions = []
+        params = []
         
         if date_from:
-            query += ' AND deal_date >= ?'
+            conditions.append('deal_date >= ?')
             params.append(date_from)
         
         if date_to:
-            query += ' AND deal_date <= ?'
+            conditions.append('deal_date <= ?')
             params.append(date_to)
+
+        if conditions:
+            query += ' WHERE ' + ' AND '.join(conditions)
         
         query += ' ORDER BY deal_date DESC, worker_full_name'
         
@@ -41,7 +59,11 @@ def get_worker_statuses(agent_full_name, date_from=None, date_to=None):
         rows = cursor.fetchall()
         conn.close()
         
-        return [dict(row) for row in rows]
+        return [
+            dict(row)
+            for row in rows
+            if _agent_name_key(row['agent_full_name']) in agent_name_keys
+        ]
     
     except Exception as e:
         logger.error(f"Ошибка при получении статусов вахтовиков: {e}")

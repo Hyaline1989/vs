@@ -10,6 +10,26 @@ from normalizer import ObjectNameNormalizer
 
 logger = logging.getLogger(__name__)
 
+
+def get_agent_name_variants(agent_fullname):
+    parts = [part for part in (agent_fullname or '').split() if part]
+    variants = []
+
+    def add_variant(value):
+        value = ' '.join(value.split())
+        if value and value not in variants:
+            variants.append(value)
+
+    add_variant(agent_fullname or '')
+
+    if len(parts) >= 2:
+        # Supports both "Last First Patronymic" and "First Last Patronymic".
+        add_variant(' '.join([parts[1], parts[0], *parts[2:]]))
+        add_variant(' '.join([parts[1], parts[0]]))
+        add_variant(' '.join(parts[:2]))
+
+    return variants
+
 # Константа для поля "Скан паспорта"
 PASSPORT_FIELD = "UF_CRM_1707988048727"
 # Константа для поля "ФИО агента"
@@ -538,16 +558,27 @@ class BitrixAPI:
     
     def get_deals_by_agent_fullname(self, agent_fullname, date_from=None, date_to=None):
         """Получает лиды агента и обогащает их данными из связанных сделок"""
-        filter_params = {
-            AGENT_NAME_FIELD: agent_fullname
-        }
-        
-        if date_from:
-            filter_params['>DATE_CREATE'] = date_from + ' 00:00:00'
-        if date_to:
-            filter_params['<DATE_CREATE'] = date_to + ' 23:59:59'
-        
-        all_leads = self._get_all_leads_raw_for_worker(filter_params)
+        all_leads = []
+        seen_lead_ids = set()
+
+        for agent_name in get_agent_name_variants(agent_fullname):
+            filter_params = {
+                AGENT_NAME_FIELD: agent_name
+            }
+            
+            if date_from:
+                filter_params['>DATE_CREATE'] = date_from + ' 00:00:00'
+            if date_to:
+                filter_params['<DATE_CREATE'] = date_to + ' 23:59:59'
+            
+            leads = self._get_all_leads_raw_for_worker(filter_params)
+            for lead in leads:
+                lead_id = lead.get('ID')
+                if lead_id in seen_lead_ids:
+                    continue
+                seen_lead_ids.add(lead_id)
+                all_leads.append(lead)
+
         return self._process_leads_with_deal_statuses(all_leads)
     
     def _get_all_leads_raw_for_worker(self, filter_params):
@@ -671,7 +702,7 @@ class BitrixAPI:
             save_or_update_worker_status(
                 lead_id=lead['lead_id'],
                 worker_full_name=lead['worker_full_name'],
-                agent_full_name=lead['agent_full_name'],
+                agent_full_name=agent_fullname,
                 deal_date=lead['deal_date'],
                 check_in_date=lead['check_in_date'],
                 shift_1_date=lead['shift_1_date'],

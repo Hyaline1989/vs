@@ -9,7 +9,7 @@ import sqlite3
 
 from database.worker_status import get_worker_statuses, save_or_update_worker_status, get_worker_status_by_lead_id
 from database import log_user_action, DB_NAME
-from bitrix_api import BitrixAPI, AGENT_NAME_FIELD
+from bitrix_api import BitrixAPI, AGENT_NAME_FIELD, get_agent_name_variants
 from config import BITRIX_WEBHOOK_URL
 
 logger = logging.getLogger(__name__)
@@ -55,7 +55,7 @@ def get_worker_statuses_api():
         logger.error(f"Ошибка синхронизации с Bitrix: {e}")
     
     # Получаем данные из БД с учётом фильтра
-    statuses = get_worker_statuses(agent_full_name, date_from, date_to)
+    statuses = get_worker_statuses(get_agent_name_variants(agent_full_name), date_from, date_to)
     
     # Форматируем ответ
     result = []
@@ -101,14 +101,10 @@ def force_sync():
         fixed_count = 0
         
         # Проверяем, есть ли лиды с другим вариантом имени
-        name_parts = agent_full_name.split()
-        alternative_names = []
-        
-        if len(name_parts) >= 2:
-            # Если имя состоит из двух частей - пробуем переставить
-            alt1 = f"{name_parts[1]} {name_parts[0]}"
-            if alt1 != agent_full_name:
-                alternative_names.append(alt1)
+        alternative_names = [
+            name for name in get_agent_name_variants(agent_full_name)
+            if name != agent_full_name
+        ]
         
         # Проверяем каждый альтернативный вариант
         for alt_name in alternative_names:
@@ -157,7 +153,7 @@ def force_sync():
         # ========== ОСНОВНАЯ СИНХРОНИЗАЦИЯ ==========
         synced = bitrix.sync_worker_statuses_for_agent(agent_full_name, date_from, date_to)
         
-        statuses = get_worker_statuses(agent_full_name, date_from, date_to)
+        statuses = get_worker_statuses(get_agent_name_variants(agent_full_name), date_from, date_to)
         
         message = f'Синхронизировано {synced} записей'
         if fixed_count > 0:
@@ -467,15 +463,10 @@ def debug_agent_check():
     leads = bitrix._get_all_leads_raw_for_worker(filter_params)
     
     # Также проверяем, какие лиды есть с другим вариантом имени
-    name_parts = agent_full_name.split()
-    alternative_names = []
-    
-    if len(name_parts) >= 2:
-        alt1 = f"{name_parts[1]} {name_parts[0]}"
-        if alt1 != agent_full_name:
-            alternative_names.append(alt1)
-        alternative_names.append(name_parts[0])
-        alternative_names.append(name_parts[1])
+    alternative_names = [
+        name for name in get_agent_name_variants(agent_full_name)
+        if name != agent_full_name
+    ]
     
     alt_leads = []
     for alt_name in alternative_names:
