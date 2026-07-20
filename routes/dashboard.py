@@ -226,10 +226,24 @@ def dashboard():
         
         target_date = datetime.strptime(date_str, '%Y-%m-%d')
         
-        cache_key = f"dashboard_{date_str}"
-        offices_stats = get_cached_data(cache_key, bitrix_api.get_all_offices_stats, target_date)
-        
-        comparison = comparer.compare_by_date(target_date)
+        # Загружаем сделки за день одним проходом. Раньше статистика офисов и
+        # сравнение план/факт повторно запрашивали одни и те же данные из Bitrix,
+        # из-за чего обработчик мог не уложиться в таймаут веб-сервера.
+        cache_key = f"dashboard_facts_{date_str}"
+        facts_by_date = get_cached_data(
+            cache_key,
+            bitrix_api.get_report_facts_range,
+            date_str,
+            date_str
+        )
+        facts_for_date = facts_by_date.get(date_str, {})
+        offices_stats = convert_report_facts_to_offices(facts_for_date)
+
+        total_facts = {
+            object_name: sum(office_counts.values())
+            for object_name, office_counts in facts_for_date.items()
+        }
+        comparison = comparer.compare_by_date(target_date, deals=total_facts)
         
         response = {
             'date': target_date.strftime('%d.%m.%Y'),

@@ -272,11 +272,19 @@ class BitrixAPI:
                 if 'result' in result and result['result']:
                     deals_batch = result['result']
                     all_deals.extend(deals_batch)
-                    
-                    if len(deals_batch) < limit:
+
+                    # Bitrix явно сообщает следующую страницу в поле next.
+                    # Размер страницы сам по себе не означает, что продолжение есть:
+                    # при ровно 50 сделках повторный запрос мог вернуть ту же страницу.
+                    next_start = result.get('next')
+                    if next_start is None:
                         break
-                    
-                    start += limit
+
+                    if next_start == start:
+                        logger.error("Bitrix вернул тот же указатель страницы; загрузка остановлена")
+                        break
+
+                    start = next_start
                 else:
                     break
                     
@@ -337,23 +345,37 @@ class BitrixAPI:
             return {}
         
         companies_info = {}
-        
-        for company_id in company_ids:
-            method = 'crm.company.get'
-            params = {'id': company_id}
-            
+
+        # crm.company.list принимает массив ID и возвращает названия компаний
+        # одним лёгким запросом вместо выполнения множества crm.company.get.
+        unique_ids = list(dict.fromkeys(str(company_id) for company_id in company_ids))
+        batch_size = 50
+
+        for offset in range(0, len(unique_ids), batch_size):
+            batch_ids = unique_ids[offset:offset + batch_size]
             try:
-                response = requests.post(f"{self.webhook_url}{method}", json=params, timeout=10)
-                result = response.json()
-                
-                if 'result' in result:
-                    company_name = result['result'].get('TITLE', 'Неизвестная компания')
-                    companies_info[company_id] = company_name
-                else:
-                    companies_info[company_id] = 'Неизвестная компания'
+                response = requests.post(
+                    f"{self.webhook_url}crm.company.list",
+                    json={
+                        'filter': {'ID': batch_ids},
+                        'select': ['ID', 'TITLE']
+                    },
+                    timeout=15
+                )
+                response.raise_for_status()
+                companies = response.json().get('result', [])
+
+                for company in companies:
+                    company_id = str(company.get('ID', ''))
+                    if company_id:
+                        companies_info[company_id] = company.get('TITLE', 'Неизвестная компания')
+
+                for company_id in batch_ids:
+                    companies_info.setdefault(company_id, 'Неизвестная компания')
             except Exception as e:
-                logger.error(f"Ошибка при получении компании {company_id}: {e}")
-                companies_info[company_id] = 'Ошибка загрузки'
+                logger.error(f"Ошибка загрузки списка компаний: {e}")
+                for company_id in batch_ids:
+                    companies_info[company_id] = 'Ошибка загрузки'
         
         return companies_info
     

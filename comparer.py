@@ -19,7 +19,7 @@ class DataComparer:
         from database import get_plan_requirements_for_date
         return get_plan_requirements_for_date(target_date)
     
-    def compare_by_date(self, target_date):
+    def compare_by_date(self, target_date, deals=None):
         """Сравнивает данные за указанную дату"""
         try:
             if isinstance(target_date, str):
@@ -47,7 +47,10 @@ class DataComparer:
             logger.info(f"Приоритетных объектов: {len(priorities)}")
             
             # Получаем фактические направленные из Bitrix
-            deals = self.bitrix.get_directed_deals_by_date(target_date)
+            # Если факты уже загружены вызывающим кодом, используем их повторно.
+            # Это позволяет дашборду не выполнять ещё один запрос к Bitrix.
+            if deals is None:
+                deals = self.bitrix.get_directed_deals_by_date(target_date)
             logger.info(f"Из Bitrix получено {len(deals)} объектов")
             
             # Нормализуем названия для сравнения
