@@ -39,7 +39,7 @@ async function loadDashboardForDate(dateString) {
         updateUpdateTime();
         
         if (data.offices) {
-            updateOffices(data.offices);
+            updateOffices(data.offices, getPriorityObjectNames(data.comparison));
             currentDashboardData.offices = data.offices;
         }
         
@@ -82,15 +82,35 @@ function showErrorInContainers(message) {
     }
 }
 
-function updateOffices(offices) {
+function compareObjectNames(a, b) {
+    return a.localeCompare(b, 'ru', { sensitivity: 'base' });
+}
+
+function getPriorityObjectNames(comparison) {
+    const priorityNames = new Set();
+    if (!comparison) return priorityNames;
+
+    const sections = ['only_plan', 'negative_delta', 'zero_delta', 'positive_delta'];
+    sections.forEach(section => {
+        for (const [name, data] of Object.entries(comparison[section] || {})) {
+            if (data && typeof data === 'object' && data.is_high) {
+                priorityNames.add(name);
+            }
+        }
+    });
+
+    return priorityNames;
+}
+
+function updateOffices(offices, priorityNames = new Set()) {
     const container = document.getElementById('offices-container');
     if (!container) return;
     
     const officesConfig = [
         { key: 'agent', name: 'Агент' },
-        { key: 'potok', name: 'Поток' },
         { key: 'bishkek', name: 'Бишкек' },
-        { key: 'complect', name: 'Комплект' }
+        { key: 'complect', name: 'Комплект' },
+        { key: 'potok', name: 'Поток' }
     ];
     
     let hasData = false;
@@ -105,10 +125,10 @@ function updateOffices(offices) {
             officeElement = document.createElement('div');
             officeElement.className = 'office-item';
             officeElement.setAttribute('data-office', office.key);
-            container.appendChild(officeElement);
         }
-        
-        updateOfficeContent(officeElement, office.name, data);
+
+        container.appendChild(officeElement);
+        updateOfficeContent(officeElement, office.name, data, priorityNames);
     });
     
     const noDataImage = document.getElementById('noDataImage');
@@ -122,7 +142,7 @@ function updateOffices(offices) {
     }
 }
 
-function updateOfficeContent(officeElement, name, data) {
+function updateOfficeContent(officeElement, name, data, priorityNames = new Set()) {
     const safeName = escapeHtml(name);
     const currentHeader = officeElement.querySelector('.office-header');
     
@@ -148,10 +168,17 @@ function updateOfficeContent(officeElement, name, data) {
     }
     
     let objectsHtml = '';
-    for (const [objName, count] of Object.entries(data.objects)) {
+    const sortedObjects = Object.entries(data.objects).sort(([nameA], [nameB]) => (
+        compareObjectNames(nameA, nameB)
+    ));
+
+    for (const [objName, count] of sortedObjects) {
+        const isPriority = priorityNames.has(objName);
         objectsHtml += `
             <div class="object-row" data-object="${escapeHtml(objName)}">
-                <span class="object-name">${escapeHtml(objName)}</span>
+                <span class="object-name${isPriority ? ' priority-high' : ''}">
+                    ${isPriority ? '🔴 ' : ''}${escapeHtml(objName)}
+                </span>
                 <span class="object-value">${count}</span>
             </div>
         `;
@@ -214,7 +241,7 @@ function updatePlanFactTable(comparison) {
     items.sort((a, b) => {
         if (a.is_high && !b.is_high) return -1;
         if (!a.is_high && b.is_high) return 1;
-        return a.name.localeCompare(b.name);
+        return compareObjectNames(a.name, b.name);
     });
     
     if (items.length === 0) {

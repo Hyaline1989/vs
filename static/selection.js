@@ -404,7 +404,7 @@ async function openDirectionForm(objectId, objectName, positionName) {
                     
                     <div class="form-group">
                         <label>Объект *</label>
-                        <input type="text" id="agentObject" required placeholder="Название объекта" autocomplete="off">
+                        <input type="text" id="agentObject" required value="${escapeHtml(objectName)}" placeholder="Название объекта" autocomplete="off">
                         <div class="info-text" style="font-size: 0.7rem; color: var(--gray);">
                             <i class="fas fa-building"></i> Укажите объект, куда направляется кандидат
                         </div>
