@@ -188,8 +188,12 @@ function openAddObjectModal() {
     // Устанавливаем значения по умолчанию
     document.getElementById('objAgeMin').value = '18';
     document.getElementById('objAgeMax').value = '55';
-    document.getElementById('objAllowedGenders').value = 'мужчина,женщина';
-    document.getElementById('objAllowedNationalities').value = 'РФ';
+    document.querySelectorAll('input[name="objAllowedGender"]').forEach(checkbox => {
+        checkbox.checked = true;
+    });
+    document.querySelectorAll('input[name="objAllowedNationality"]').forEach(checkbox => {
+        checkbox.checked = checkbox.value === 'РФ';
+    });
     document.getElementById('objAllowsConviction').checked = false;
     document.getElementById('objVisible').checked = true;
     document.getElementById('objRegion').value = '';
@@ -210,8 +214,14 @@ async function editObject(objectId) {
     document.getElementById('objName').value = obj.name || '';
     document.getElementById('objAgeMin').value = obj.ageMin || 18;
     document.getElementById('objAgeMax').value = obj.ageMax || 55;
-    document.getElementById('objAllowedGenders').value = (obj.allowedGenders || []).join(',');
-    document.getElementById('objAllowedNationalities').value = (obj.allowedNationalities || []).join(',');
+    const allowedGenders = new Set(obj.allowedGenders || []);
+    document.querySelectorAll('input[name="objAllowedGender"]').forEach(checkbox => {
+        checkbox.checked = allowedGenders.has(checkbox.value);
+    });
+    const allowedNationalities = new Set(obj.allowedNationalities || []);
+    document.querySelectorAll('input[name="objAllowedNationality"]').forEach(checkbox => {
+        checkbox.checked = allowedNationalities.has(checkbox.value);
+    });
     document.getElementById('objAllowsConviction').checked = obj.allowsConviction || false;
     document.getElementById('objVisible').checked = obj.visible !== false;
     document.getElementById('objRegion').value = obj.region || '';
@@ -236,8 +246,12 @@ async function saveObject() {
     const name = document.getElementById('objName').value.trim();
     const ageMin = parseInt(document.getElementById('objAgeMin').value);
     const ageMax = parseInt(document.getElementById('objAgeMax').value);
-    const allowedGendersStr = document.getElementById('objAllowedGenders').value;
-    const allowedNationalitiesStr = document.getElementById('objAllowedNationalities').value;
+    const allowedGenders = Array.from(
+        document.querySelectorAll('input[name="objAllowedGender"]:checked')
+    ).map(checkbox => checkbox.value);
+    const allowedNationalities = Array.from(
+        document.querySelectorAll('input[name="objAllowedNationality"]:checked')
+    ).map(checkbox => checkbox.value);
     const allowsConviction = document.getElementById('objAllowsConviction').checked;
     const visible = document.getElementById('objVisible').checked;
     const region = document.getElementById('objRegion').value.trim();
@@ -258,13 +272,11 @@ async function saveObject() {
         return;
     }
     
-    const allowedGenders = allowedGendersStr.split(',').map(g => g.trim()).filter(g => g);
     if (allowedGenders.length === 0) {
         showNotification('❌ Укажите хотя бы один допустимый пол', 'error');
         return;
     }
     
-    const allowedNationalities = allowedNationalitiesStr.split(',').map(n => n.trim()).filter(n => n);
     if (allowedNationalities.length === 0) {
         showNotification('❌ Укажите хотя бы одно допустимое гражданство', 'error');
         return;

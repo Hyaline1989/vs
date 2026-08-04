@@ -1193,13 +1193,35 @@
                     </div>
                     
                     <div class="form-group">
-                        <label for="objAllowedGenders">Допустимые полы * <span class="hint">(через запятую: мужчина,женщина)</span></label>
-                        <input type="text" id="objAllowedGenders" required placeholder="мужчина,женщина">
+                        <label>Допустимый пол *</label>
+                        <div id="objAllowedGenders" style="display: flex; flex-wrap: wrap; gap: 16px; margin-top: 8px;">
+                            <label class="checkbox" style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                <input type="checkbox" name="objAllowedGender" value="мужчина">
+                                <span>Мужчина</span>
+                            </label>
+                            <label class="checkbox" style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                <input type="checkbox" name="objAllowedGender" value="женщина">
+                                <span>Женщина</span>
+                            </label>
+                        </div>
                     </div>
                     
                     <div class="form-group">
-                        <label for="objAllowedNationalities">Допустимые гражданства * <span class="hint">(через запятую: РФ,РБ,СНГ)</span></label>
-                        <input type="text" id="objAllowedNationalities" required placeholder="РФ,РБ,СНГ">
+                        <label>Допустимые гражданства *</label>
+                        <div id="objAllowedNationalities" style="display: flex; flex-wrap: wrap; gap: 16px; margin-top: 8px;">
+                            <label class="checkbox" style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                <input type="checkbox" name="objAllowedNationality" value="РФ">
+                                <span>РФ</span>
+                            </label>
+                            <label class="checkbox" style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                <input type="checkbox" name="objAllowedNationality" value="РБ">
+                                <span>РБ</span>
+                            </label>
+                            <label class="checkbox" style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                <input type="checkbox" name="objAllowedNationality" value="СНГ">
+                                <span>СНГ</span>
+                            </label>
+                        </div>
                     </div>
                     
                     <div class="form-group">
