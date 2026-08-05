@@ -581,10 +581,9 @@ function renderFirstShiftByObject(data, totals) {
             html += `<div class="empty-objects">✘ Нет сделок</div>`;
         } else {
             for (const [company, count] of items) {
-                const emoji = getCompanyEmoji(company);
                 html += `
                     <div class="object-row">
-                        <span class="object-name">${emoji} ${escapeHtml(company)}</span>
+                        <span class="object-name">${escapeHtml(company)}</span>
                         <span class="object-value">${count}</span>
                     </div>
                 `;
@@ -667,7 +666,7 @@ function renderFirstShiftByStaff(data, totals) {
     const container = document.getElementById('fsStaffContent');
     if (!container) return;
     
-    const categories = ['Поток', 'Комплект', 'Бишкек'];
+    const categories = ['Поток', 'Комплект', 'Сервис', 'Спутник', 'Бишкек'];
     let html = '';
     
     for (const cat of categories) {

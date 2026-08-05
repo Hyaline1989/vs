@@ -951,14 +951,26 @@ class ShiftReportAPI:
     
     def _group_by_staff(self, deals):
         """Группировка по полю Сотрудник Колл-центра (ОТЧЕТ)."""
-        categories = {'Поток': [], 'Бишкек': [], 'Комплект': []}
+        categories = {
+            'Поток': [],
+            'Комплект': [],
+            'Сервис': [],
+            'Спутник': [],
+            'Бишкек': []
+        }
         exclude = {SOURCE_AGENT}
         
         for d in deals:
             src = d.get('SOURCE_ID')
             if src in exclude:
                 continue
-            if src == SOURCE_POTOK:
+
+            staff = (d.get(FIELD_CC_OPERATOR_REPORT) or '').strip()
+            if staff.casefold().startswith('сервис'):
+                categories['Сервис'].append(d)
+            elif staff.casefold().startswith('спутник'):
+                categories['Спутник'].append(d)
+            elif src == SOURCE_POTOK:
                 categories['Поток'].append(d)
             elif src == SOURCE_BISHKEK:
                 categories['Бишкек'].append(d)
