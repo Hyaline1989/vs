@@ -19,6 +19,56 @@
             border-radius: 20px;
             font-weight: bold;
         }
+
+        .plan-fact-table-wrap {
+            width: 100%;
+            overflow-x: auto;
+        }
+
+        .plan-fact-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.95rem;
+        }
+
+        .plan-fact-table th,
+        .plan-fact-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #e5e5e5;
+            text-align: center;
+        }
+
+        .plan-fact-table th {
+            background: rgba(164, 44, 48, 0.08);
+            color: var(--primary-dark);
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .plan-fact-table th:first-child,
+        .plan-fact-table .plan-fact-name {
+            text-align: left;
+        }
+
+        .plan-fact-table .priority-row {
+            background: rgba(164, 44, 48, 0.09);
+            color: #a42c30;
+            font-weight: 700;
+        }
+
+        .plan-change-up {
+            color: #218838;
+            font-weight: 700;
+        }
+
+        .plan-change-down {
+            color: #c82333;
+            font-weight: 700;
+        }
+
+        .plan-change-zero {
+            color: #6c757d;
+        }
         
         .dashboard-tab-content {
             display: none;

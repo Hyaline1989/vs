@@ -7,7 +7,7 @@ import re
 import logging
 import sqlite3
 
-from database import get_user_module_permissions, DB_NAME
+from database import get_user_module_permissions, get_plan_requirements_for_date, DB_NAME
 from bitrix_api import BitrixAPI, ShiftReportAPI
 from comparer import DataComparer
 from config import BITRIX_WEBHOOK_URL
@@ -244,6 +244,40 @@ def dashboard():
             for object_name, office_counts in facts_for_date.items()
         }
         comparison = comparer.compare_by_date(target_date, deals=total_facts)
+
+        comparison_names = {}
+        for section_name in ('only_plan', 'only_fact', 'negative_delta', 'positive_delta', 'zero_delta'):
+            for object_name in comparison.get(section_name, {}):
+                comparison_names[comparer.normalizer.normalize(object_name)] = object_name
+
+        current_plans = get_plan_requirements_for_date(target_date)
+        previous_plans = get_plan_requirements_for_date(target_date - timedelta(days=1))
+        current_normalized = {
+            comparer.normalizer.normalize(name): (name, data)
+            for name, data in current_plans.items()
+        }
+        previous_normalized = {
+            comparer.normalizer.normalize(name): (name, data)
+            for name, data in previous_plans.items()
+        }
+        plan_changes = {}
+        for normalized_name in set(current_normalized) | set(previous_normalized):
+            current_entry = current_normalized.get(normalized_name)
+            previous_entry = previous_normalized.get(normalized_name)
+            display_name = comparison_names.get(
+                normalized_name,
+                current_entry[0] if current_entry else previous_entry[0]
+            )
+            current_data = current_entry[1] if current_entry else {}
+            previous_data = previous_entry[1] if previous_entry else {}
+            current_count = current_data.get('count', 0)
+            previous_count = previous_data.get('count', 0)
+            plan_changes[display_name] = {
+                'current': current_count,
+                'previous': previous_count,
+                'change': current_count - previous_count,
+                'is_high': bool(current_data.get('is_high', False))
+            }
         
         response = {
             'date': target_date.strftime('%d.%m.%Y'),
@@ -253,7 +287,8 @@ def dashboard():
                 'only_fact': comparison.get('only_fact', {}),
                 'negative_delta': comparison.get('negative_delta', {}),
                 'positive_delta': comparison.get('positive_delta', {}),
-                'zero_delta': comparison.get('zero_delta', {})
+                'zero_delta': comparison.get('zero_delta', {}),
+                'plan_changes': plan_changes
             },
             'summary': comparison.get('summary', {
                 'total_plan': 0, 'total_fact': 0, 'percent': 0, 'delta': 0

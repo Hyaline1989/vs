@@ -197,24 +197,38 @@ function updateOfficeContent(officeElement, name, data, priorityNames = new Set(
 function updatePlanFactTable(comparison) {
     const container = document.getElementById('plan-fact-container');
     if (!container) return;
-    
+
     const allObjects = new Map();
-    
-    if (comparison.only_plan) {
-        for (const [name, value] of Object.entries(comparison.only_plan)) {
-            allObjects.set(name, { 
-                plan: value.count || value, 
-                fact: 0, 
-                is_high: value.is_high || false 
+
+    if (comparison.plan_changes) {
+        for (const [name, data] of Object.entries(comparison.plan_changes)) {
+            allObjects.set(name, {
+                plan: data.current || 0,
+                planChange: data.change || 0,
+                fact: 0,
+                is_high: data.is_high || false
             });
         }
     }
-    
+
+    if (comparison.only_plan) {
+        for (const [name, value] of Object.entries(comparison.only_plan)) {
+            const current = allObjects.get(name) || {};
+            allObjects.set(name, {
+                ...current,
+                plan: value.count || value,
+                planChange: current.planChange || 0,
+                fact: current.fact || 0,
+                is_high: value.is_high || false
+            });
+        }
+    }
+
     const deltaSections = ['negative_delta', 'zero_delta', 'positive_delta'];
     deltaSections.forEach(section => {
         if (comparison[section]) {
             for (const [name, data] of Object.entries(comparison[section])) {
-                const current = allObjects.get(name) || { plan: 0, fact: 0, is_high: false };
+                const current = allObjects.get(name) || { plan: 0, planChange: 0, fact: 0, is_high: false };
                 current.plan = data.plan;
                 current.fact = data.fact;
                 current.is_high = data.is_high || false;
@@ -225,43 +239,62 @@ function updatePlanFactTable(comparison) {
     
     if (comparison.only_fact) {
         for (const [name, factCount] of Object.entries(comparison.only_fact)) {
-            const current = allObjects.get(name) || { plan: 0, fact: 0, is_high: false };
+            const current = allObjects.get(name) || { plan: 0, planChange: 0, fact: 0, is_high: false };
             current.fact = factCount;
             allObjects.set(name, current);
         }
     }
-    
+
     const items = Array.from(allObjects.entries()).map(([name, data]) => ({
-        name, 
-        plan: data.plan, 
-        fact: data.fact, 
+        name,
+        plan: data.plan || 0,
+        planChange: data.planChange || 0,
+        fact: data.fact || 0,
         is_high: data.is_high
     }));
-    
+
     items.sort((a, b) => {
         if (a.is_high && !b.is_high) return -1;
         if (!a.is_high && b.is_high) return 1;
         return compareObjectNames(a.name, b.name);
     });
-    
+
     if (items.length === 0) {
         container.innerHTML = '<div class="empty-state">Нет данных для отображения</div>';
         return;
     }
-    
-    let html = '';
+
+    let html = `
+        <div class="plan-fact-table-wrap">
+            <table class="plan-fact-table">
+                <thead>
+                    <tr>
+                        <th>Название объекта</th>
+                        <th>План</th>
+                        <th>Рост/снижение</th>
+                        <th>Факт</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+
     items.forEach(item => {
-        const badgeClass = getBadgeClass(item.plan, item.fact);
+        const changeSign = item.planChange > 0 ? '+' : '';
+        const changeClass = item.planChange > 0
+            ? 'plan-change-up'
+            : item.planChange < 0 ? 'plan-change-down' : 'plan-change-zero';
+
         html += `
-            <div class="discrepancy-item" data-object="${escapeHtml(item.name)}">
-                <span class="object-tag${item.is_high ? ' priority-high' : ''}">
-                    ${item.is_high ? '🔴 ' : ''}${escapeHtml(item.name)}
-                </span>
-                <span class="badge ${badgeClass}">${item.plan} / ${item.fact}</span>
-            </div>
+            <tr data-object="${escapeHtml(item.name)}" class="${item.is_high ? 'priority-row' : ''}">
+                <td class="plan-fact-name">${escapeHtml(item.name)}</td>
+                <td>${item.plan}</td>
+                <td class="${changeClass}">${changeSign}${item.planChange}</td>
+                <td>${item.fact}</td>
+            </tr>
         `;
     });
-    
+
+    html += '</tbody></table></div>';
     container.innerHTML = html;
 }
 
