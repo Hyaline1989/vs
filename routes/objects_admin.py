@@ -10,7 +10,7 @@ from database import (
     get_objects_settings_extended,
     update_object_settings_full,
     get_object_by_id, 
-    create_object_extended, 
+    create_object_with_vacancy,
     delete_object,
     get_objects_settings,
     get_global_order, 
@@ -76,7 +76,7 @@ def create_object_api():
     data = request.get_json()
     
     # Валидация обязательных полей
-    required_fields = ['name', 'ageMin', 'ageMax', 'allowedGenders', 'allowedNationalities']
+    required_fields = ['name', 'positionName', 'ageMin', 'ageMax', 'allowedGenders', 'allowedNationalities']
     for field in required_fields:
         if field not in data:
             return jsonify({'error': f'Поле {field} обязательно'}), 400
@@ -100,6 +100,13 @@ def create_object_api():
     allowed_nationalities = data.get('allowedNationalities', [])
     if not isinstance(allowed_nationalities, list) or not allowed_nationalities:
         return jsonify({'error': 'Укажите допустимые гражданства'}), 400
+
+    name = str(data.get('name', '')).strip()
+    position_name = str(data.get('positionName', '')).strip()
+    if not name:
+        return jsonify({'error': 'Название объекта обязательно'}), 400
+    if not position_name:
+        return jsonify({'error': 'Должность обязательна'}), 400
     
     allows_conviction = bool(data.get('allowsConviction', False))
     link = data.get('link', '')
@@ -107,8 +114,9 @@ def create_object_api():
     priority = bool(data.get('priority', False))
     region = data.get('region', '')
     
-    object_id = create_object_extended(
-        name=data['name'],
+    object_id = create_object_with_vacancy(
+        name=name,
+        position_name=position_name,
         age_min=age_min,
         age_max=age_max,
         allowed_genders=allowed_genders,
@@ -120,10 +128,18 @@ def create_object_api():
         region=region
     )
     
+    if object_id == 'duplicate':
+        return jsonify({'error': 'Объект с таким именем уже существует'}), 409
+
     if not object_id:
         return jsonify({'error': 'Ошибка при создании объекта (возможно, такое имя уже существует)'}), 500
     
-    log_user_action(current_user.id, 'create_object', f"Создан объект {data['name']} (ID: {object_id})", request.remote_addr)
+    log_user_action(
+        current_user.id,
+        'create_object',
+        f"Создан объект {name} с должностью {position_name} (ID: {object_id})",
+        request.remote_addr
+    )
     
     return jsonify({'success': True, 'object_id': object_id})
 

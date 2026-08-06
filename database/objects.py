@@ -535,3 +535,98 @@ def get_route_sheet_by_id(sheet_id):
     except Exception as e:
         logger.error(f"Ошибка при получении маршрутного листа ID {sheet_id}: {e}")
         return None
+
+
+def create_object_with_vacancy(name, position_name, age_min, age_max,
+                               allowed_genders, allowed_nationalities,
+                               allows_conviction, link='', visible=True,
+                               priority=False, region=''):
+    """Атомарно создаёт объект настроек, объект подбора и первую должность."""
+    conn = None
+    try:
+        conn = sqlite3.connect(DB_NAME, timeout=30)
+        conn.execute('PRAGMA foreign_keys = ON')
+        cursor = conn.cursor()
+
+        cursor.execute('SELECT id FROM objects_settings WHERE name = ?', (name,))
+        if cursor.fetchone():
+            raise sqlite3.IntegrityError('Объект уже существует в настройках')
+
+        cursor.execute('SELECT MAX(id) FROM objects_settings')
+        max_id = cursor.fetchone()[0]
+        new_id = (max_id or 0) + 1
+
+        genders_str = ','.join(allowed_genders)
+        nationalities_str = ','.join(allowed_nationalities)
+
+        cursor.execute('''
+            INSERT INTO objects_settings
+                (id, name, visible, priority, age_min, age_max,
+                 allowed_genders, allowed_nationalities, allows_conviction,
+                 link, region)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            new_id, name, 1 if visible else 0, 1 if priority else 0,
+            age_min, age_max, genders_str, nationalities_str,
+            1 if allows_conviction else 0, link, region
+        ))
+
+        cursor.execute('SELECT id FROM vacancy_objects WHERE name = ?', (name,))
+        vacancy_row = cursor.fetchone()
+        if vacancy_row:
+            vacancy_object_id = vacancy_row[0]
+        else:
+            cursor.execute('INSERT INTO vacancy_objects (name) VALUES (?)', (name,))
+            vacancy_object_id = cursor.lastrowid
+
+        cursor.execute('''
+            INSERT OR IGNORE INTO vacancy_positions (object_id, name)
+            VALUES (?, ?)
+        ''', (vacancy_object_id, position_name))
+
+        cursor.execute('''
+            INSERT OR IGNORE INTO current_requirements
+                (object_name, position_name, rf_men, rf_women, rf_family,
+                 cis_men, cis_women, cis_family, is_high)
+            VALUES (?, ?, 0, 0, 0, 0, 0, 0, 0)
+        ''', (name, position_name))
+
+        cursor.execute('SELECT object_order FROM global_objects_order WHERE id = 1')
+        order_row = cursor.fetchone()
+        if order_row:
+            try:
+                order = json.loads(order_row[0])
+            except (TypeError, json.JSONDecodeError):
+                order = []
+            if new_id not in order:
+                order.append(new_id)
+                cursor.execute('''
+                    UPDATE global_objects_order
+                    SET object_order = ?, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = 1
+                ''', (json.dumps(order),))
+        else:
+            cursor.execute('''
+                INSERT INTO global_objects_order (id, object_order)
+                VALUES (1, ?)
+            ''', (json.dumps([new_id]),))
+
+        conn.commit()
+        logger.info(
+            "Создан объект %s (ID: %s) и должность %s для подбора",
+            name, new_id, position_name
+        )
+        return new_id
+    except sqlite3.IntegrityError as e:
+        if conn:
+            conn.rollback()
+        logger.warning("Не удалось создать объект %s: %s", name, e)
+        return 'duplicate'
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        logger.error("Ошибка связанного создания объекта %s: %s", name, e, exc_info=True)
+        return None
+    finally:
+        if conn:
+            conn.close()

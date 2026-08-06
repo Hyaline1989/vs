@@ -184,6 +184,13 @@ function openAddObjectModal() {
     document.getElementById('objectModalTitle').textContent = 'Добавить объект';
     document.getElementById('objectForm').reset();
     document.getElementById('objectId').value = '';
+    const positionGroup = document.getElementById('objPositionGroup');
+    const positionInput = document.getElementById('objPosition');
+    if (positionGroup) positionGroup.style.display = 'block';
+    if (positionInput) {
+        positionInput.value = '';
+        positionInput.required = true;
+    }
     
     // Устанавливаем значения по умолчанию
     document.getElementById('objAgeMin').value = '18';
@@ -212,6 +219,13 @@ async function editObject(objectId) {
     document.getElementById('objectModalTitle').textContent = 'Редактировать объект';
     document.getElementById('objectId').value = objectId;
     document.getElementById('objName').value = obj.name || '';
+    const positionGroup = document.getElementById('objPositionGroup');
+    const positionInput = document.getElementById('objPosition');
+    if (positionGroup) positionGroup.style.display = 'none';
+    if (positionInput) {
+        positionInput.value = '';
+        positionInput.required = false;
+    }
     document.getElementById('objAgeMin').value = obj.ageMin || 18;
     document.getElementById('objAgeMax').value = obj.ageMax || 55;
     const allowedGenders = new Set(obj.allowedGenders || []);
@@ -242,8 +256,17 @@ function editObjectPassport(objectId, objectName) {
 
 // ========== СОХРАНЕНИЕ ОБЪЕКТА ==========
 async function saveObject() {
+    const form = document.getElementById('objectForm');
+    const saveButton = form?.querySelector('button[type="submit"]');
+
+    // Prevent duplicate requests while the server is processing the first one.
+    if (form?.dataset.saving === 'true') {
+        return;
+    }
+
     const objectId = document.getElementById('objectId').value;
     const name = document.getElementById('objName').value.trim();
+    const positionName = document.getElementById('objPosition')?.value.trim() || '';
     const ageMin = parseInt(document.getElementById('objAgeMin').value);
     const ageMax = parseInt(document.getElementById('objAgeMax').value);
     const allowedGenders = Array.from(
@@ -259,6 +282,11 @@ async function saveObject() {
     // Валидация
     if (!name) {
         showNotification('❌ Введите название объекта', 'error');
+        return;
+    }
+
+    if (!objectId && !positionName) {
+        showNotification('❌ Введите должность', 'error');
         return;
     }
     
@@ -292,8 +320,15 @@ async function saveObject() {
         visible,
         region
     };
+
+    if (!objectId) {
+        data.positionName = positionName;
+    }
     
     try {
+        if (form) form.dataset.saving = 'true';
+        if (saveButton) saveButton.disabled = true;
+
         let url, method;
         if (objectId) {
             url = `/api/admin/objects/${objectId}`;
@@ -315,10 +350,14 @@ async function saveObject() {
             closeObjectModal();
             loadObjects();
         } else {
+            if (form) delete form.dataset.saving;
+            if (saveButton) saveButton.disabled = false;
             const error = await response.json();
             showNotification('❌ ' + (error.error || 'Ошибка сохранения'), 'error');
         }
     } catch (error) {
+        if (form) delete form.dataset.saving;
+        if (saveButton) saveButton.disabled = false;
         console.error('Ошибка сохранения:', error);
         showNotification('❌ Ошибка сохранения', 'error');
     }
