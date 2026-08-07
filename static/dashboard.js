@@ -270,8 +270,8 @@ function updatePlanFactTable(comparison) {
                 <thead>
                     <tr>
                         <th>Название объекта</th>
+                        <th>Дельта от вчера</th>
                         <th>План</th>
-                        <th>Рост/снижение</th>
                         <th>Факт</th>
                     </tr>
                 </thead>
@@ -287,14 +287,37 @@ function updatePlanFactTable(comparison) {
         html += `
             <tr data-object="${escapeHtml(item.name)}" class="${item.is_high ? 'priority-row' : ''}">
                 <td class="plan-fact-name">${escapeHtml(item.name)}</td>
-                <td>${item.plan}</td>
                 <td class="${changeClass}">${changeSign}${item.planChange}</td>
+                <td>${item.plan}</td>
                 <td>${item.fact}</td>
             </tr>
         `;
     });
 
-    html += '</tbody></table></div>';
+    const totals = items.reduce((result, item) => {
+        result.planChange += item.planChange;
+        result.plan += item.plan;
+        result.fact += item.fact;
+        return result;
+    }, { planChange: 0, plan: 0, fact: 0 });
+    const totalChangeSign = totals.planChange > 0 ? '+' : '';
+    const totalChangeClass = totals.planChange > 0
+        ? 'plan-change-up'
+        : totals.planChange < 0 ? 'plan-change-down' : 'plan-change-zero';
+
+    html += `
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td>Итого</td>
+                        <td class="${totalChangeClass}">${totalChangeSign}${totals.planChange}</td>
+                        <td>${totals.plan}</td>
+                        <td>${totals.fact}</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    `;
     container.innerHTML = html;
 }
 
