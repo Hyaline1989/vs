@@ -31,6 +31,7 @@ def init_db():
                 allowed_genders TEXT DEFAULT 'мужчина,женщина',
                 allowed_nationalities TEXT DEFAULT 'РФ',
                 allows_conviction INTEGER DEFAULT 0,
+                strict_labor_code INTEGER DEFAULT 0,
                 link TEXT,
                 region TEXT DEFAULT '',
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -40,6 +41,14 @@ def init_db():
         # Добавляем колонку region для существующих таблиц
         try:
             cursor.execute('ALTER TABLE objects_settings ADD COLUMN region TEXT DEFAULT ""')
+        except sqlite3.OperationalError:
+            # Колонка уже существует
+            pass
+
+        # Признак обязательного оформления строго по ТК РФ.
+        # Для существующих объектов значение остаётся выключенным.
+        try:
+            cursor.execute('ALTER TABLE objects_settings ADD COLUMN strict_labor_code INTEGER DEFAULT 0')
         except sqlite3.OperationalError:
             # Колонка уже существует
             pass

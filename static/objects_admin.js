@@ -202,6 +202,7 @@ function openAddObjectModal() {
         checkbox.checked = checkbox.value === 'РФ';
     });
     document.getElementById('objAllowsConviction').checked = false;
+    document.getElementById('objStrictLaborCode').checked = false;
     document.getElementById('objVisible').checked = true;
     document.getElementById('objRegion').value = '';
     
@@ -237,6 +238,7 @@ async function editObject(objectId) {
         checkbox.checked = allowedNationalities.has(checkbox.value);
     });
     document.getElementById('objAllowsConviction').checked = obj.allowsConviction || false;
+    document.getElementById('objStrictLaborCode').checked = obj.strictLaborCode || false;
     document.getElementById('objVisible').checked = obj.visible !== false;
     document.getElementById('objRegion').value = obj.region || '';
     
@@ -276,6 +278,7 @@ async function saveObject() {
         document.querySelectorAll('input[name="objAllowedNationality"]:checked')
     ).map(checkbox => checkbox.value);
     const allowsConviction = document.getElementById('objAllowsConviction').checked;
+    const strictLaborCode = document.getElementById('objStrictLaborCode').checked;
     const visible = document.getElementById('objVisible').checked;
     const region = document.getElementById('objRegion').value.trim();
     
@@ -317,6 +320,7 @@ async function saveObject() {
         allowedGenders,
         allowedNationalities,
         allowsConviction,
+        strictLaborCode,
         visible,
         region
     };

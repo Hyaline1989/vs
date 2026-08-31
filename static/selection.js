@@ -268,6 +268,7 @@ function displayResults(objectsToDisplay) {
                 <div class="flip-card-front">
                     ${dragHandle}
                     <h3>${orderNumber}<a href="#" onclick="event.preventDefault(); viewPassport(${obj.id}, '${escapeHtml(obj.name)}')" style="cursor: pointer;">${escapeHtml(obj.name)}</a>${obj.priority ? ' 🔥' : ''}</h3>
+                    ${obj.strictLaborCode ? '<div class="strict-labor-code-badge"><i class="fas fa-file-contract"></i> Трудоустройство строго по ТК</div>' : ''}
                     <div class="vacancy-stats">
                         <div class="vacancy-stat"><div class="vacancy-value vacancy-men">${totalMen}</div><div class="vacancy-label">Мужчины</div></div>
                         <div class="vacancy-stat"><div class="vacancy-value vacancy-women">${totalWomen}</div><div class="vacancy-label">Женщины</div></div>

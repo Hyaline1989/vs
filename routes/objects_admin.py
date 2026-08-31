@@ -109,6 +109,7 @@ def create_object_api():
         return jsonify({'error': 'Должность обязательна'}), 400
     
     allows_conviction = bool(data.get('allowsConviction', False))
+    strict_labor_code = bool(data.get('strictLaborCode', False))
     link = data.get('link', '')
     visible = bool(data.get('visible', True))
     priority = bool(data.get('priority', False))
@@ -125,7 +126,8 @@ def create_object_api():
         link=link,
         visible=visible,
         priority=priority,
-        region=region
+        region=region,
+        strict_labor_code=strict_labor_code
     )
     
     if object_id == 'duplicate':
@@ -188,6 +190,9 @@ def update_object_api(object_id):
     
     if 'allowsConviction' in data:
         updates['allows_conviction'] = bool(data['allowsConviction'])
+
+    if 'strictLaborCode' in data:
+        updates['strict_labor_code'] = bool(data['strictLaborCode'])
     
     if 'link' in data:
         updates['link'] = data['link']

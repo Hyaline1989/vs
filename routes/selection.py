@@ -86,6 +86,7 @@ def selection_settings():
                 'allowedGenders': db_obj.get('allowedGenders', ['мужчина', 'женщина']),
                 'allowedNationalities': db_obj.get('allowedNationalities', ['РФ']),
                 'allowsConviction': db_obj.get('allowsConviction', False),
+                'strictLaborCode': db_obj.get('strictLaborCode', False),
                 'link': db_obj.get('link', ''),
                 'visible': setting['visible'] if setting else True,
                 'priority': priority_from_req,

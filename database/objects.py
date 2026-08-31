@@ -30,7 +30,8 @@ def get_objects_settings_extended():
         cursor = conn.cursor()
         cursor.execute('''
             SELECT id, name, visible, priority, age_min, age_max, 
-                   allowed_genders, allowed_nationalities, allows_conviction, link, region
+                   allowed_genders, allowed_nationalities, allows_conviction,
+                   strict_labor_code, link, region
             FROM objects_settings ORDER BY id
         ''')
         rows = cursor.fetchall()
@@ -51,8 +52,9 @@ def get_objects_settings_extended():
                 'allowedGenders': [g.strip() for g in genders_str.split(',') if g.strip()],
                 'allowedNationalities': [n.strip() for n in nationalities_str.split(',') if n.strip()],
                 'allowsConviction': bool(row[8]),
-                'link': row[9] or '',
-                'region': row[10] or ''
+                'strictLaborCode': bool(row[9]),
+                'link': row[10] or '',
+                'region': row[11] or ''
             })
         return objects
     except Exception as e:
@@ -67,7 +69,8 @@ def get_object_by_id(object_id):
         cursor = conn.cursor()
         cursor.execute('''
             SELECT id, name, visible, priority, age_min, age_max, 
-                   allowed_genders, allowed_nationalities, allows_conviction, link, region
+                   allowed_genders, allowed_nationalities, allows_conviction,
+                   strict_labor_code, link, region
             FROM objects_settings WHERE id = ?
         ''', (object_id,))
         row = cursor.fetchone()
@@ -87,8 +90,9 @@ def get_object_by_id(object_id):
                 'allowedGenders': [g.strip() for g in genders_str.split(',') if g.strip()],
                 'allowedNationalities': [n.strip() for n in nationalities_str.split(',') if n.strip()],
                 'allowsConviction': bool(row[8]),
-                'link': row[9] or '',
-                'region': row[10] or ''
+                'strictLaborCode': bool(row[9]),
+                'link': row[10] or '',
+                'region': row[11] or ''
             }
         return None
     except Exception as e:
@@ -132,6 +136,7 @@ def update_object_settings_full(object_id, updates):
             'allowed_genders': 'allowed_genders',
             'allowed_nationalities': 'allowed_nationalities',
             'allows_conviction': 'allows_conviction',
+            'strict_labor_code': 'strict_labor_code',
             'link': 'link',
             'region': 'region'
         }
@@ -140,7 +145,7 @@ def update_object_settings_full(object_id, updates):
             if key in updates:
                 fields.append(f"{db_field} = ?")
                 value = updates[key]
-                if key in ['visible', 'priority', 'allows_conviction']:
+                if key in ['visible', 'priority', 'allows_conviction', 'strict_labor_code']:
                     value = 1 if value else 0
                 elif key in ['allowed_genders', 'allowed_nationalities']:
                     value = ','.join(value) if isinstance(value, list) else value
@@ -540,7 +545,7 @@ def get_route_sheet_by_id(sheet_id):
 def create_object_with_vacancy(name, position_name, age_min, age_max,
                                allowed_genders, allowed_nationalities,
                                allows_conviction, link='', visible=True,
-                               priority=False, region=''):
+                               priority=False, region='', strict_labor_code=False):
     """Атомарно создаёт объект настроек, объект подбора и первую должность."""
     conn = None
     try:
@@ -563,12 +568,13 @@ def create_object_with_vacancy(name, position_name, age_min, age_max,
             INSERT INTO objects_settings
                 (id, name, visible, priority, age_min, age_max,
                  allowed_genders, allowed_nationalities, allows_conviction,
-                 link, region)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 strict_labor_code, link, region)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             new_id, name, 1 if visible else 0, 1 if priority else 0,
             age_min, age_max, genders_str, nationalities_str,
-            1 if allows_conviction else 0, link, region
+            1 if allows_conviction else 0,
+            1 if strict_labor_code else 0, link, region
         ))
 
         cursor.execute('SELECT id FROM vacancy_objects WHERE name = ?', (name,))
