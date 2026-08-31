@@ -445,6 +445,13 @@ def fix_day():
             if obj_data.get('is_high', False):
                 priorities[obj_name] = True
                 logger.info(f"🔴 Приоритетный объект: {obj_name}")
+
+        # Названия в текущей потребности и в исторических данных могут немного
+        # отличаться регистром, пробелами или служебными частями названия.
+        priority_names_normalized = {
+            comparer.normalizer.normalize(obj_name)
+            for obj_name in priorities
+        }
         
         # 2. ОБНОВЛЯЕМ ПРИОРИТЕТЫ В vacancy_requirements ДЛЯ ДАШБОРДА
         #    Это нужно, чтобы в Дашборде (план/факт) отображался приоритет
@@ -452,56 +459,29 @@ def fix_day():
         cursor = conn.cursor()
         
         try:
-            # Для каждого приоритетного объекта обновляем is_high в vacancy_requirements
-            for obj_name, is_high in priorities.items():
-                if is_high:
-                    # Находим все position_id для этого объекта
-                    cursor.execute('''
-                        SELECT vp.id FROM vacancy_positions vp
-                        JOIN vacancy_objects vo ON vo.id = vp.object_id
-                        WHERE vo.name = ?
-                    ''', (obj_name,))
-                    position_ids = [row[0] for row in cursor.fetchall()]
-                    
-                    if position_ids:
-                        # Обновляем is_high для всех позиций этого объекта на указанную дату
-                        placeholders = ','.join(['?'] * len(position_ids))
-                        cursor.execute(f'''
-                            UPDATE vacancy_requirements 
-                            SET is_high = 1, updated_at = CURRENT_TIMESTAMP
-                            WHERE position_id IN ({placeholders}) AND date = ?
-                        ''', position_ids + [date_key])
-                        logger.info(f"✅ Обновлён приоритет для объекта {obj_name} в vacancy_requirements на дату {date_key}")
-            
-            # Также сбрасываем приоритеты для объектов, у которых нет приоритета в current_requirements
-            # Находим все объекты, у которых есть записи в vacancy_requirements за эту дату
+            # При каждом нажатии заново записываем состояние ВСЕХ объектов дня.
+            # Это одновременно устанавливает новые приоритеты и снимает старые.
             cursor.execute('''
-                SELECT DISTINCT vo.name 
+                SELECT vr.id, vo.name
                 FROM vacancy_requirements vr
                 JOIN vacancy_positions vp ON vp.id = vr.position_id
                 JOIN vacancy_objects vo ON vo.id = vp.object_id
                 WHERE vr.date = ?
             ''', (date_key,))
-            all_objects_in_db = [row[0] for row in cursor.fetchall()]
-            
-            for obj_name in all_objects_in_db:
-                if obj_name not in priorities or not priorities[obj_name]:
-                    # Сбрасываем приоритет для этого объекта
-                    cursor.execute('''
-                        SELECT vp.id FROM vacancy_positions vp
-                        JOIN vacancy_objects vo ON vo.id = vp.object_id
-                        WHERE vo.name = ?
-                    ''', (obj_name,))
-                    position_ids = [row[0] for row in cursor.fetchall()]
-                    
-                    if position_ids:
-                        placeholders = ','.join(['?'] * len(position_ids))
-                        cursor.execute(f'''
-                            UPDATE vacancy_requirements 
-                            SET is_high = 0, updated_at = CURRENT_TIMESTAMP
-                            WHERE position_id IN ({placeholders}) AND date = ?
-                        ''', position_ids + [date_key])
-                        logger.info(f"✅ Сброшен приоритет для объекта {obj_name} в vacancy_requirements на дату {date_key}")
+            requirement_rows = cursor.fetchall()
+
+            priority_updates = []
+            for requirement_id, obj_name in requirement_rows:
+                normalized_name = comparer.normalizer.normalize(obj_name)
+                is_high = 1 if normalized_name in priority_names_normalized else 0
+                priority_updates.append((is_high, requirement_id))
+
+            if priority_updates:
+                cursor.executemany('''
+                    UPDATE vacancy_requirements
+                    SET is_high = ?, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                ''', priority_updates)
             
             conn.commit()
             logger.info(f"✅ Приоритеты обновлены в vacancy_requirements для даты {date_key}")
@@ -530,7 +510,7 @@ def fix_day():
             for obj_name, count in office_data.get('objects', {}).items():
                 plan_info = plans.get(obj_name, {})
                 # Проверяем, есть ли у объекта приоритет
-                is_high = priorities.get(obj_name, False)
+                is_high = comparer.normalizer.normalize(obj_name) in priority_names_normalized
                 
                 snapshots.append({
                     'object_name': obj_name,
@@ -544,7 +524,7 @@ def fix_day():
         for obj_name, plan_info in plans.items():
             already_added = any(s['object_name'] == obj_name for s in snapshots)
             if not already_added:
-                is_high = priorities.get(obj_name, False)
+                is_high = comparer.normalizer.normalize(obj_name) in priority_names_normalized
                 snapshots.append({
                     'object_name': obj_name,
                     'office_name': 'complect',

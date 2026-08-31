@@ -56,6 +56,10 @@ class DataComparer:
             # Нормализуем названия для сравнения
             req_normalized = self.normalizer.normalize_dict(requirements)
             deals_normalized = self.normalizer.normalize_dict(deals)
+            priorities_normalized = {
+                self.normalizer.normalize(name)
+                for name in priorities
+            }
             
             logger.info(f"Нормализованные План (БД): {list(req_normalized.keys())[:10]}")
             logger.info(f"Нормализованные Bitrix: {list(deals_normalized.keys())[:10]}")
@@ -87,7 +91,7 @@ class DataComparer:
                         'plan': plan,
                         'fact': fact,
                         'delta': fact - plan,
-                        'is_high': priorities.get(original, False)
+                        'is_high': norm_name in priorities_normalized
                     }
                     logger.info(f"Совпадение: '{original}' план={plan} факт={fact}")
                     del deals_remaining[norm_name]
@@ -95,7 +99,7 @@ class DataComparer:
                     original = original_names.get(norm_name, norm_name)
                     only_plan[original] = {
                         'count': plan,
-                        'is_high': priorities.get(original, False)
+                        'is_high': norm_name in priorities_normalized
                     }
                     logger.info(f"Только в плане: '{original}' план={plan}")
             

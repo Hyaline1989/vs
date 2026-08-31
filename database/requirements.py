@@ -39,6 +39,13 @@ def get_current_requirements():
                     'positions': [],
                     'is_high': bool(row['is_high'])
                 }
+
+            # У объекта может быть несколько должностей. Приоритет относится
+            # ко всему объекту, поэтому учитываем флаг из каждой строки, а не
+            # только из первой должности по алфавиту.
+            result[obj_name]['is_high'] = (
+                result[obj_name]['is_high'] or bool(row['is_high'])
+            )
             
             pos_data = {
                 'name': pos_name,
