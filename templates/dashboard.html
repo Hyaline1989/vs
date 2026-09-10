@@ -97,6 +97,25 @@
             flex-wrap: wrap;
             align-items: flex-end;
         }
+
+        /* Рамка отчёта остаётся широкой, а названия и цифры собраны ближе. */
+        #fsObjectContent .office-header,
+        #fsStaffContent .office-header {
+            width: 100%;
+            max-width: 700px;
+        }
+
+        #fsObjectSummary .summary-row,
+        #fsStaffSummary .summary-row {
+            width: 100%;
+            max-width: 700px;
+        }
+
+        #fsObjectContent .office-objects,
+        #fsStaffContent .office-objects {
+            width: calc(100% - 32px);
+            max-width: 668px;
+        }
         
         /* Стили для внутренних вкладок дашборда */
         .dashboard-inner-tabs {
@@ -189,6 +208,65 @@
         }
 
         @media (max-width: 768px) {
+            #planFactContainer,
+            .dashboard-header,
+            .two-panel,
+            .panel-card {
+                width: 100%;
+                min-width: 0;
+                max-width: 100%;
+            }
+
+            .plan-fact-table-wrap {
+                width: 100%;
+                max-width: 100%;
+                overflow-x: visible;
+            }
+
+            .plan-fact-table {
+                width: 100%;
+                table-layout: fixed;
+                font-size: 0.72rem;
+            }
+
+            .plan-fact-table th,
+            .plan-fact-table td {
+                padding: 6px 3px;
+                white-space: normal;
+                overflow-wrap: anywhere;
+                word-break: normal;
+            }
+
+            .plan-fact-table th:nth-child(1),
+            .plan-fact-table td:nth-child(1) {
+                width: 43%;
+            }
+
+            .plan-fact-table th:nth-child(2),
+            .plan-fact-table td:nth-child(2) {
+                width: 23%;
+            }
+
+            .plan-fact-table th:nth-child(3),
+            .plan-fact-table td:nth-child(3),
+            .plan-fact-table th:nth-child(4),
+            .plan-fact-table td:nth-child(4) {
+                width: 17%;
+            }
+
+            .office-item,
+            .office-header,
+            .office-objects,
+            .object-row {
+                min-width: 0;
+                max-width: 100%;
+            }
+
+            .object-row .object-name {
+                min-width: 0;
+                overflow-wrap: anywhere;
+            }
+
             .dashboard-inner-tab {
                 flex: 1 1 100%;
                 text-align: center;
