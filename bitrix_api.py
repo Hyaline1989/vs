@@ -867,13 +867,14 @@ class ShiftReportAPI:
         no_agent = [d for d in worked if not d.get(FIELD_AGENT_FIO)]
         logger.info(f"📊 [1 смена] После фильтра 'без агента': {len(no_agent)}")
         
-        # Исключаем операторов (всех, чьё имя начинается с "Опер")
+        # Исключаем операторов и Спутник.
         clean = [
             d for d in no_agent
             if not is_operator(d.get(FIELD_CC_OPERATOR, ''))
             and not is_operator(d.get(FIELD_CC_OPERATOR_REPORT, ''))
+            and not (d.get(FIELD_CC_OPERATOR_REPORT, '') or '').strip().casefold().startswith('спутник')
         ]
-        logger.info(f"📊 [1 смена] После фильтра 'не оператор': {len(clean)}")
+        logger.info(f"📊 [1 смена] После фильтра 'не оператор и не Спутник': {len(clean)}")
         
         # ДОПОЛНИТЕЛЬНАЯ ОТЛАДКА: показываем первые 5 сделок для проверки
         if clean:
@@ -977,7 +978,6 @@ class ShiftReportAPI:
             'Поток': [],
             'Комплект': [],
             'Сервис': [],
-            'Спутник': [],
             'Бишкек': []
         }
         exclude = {SOURCE_AGENT}
@@ -990,8 +990,6 @@ class ShiftReportAPI:
             staff = (d.get(FIELD_CC_OPERATOR_REPORT) or '').strip()
             if staff.casefold().startswith('сервис'):
                 categories['Сервис'].append(d)
-            elif staff.casefold().startswith('спутник'):
-                categories['Спутник'].append(d)
             elif src == SOURCE_POTOK:
                 categories['Поток'].append(d)
             elif src == SOURCE_BISHKEK:

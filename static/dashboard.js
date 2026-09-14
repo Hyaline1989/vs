@@ -815,7 +815,7 @@ function renderFirstShiftByStaff(data, totals) {
     const container = document.getElementById('fsStaffContent');
     if (!container) return;
     
-    const categories = ['Поток', 'Комплект', 'Сервис', 'Спутник', 'Бишкек'];
+    const categories = ['Поток', 'Комплект', 'Сервис', 'Бишкек'];
     let html = '';
     
     for (const cat of categories) {

@@ -912,7 +912,7 @@ def get_first_shift_by_staff():
         
         # Подсчёт итогов
         totals = {}
-        for cat in ['Поток', 'Комплект', 'Сервис', 'Спутник', 'Бишкек']:
+        for cat in ['Поток', 'Комплект', 'Сервис', 'Бишкек']:
             cat_data = data.get(cat, {})
             totals[cat] = sum(cat_data.values()) if cat_data else 0
         
