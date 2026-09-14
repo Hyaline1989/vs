@@ -229,15 +229,36 @@ def dashboard():
         # Загружаем сделки за день одним проходом. Раньше статистика офисов и
         # сравнение план/факт повторно запрашивали одни и те же данные из Bitrix,
         # из-за чего обработчик мог не уложиться в таймаут веб-сервера.
-        cache_key = f"dashboard_facts_{date_str}"
-        facts_by_date = get_cached_data(
+        cache_key = f"dashboard_data_{date_str}"
+        dashboard_data = get_cached_data(
             cache_key,
             bitrix_api.get_report_facts_range,
             date_str,
-            date_str
+            date_str,
+            True
         )
+        facts_by_date = dashboard_data.get('facts', {})
+        staff_by_date = dashboard_data.get('staff', {})
         facts_for_date = facts_by_date.get(date_str, {})
+        staff_for_date = staff_by_date.get(date_str, {})
         offices_stats = convert_report_facts_to_offices(facts_for_date)
+
+        # Переносим направления сотрудников «Сервис» из исходных офисов.
+        # Исходный факт сохраняется для расчётов плана/факта и выгрузок.
+        service_office = {'count': 0, 'objects': {}}
+        for object_name, source_counts in dashboard_data.get('service', {}).get(date_str, {}).items():
+            for source_key, count in source_counts.items():
+                office_key = 'gorkiy52' if source_key == 'gorkiy' else source_key
+                source_office = offices_stats[office_key]
+                source_office['count'] -= count
+                remaining = source_office['objects'].get(object_name, 0) - count
+                if remaining > 0:
+                    source_office['objects'][object_name] = remaining
+                else:
+                    source_office['objects'].pop(object_name, None)
+                service_office['count'] += count
+                service_office['objects'][object_name] = service_office['objects'].get(object_name, 0) + count
+        offices_stats['service'] = service_office
 
         total_facts = {
             object_name: sum(office_counts.values())
@@ -282,6 +303,7 @@ def dashboard():
         response = {
             'date': target_date.strftime('%d.%m.%Y'),
             'offices': offices_stats,
+            'staff_by_object': staff_for_date,
             'comparison': {
                 'only_plan': comparison.get('only_plan', {}),
                 'only_fact': comparison.get('only_fact', {}),

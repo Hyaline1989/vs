@@ -98,6 +98,41 @@
             align-items: flex-end;
         }
 
+        .directions-view-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 22px;
+            flex-wrap: wrap;
+        }
+
+        .directions-view-header .panel-title {
+            margin-bottom: 0;
+        }
+
+        .directions-view-toggle {
+            display: inline-flex;
+            padding: 3px;
+            border-radius: 20px;
+            background: rgba(164, 44, 48, 0.1);
+        }
+
+        .directions-view-btn {
+            border: none;
+            border-radius: 17px;
+            padding: 6px 12px;
+            background: transparent;
+            color: var(--primary-dark);
+            font-weight: 650;
+            cursor: pointer;
+        }
+
+        .directions-view-btn.active {
+            background: var(--primary);
+            color: white;
+        }
+
         /* Рамка отчёта остаётся широкой, а названия и цифры собраны ближе. */
         #fsObjectContent .office-header,
         #fsStaffContent .office-header {
@@ -208,6 +243,18 @@
         }
 
         @media (max-width: 768px) {
+            .directions-view-header {
+                align-items: flex-start;
+            }
+
+            .directions-view-toggle {
+                width: 100%;
+            }
+
+            .directions-view-btn {
+                flex: 1;
+            }
+
             #planFactContainer,
             .dashboard-header,
             .two-panel,
@@ -386,11 +433,20 @@
 
             <div class="two-panel">
                 <div class="panel-card">
-                    <h2 class="panel-title">
-                        Офисы
-                        <span>направления за сегодня</span>
-                    </h2>
+                    <div class="directions-view-header">
+                        <h2 class="panel-title">
+                            Направления
+                            <span>за выбранную дату</span>
+                        </h2>
+                        <div class="directions-view-toggle" role="group" aria-label="Группировка направлений">
+                            <button type="button" class="directions-view-btn active" data-directions-view="offices" onclick="switchDirectionsView('offices')">Офисы</button>
+                            <button type="button" class="directions-view-btn" data-directions-view="staff" onclick="switchDirectionsView('staff')">Сотрудники</button>
+                        </div>
+                    </div>
                     <div class="office-list" id="offices-container">
+                        <div class="loading">Загрузка данных...</div>
+                    </div>
+                    <div class="office-list" id="staff-directions-container" style="display: none;">
                         <div class="loading">Загрузка данных...</div>
                     </div>
                     <div class="no-data-image" id="noDataImage" style="display: none;">

@@ -140,7 +140,7 @@ class BitrixAPI:
         
         return result
     
-    def get_report_facts_range(self, start_date, end_date):
+    def get_report_facts_range(self, start_date, end_date, include_staff=False):
         """
         Получает факт направлений за период одним проходом по Bitrix.
 
@@ -172,7 +172,7 @@ class BitrixAPI:
         })
 
         if not deals:
-            return {}
+            return {'facts': {}, 'staff': {}} if include_staff else {}
 
         filtered_deals = [
             deal for deal in deals
@@ -187,6 +187,8 @@ class BitrixAPI:
 
         companies_info = self._get_companies_info(company_ids)
         facts_by_date = {}
+        staff_by_date = {}
+        service_by_date = {}
 
         for deal in filtered_deals:
             date_key = self._extract_date_key(deal.get(FIELD_DATE_DIRECTED))
@@ -218,11 +220,28 @@ class BitrixAPI:
 
             facts_by_date[date_key][object_name][office_key] += 1
 
+            staff_name = (deal.get(FIELD_CC_OPERATOR_REPORT) or '').strip()
+            if staff_name.casefold().startswith('сервис'):
+                service_counts = service_by_date.setdefault(date_key, {}).setdefault(object_name, {})
+                service_counts[office_key] = service_counts.get(office_key, 0) + 1
+            if staff_name and not is_operator(staff_name):
+                staff_by_date.setdefault(date_key, {})
+                staff_by_date[date_key].setdefault(object_name, {})
+                staff_by_date[date_key][object_name][staff_name] = (
+                    staff_by_date[date_key][object_name].get(staff_name, 0) + 1
+                )
+
         logger.info(
             "Факт для отчёта сгруппирован: %s дат, %s сделок",
             len(facts_by_date),
             len(filtered_deals)
         )
+        if include_staff:
+            return {
+                'facts': facts_by_date,
+                'staff': staff_by_date,
+                'service': service_by_date
+            }
         return facts_by_date
 
     def _format_date_param(self, value):
@@ -261,7 +280,10 @@ class BitrixAPI:
             method = 'crm.deal.list'
             params = {
                 'filter': filter_params,
-                'select': ['ID', 'TITLE', FIELD_DATE_DIRECTED, FIELD_COMPANY, 'SOURCE_ID'],
+                'select': [
+                    'ID', 'TITLE', FIELD_DATE_DIRECTED, FIELD_COMPANY,
+                    'SOURCE_ID', FIELD_CC_OPERATOR_REPORT
+                ],
                 'start': start
             }
             

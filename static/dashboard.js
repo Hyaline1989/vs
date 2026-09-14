@@ -3,10 +3,12 @@
 // ========== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ==========
 let currentDashboardData = {
     offices: null,
+    staffByObject: null,
     comparison: null,
     summary: null
 };
 let isLoading = false;
+let currentDirectionsView = 'offices';
 
 // ========== ИНКРЕМЕНТНАЯ ЗАГРУЗКА ДАШБОРДА ==========
 async function loadDashboardForDate(dateString) {
@@ -42,6 +44,13 @@ async function loadDashboardForDate(dateString) {
             updateOffices(data.offices, getPriorityObjectNames(data.comparison));
             currentDashboardData.offices = data.offices;
         }
+
+        if (Object.prototype.hasOwnProperty.call(data, 'staff_by_object')) {
+            updateStaffDirections(data.staff_by_object || {}, getPriorityObjectNames(data.comparison));
+            currentDashboardData.staffByObject = data.staff_by_object || {};
+        }
+
+        switchDirectionsView(currentDirectionsView);
         
         if (data.comparison) {
             updatePlanFactTable(data.comparison);
@@ -110,7 +119,8 @@ function updateOffices(offices, priorityNames = new Set()) {
         { key: 'agent', name: 'Агент' },
         { key: 'bishkek', name: 'Бишкек' },
         { key: 'complect', name: 'Комплект' },
-        { key: 'potok', name: 'Поток' }
+        { key: 'potok', name: 'Поток' },
+        { key: 'service', name: 'Сервис' }
     ];
     
     let hasData = false;
@@ -144,26 +154,16 @@ function updateOffices(offices, priorityNames = new Set()) {
 
 function updateOfficeContent(officeElement, name, data, priorityNames = new Set()) {
     const safeName = escapeHtml(name);
-    const currentHeader = officeElement.querySelector('.office-header');
     
     if (data.count === 0) {
-        if (currentHeader) {
-            const countSpan = currentHeader.querySelector('.office-count');
-            if (countSpan && countSpan.textContent !== '0') {
-                countSpan.textContent = '0';
-            }
-        }
-        const existingEmpty = officeElement.querySelector('.empty-objects');
-        if (!existingEmpty && !officeElement.querySelector('.office-objects')) {
-            officeElement.innerHTML = `
-                <div class="office-header">
-                    <span class="toggle">▼</span>
-                    <span class="office-name">${safeName}</span>
-                    <span class="office-count">0</span>
-                </div>
-                <div class="empty-objects">✘ На сегодня нет сделок</div>
-            `;
-        }
+        officeElement.innerHTML = `
+            <div class="office-header">
+                <span class="toggle">▼</span>
+                <span class="office-name">${safeName}</span>
+                <span class="office-count">0</span>
+            </div>
+            <div class="empty-objects">Нет направлений за выбранную дату</div>
+        `;
         return;
     }
     
@@ -319,6 +319,99 @@ function updatePlanFactTable(comparison) {
         </div>
     `;
     container.innerHTML = html;
+}
+
+function switchDirectionsView(view) {
+    currentDirectionsView = view === 'staff' ? 'staff' : 'offices';
+
+    const officesContainer = document.getElementById('offices-container');
+    const staffContainer = document.getElementById('staff-directions-container');
+    const noDataImage = document.getElementById('noDataImage');
+
+    if (officesContainer) {
+        officesContainer.style.display = currentDirectionsView === 'offices' ? 'flex' : 'none';
+    }
+    if (staffContainer) {
+        staffContainer.style.display = currentDirectionsView === 'staff' ? 'flex' : 'none';
+    }
+
+    document.querySelectorAll('.directions-view-btn').forEach(button => {
+        button.classList.toggle(
+            'active',
+            button.dataset.directionsView === currentDirectionsView
+        );
+    });
+
+    if (noDataImage) {
+        const hasOfficeData = Object.values(currentDashboardData.offices || {})
+            .some(office => (office?.count || 0) > 0);
+        noDataImage.style.display = (
+            currentDirectionsView === 'offices' && !hasOfficeData
+        ) ? 'block' : 'none';
+    }
+}
+
+function updateStaffDirections(staffByObject, priorityNames = new Set()) {
+    const container = document.getElementById('staff-directions-container');
+    if (!container) return;
+
+    const objectsByStaff = new Map();
+    for (const [objectName, staff] of Object.entries(staffByObject || {})) {
+        for (const [staffName, count] of Object.entries(staff || {})) {
+            if (staffName.trim().toLocaleLowerCase('ru').startsWith('спутник')) {
+                continue;
+            }
+            if (!objectsByStaff.has(staffName)) {
+                objectsByStaff.set(staffName, new Map());
+            }
+            const objects = objectsByStaff.get(staffName);
+            objects.set(objectName, (objects.get(objectName) || 0) + count);
+        }
+    }
+
+    const employees = Array.from(objectsByStaff, ([staffName, objects]) => ({
+            staffName,
+            objects: Array.from(objects).sort(([nameA], [nameB]) => (
+                compareObjectNames(nameA, nameB)
+            ))
+        }))
+        .sort((a, b) => compareObjectNames(a.staffName, b.staffName));
+
+    if (employees.length === 0) {
+        container.innerHTML = '<div class="empty-state">Нет направлений с указанным сотрудником</div>';
+        return;
+    }
+
+    container.innerHTML = employees.map(item => {
+        const total = item.objects.reduce((sum, [, count]) => sum + count, 0);
+        const objectRows = item.objects.map(([objectName, count]) => `
+            <div class="object-row">
+                <span class="object-name${priorityNames.has(objectName) ? ' priority-high' : ''}">${priorityNames.has(objectName) ? '🔴 ' : ''}${escapeHtml(objectName)}</span>
+                <span class="object-value">${count}</span>
+            </div>
+        `).join('');
+
+        return `
+            <div class="office-item">
+                <div class="office-header">
+                    <span class="toggle">▼</span>
+                    <span class="office-name"><i class="fas fa-user"></i> ${escapeHtml(item.staffName)}</span>
+                    <span class="office-count">${total}</span>
+                </div>
+                <div class="office-objects">${objectRows}</div>
+            </div>
+        `;
+    }).join('');
+
+    container.querySelectorAll('.office-header').forEach(header => {
+        header.addEventListener('click', function() {
+            const rows = this.nextElementSibling;
+            const toggle = this.querySelector('.toggle');
+            const isCollapsed = rows.style.display === 'none';
+            rows.style.display = isCollapsed ? 'flex' : 'none';
+            toggle.textContent = isCollapsed ? '▼' : '▶';
+        });
+    });
 }
 
 function updateSummary(summary) {
