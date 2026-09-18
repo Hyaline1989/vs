@@ -2,6 +2,8 @@
 # -*- coding: utf-8 -*-
 import csv
 import io
+import os
+import re
 from collections import defaultdict
 from datetime import datetime
 
@@ -9,6 +11,13 @@ from PIL import Image, ImageDraw, ImageFont
 
 SHORT_CALL_SECONDS = 15
 ANALYTICS_EXCLUDED_NAME_PARTS = ['Без менеджера', 'Тарасов Максим']
+EXCLUDED_MANAGER_PREFIXES = ['сервис']
+
+
+def is_excluded_manager(manager_name):
+    manager_name = (manager_name or '').strip().casefold()
+    manager_name = re.sub(r'^\([^)]*\)\s*', '', manager_name)
+    return any(manager_name.startswith(prefix) for prefix in EXCLUDED_MANAGER_PREFIXES)
 
 
 def secfmt(seconds):
@@ -21,6 +30,10 @@ def secfmt(seconds):
 
 def pct(value):
     return f'{value:.0%}'
+
+
+def decimal_comma(value):
+    return f'{value:.1f}'.replace('.', ',')
 
 
 def parse_dt(value):
@@ -67,7 +80,11 @@ def calculate_efficiency_rating(rows):
     )
 
     for row in rows:
-        key = (row.get('system') or '', row.get('employee_name') or 'Без менеджера')
+        manager_name = row.get('employee_name') or 'Без менеджера'
+        if is_excluded_manager(manager_name):
+            continue
+
+        key = (row.get('system') or '', manager_name)
         item = stats[key]
         direction = row.get('direction')
         duration = int(row.get('clean_talk_duration') or 0)
@@ -149,18 +166,38 @@ def save_rating_csv(rating):
         writer.writerow([
             item['system'], item['manager'], item['in_accepted'], item['out_success'],
             item['out_failed'], item['line_time'], item['avg_time'], item['break_time'],
-            item['out_success_rate_text'], item['short_share_text'], item['index_text']
+            item['out_success_rate_text'], item['short_share_text'], decimal_comma(item['index'])
         ])
     return '\ufeff' + output.getvalue()
 
 
+def find_font(*filenames):
+    font_dirs = [
+        '',
+        '/usr/share/fonts/truetype/dejavu',
+        '/usr/share/fonts/truetype/liberation',
+        '/usr/share/fonts/truetype/liberation2',
+        '/usr/share/fonts/opentype/noto',
+        '/usr/share/fonts/truetype/noto',
+        'C:/Windows/Fonts'
+    ]
+    for directory in font_dirs:
+        for filename in filenames:
+            path = os.path.join(directory, filename) if directory else filename
+            if os.path.exists(path):
+                return path
+    return filenames[0]
+
+
 def fonts():
     try:
+        regular = find_font('arial.ttf', 'DejaVuSans.ttf', 'LiberationSans-Regular.ttf', 'NotoSans-Regular.ttf')
+        bold = find_font('arialbd.ttf', 'DejaVuSans-Bold.ttf', 'LiberationSans-Bold.ttf', 'NotoSans-Bold.ttf')
         return {
-            'title': ImageFont.truetype('arialbd.ttf', 18),
-            'bold': ImageFont.truetype('arialbd.ttf', 14),
-            'regular': ImageFont.truetype('arial.ttf', 14),
-            'small': ImageFont.truetype('arial.ttf', 12)
+            'title': ImageFont.truetype(bold, 18),
+            'bold': ImageFont.truetype(bold, 14),
+            'regular': ImageFont.truetype(regular, 14),
+            'small': ImageFont.truetype(regular, 12)
         }
     except OSError:
         font = ImageFont.load_default()
