@@ -1,10 +1,12 @@
 # routes/objects_admin.py
 # -*- coding: utf-8 -*-
-from flask import Blueprint, request, jsonify, send_file
+from flask import Blueprint, request, jsonify, send_file, current_app
 from flask_login import current_user
 import logging
 import os
+import uuid
 from datetime import datetime
+from werkzeug.utils import secure_filename
 
 from database import (
     get_objects_settings_extended,
@@ -25,13 +27,17 @@ from database import (
     add_route_sheet,
     delete_route_sheet_by_id,
     delete_all_route_sheets,
-    get_route_sheet_by_id
+    get_route_sheet_by_id,
+    get_help_card,
+    save_help_card
 )
 from config import OBJECTS_BASE
 
 logger = logging.getLogger(__name__)
 
 objects_admin_bp = Blueprint('objects_admin', __name__, url_prefix='/api/admin/objects')
+
+HELP_CARD_IMAGE_EXTENSIONS = {'jpg', 'jpeg', 'png', 'webp', 'gif'}
 
 
 @objects_admin_bp.route('', methods=['GET'])
@@ -322,6 +328,88 @@ def save_passport(object_id):
         return jsonify({'success': True})
     else:
         return jsonify({'error': 'Ошибка при сохранении паспорта'}), 500
+
+
+# ========== ЭНДПОИНТЫ ДЛЯ ШПАРГАЛКИ "ДОКУМЕНТЫ СНГ" ==========
+
+@objects_admin_bp.route('/help-cards/cis-documents', methods=['GET'])
+def get_cis_documents_help_card():
+    """Получение шпаргалки по документам СНГ."""
+    if not current_user.is_authenticated:
+        return jsonify({'error': 'Unauthorized'}), 401
+    if current_user.role != 'admin' and not current_user.can_view_selection():
+        return jsonify({'error': 'Forbidden'}), 403
+
+    card = get_help_card('cis-documents')
+    if not card:
+        return jsonify({'error': 'Шпаргалка не найдена'}), 404
+
+    return jsonify(card)
+
+
+@objects_admin_bp.route('/help-cards/cis-documents', methods=['POST'])
+def save_cis_documents_help_card():
+    """Сохранение шпаргалки по документам СНГ (только админ)."""
+    if not current_user.is_authenticated:
+        return jsonify({'error': 'Unauthorized'}), 401
+    if current_user.role != 'admin':
+        return jsonify({'error': 'Forbidden'}), 403
+
+    data = request.get_json() or {}
+    success = save_help_card(
+        slug='cis-documents',
+        title=data.get('title') or 'Документы для СНГ',
+        content=data.get('content') or {},
+        source_url=data.get('sourceUrl') or '',
+        updated_by=current_user.id
+    )
+
+    if not success:
+        return jsonify({'error': 'Ошибка при сохранении шпаргалки'}), 500
+
+    log_user_action(current_user.id, 'save_help_card', 'Сохранена шпаргалка Документы СНГ', request.remote_addr)
+    return jsonify({'success': True})
+
+
+@objects_admin_bp.route('/help-cards/cis-documents/images', methods=['POST'])
+def upload_cis_documents_help_image():
+    """Загрузка картинки для шпаргалки по документам СНГ."""
+    if not current_user.is_authenticated:
+        return jsonify({'error': 'Unauthorized'}), 401
+    if current_user.role != 'admin':
+        return jsonify({'error': 'Forbidden'}), 403
+
+    if 'image' not in request.files:
+        return jsonify({'error': 'Файл не выбран'}), 400
+
+    file = request.files['image']
+    if file.filename == '':
+        return jsonify({'error': 'Файл не выбран'}), 400
+
+    ext = file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else ''
+    if ext not in HELP_CARD_IMAGE_EXTENSIONS:
+        return jsonify({'error': 'Можно загружать только картинки: JPG, PNG, WEBP, GIF'}), 400
+
+    file.seek(0, os.SEEK_END)
+    file_size = file.tell()
+    file.seek(0)
+    max_size = 10 * 1024 * 1024
+    if file_size > max_size:
+        return jsonify({'error': 'Картинка слишком большая. Максимум 10 MB'}), 400
+
+    upload_dir = os.path.join(current_app.root_path, 'static', 'uploads', 'help_cards')
+    os.makedirs(upload_dir, exist_ok=True)
+
+    safe_original = secure_filename(file.filename) or f'image.{ext}'
+    if '.' not in safe_original:
+        safe_original = f'{safe_original}.{ext}'
+    filename = f"cis_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}_{safe_original}"
+    filepath = os.path.join(upload_dir, filename)
+    file.save(filepath)
+
+    url = f'/static/uploads/help_cards/{filename}'
+    log_user_action(current_user.id, 'upload_help_card_image', f'Загружена картинка для Документы СНГ: {safe_original}', request.remote_addr)
+    return jsonify({'success': True, 'url': url})
 
 
 # ========== СТАРЫЕ ЭНДПОИНТЫ ДЛЯ ОДНОГО МАРШРУТНОГО ЛИСТА (ДЛЯ ОБРАТНОЙ СОВМЕСТИМОСТИ) ==========

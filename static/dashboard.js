@@ -607,7 +607,7 @@ function updatePeriodDisplay() {
 // ========== ПЕРЕКЛЮЧЕНИЕ ВНУТРЕННИХ ВКЛАДОК ДАШБОРДА ==========
 function switchDashboardInnerTab(tabName) {
     // Скрываем все контейнеры
-    const containers = ['planFactContainer', 'firstShiftObjectContainer', 'firstShiftStaffContainer'];
+    const containers = ['planFactContainer', 'firstShiftObjectContainer', 'firstShiftStaffContainer', 'reportsContainer'];
     containers.forEach(containerId => {
         const el = document.getElementById(containerId);
         if (el) {
@@ -641,6 +641,16 @@ function switchDashboardInnerTab(tabName) {
             selectedContainer.classList.add('active');
         }
         loadFirstShiftByStaff();
+    } else if (tabName === 'reports') {
+        selectedContainer = document.getElementById('reportsContainer');
+        if (selectedContainer) {
+            selectedContainer.style.display = 'block';
+            selectedContainer.classList.add('active');
+        }
+        const dateInput = document.getElementById('managerEfficiencyDate');
+        if (dateInput && !dateInput.value) {
+            dateInput.value = getTodayDate();
+        }
     }
     
     // Обновляем активный класс внутренних кнопок
@@ -650,6 +660,135 @@ function switchDashboardInnerTab(tabName) {
             btn.classList.add('active');
         }
     });
+}
+
+// ========== ОТЧЁТЫ: ЭФФЕКТИВНОСТЬ МЕНЕДЖЕРОВ UIS ==========
+async function loadManagerEfficiencyReport() {
+    const dateInput = document.getElementById('managerEfficiencyDate');
+    const contentDiv = document.getElementById('managerEfficiencyContent');
+    const summaryDiv = document.getElementById('managerEfficiencySummary');
+    const csvBtn = document.getElementById('managerEfficiencyCsvBtn');
+    const pngBtn = document.getElementById('managerEfficiencyPngBtn');
+
+    if (!contentDiv) return;
+
+    const date = dateInput?.value || getTodayDate();
+    if (dateInput && !dateInput.value) dateInput.value = date;
+    if (csvBtn) csvBtn.disabled = true;
+    if (pngBtn) pngBtn.disabled = true;
+
+    contentDiv.innerHTML = '<div class="loading">Загрузка отчёта UIS...</div>';
+    if (summaryDiv) summaryDiv.innerHTML = '<div class="loading">Загрузка...</div>';
+
+    try {
+        const response = await fetch(`/api/reports/manager-efficiency?date=${date}`, {
+            credentials: 'include'
+        });
+        const data = await response.json();
+
+        if (!response.ok || data.error) {
+            throw new Error(data.error || 'Ошибка загрузки отчёта');
+        }
+
+        renderManagerEfficiencyReport(data);
+        if (csvBtn) csvBtn.disabled = false;
+        if (pngBtn) pngBtn.disabled = false;
+    } catch (error) {
+        console.error('Ошибка отчёта UIS:', error);
+        contentDiv.innerHTML = `<div class="error-state">❌ ${escapeHtml(error.message || 'Ошибка загрузки отчёта')}</div>`;
+        if (summaryDiv) {
+            summaryDiv.innerHTML = `
+                <div class="summary-row">
+                    <span>Отчёт:</span>
+                    <span class="summary-value">Эффективность менеджеров UIS</span>
+                </div>
+            `;
+        }
+    }
+}
+
+function renderManagerEfficiencyReport(data) {
+    const contentDiv = document.getElementById('managerEfficiencyContent');
+    const summaryDiv = document.getElementById('managerEfficiencySummary');
+    const rows = data.rows || [];
+
+    if (summaryDiv) {
+        summaryDiv.innerHTML = `
+            <div class="summary-row">
+                <span>Дата:</span>
+                <span class="summary-value">${escapeHtml(data.date_ru || data.date)}</span>
+            </div>
+            <div class="summary-row">
+                <span>Звонков UIS:</span>
+                <span class="summary-value">${data.total_calls || 0}</span>
+            </div>
+            <div class="summary-row">
+                <span>Менеджеров:</span>
+                <span class="summary-value">${rows.length}</span>
+            </div>
+        `;
+    }
+
+    if (!rows.length) {
+        contentDiv.innerHTML = '<div class="empty-objects">За выбранную дату данных по звонкам нет</div>';
+        return;
+    }
+
+    contentDiv.innerHTML = `
+        <div class="manager-efficiency-table-wrap">
+            <table class="manager-efficiency-table">
+                <thead>
+                    <tr>
+                        <th>Система</th>
+                        <th>Менеджер</th>
+                        <th>Вх прин</th>
+                        <th>Исх усп</th>
+                        <th>Исх неусп</th>
+                        <th>Время</th>
+                        <th>Средн</th>
+                        <th>Перерыв</th>
+                        <th>% дозв</th>
+                        <th>% кор</th>
+                        <th>Индекс</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rows.map(renderManagerEfficiencyRow).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+function renderManagerEfficiencyRow(item) {
+    const breakFill = item.break_fill || '#f2f2f2';
+    return `
+        <tr>
+            <td>${escapeHtml(item.system)}</td>
+            <td>${escapeHtml(item.manager)}</td>
+            <td class="metric-in">${item.in_accepted}</td>
+            <td class="metric-out-success">${item.out_success}</td>
+            <td class="metric-out-failed">${item.out_failed}</td>
+            <td>${escapeHtml(item.line_time)}</td>
+            <td>${escapeHtml(item.avg_time)}</td>
+            <td class="metric-break" style="background-color: ${escapeHtml(breakFill)};">${escapeHtml(item.break_time)}</td>
+            <td>${escapeHtml(item.out_success_rate_text)}</td>
+            <td>${escapeHtml(item.short_share_text)}</td>
+            <td class="metric-index">${escapeHtml(item.index_text)}</td>
+        </tr>
+    `;
+}
+
+function getManagerEfficiencyDate() {
+    return document.getElementById('managerEfficiencyDate')?.value || getTodayDate();
+}
+
+function downloadManagerEfficiencyCsv() {
+    window.location.href = `/api/reports/manager-efficiency.csv?date=${getManagerEfficiencyDate()}`;
+}
+
+function downloadManagerEfficiencyPng() {
+    window.location.href = `/api/reports/manager-efficiency.png?date=${getManagerEfficiencyDate()}`;
 }
 
 // ========== ОТЧЁТ: ОТРАБОТАВШИЕ 1 СМЕНУ ПО ОБЪЕКТАМ ==========

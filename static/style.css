@@ -2207,6 +2207,362 @@ body {
     }
 }
 
+/* Редактор и просмотр шпаргалки "Документы СНГ" */
+.manager-efficiency-table-wrap {
+    width: 100%;
+    overflow-x: auto;
+}
+
+.manager-efficiency-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+    background: #fff;
+}
+
+.manager-efficiency-table th,
+.manager-efficiency-table td {
+    padding: 10px 8px;
+    border: 1px solid #ddd;
+    text-align: right;
+    white-space: nowrap;
+}
+
+.manager-efficiency-table th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: #dde7f2;
+    color: #2c3e50;
+    font-weight: 700;
+}
+
+.manager-efficiency-table th:nth-child(1),
+.manager-efficiency-table th:nth-child(2),
+.manager-efficiency-table td:nth-child(1),
+.manager-efficiency-table td:nth-child(2) {
+    text-align: left;
+}
+
+.manager-efficiency-table tbody tr:nth-child(even) td {
+    background: #eef6ff;
+}
+
+.manager-efficiency-table .metric-in {
+    background: #fff9c4;
+}
+
+.manager-efficiency-table tbody tr:nth-child(even) .metric-in {
+    background: #fff3b0;
+}
+
+.manager-efficiency-table .metric-out-success {
+    background: #d9ead3;
+}
+
+.manager-efficiency-table tbody tr:nth-child(even) .metric-out-success {
+    background: #cfe8c8;
+}
+
+.manager-efficiency-table .metric-out-failed {
+    background: #f4cccc;
+}
+
+.manager-efficiency-table tbody tr:nth-child(even) .metric-out-failed {
+    background: #f1bebe;
+}
+
+.manager-efficiency-table .metric-break {
+    font-weight: 600;
+}
+
+.manager-efficiency-table .metric-index {
+    font-weight: 800;
+    background: #f2f2f2;
+}
+
+.manager-efficiency-table tbody tr:nth-child(even) .metric-index {
+    background: #e3edf7;
+}
+
+.cis-documents-btn {
+    width: 100%;
+    margin: 8px 0 12px;
+    padding: 10px 12px;
+    border: 1px solid rgba(164, 44, 48, 0.25);
+    border-radius: 8px;
+    background: #fff5f5;
+    color: #A42C30;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.cis-documents-btn:hover {
+    background: #A42C30;
+    color: #fff;
+}
+
+.cis-editor-modal {
+    max-width: 1100px;
+    width: 95%;
+    max-height: 90vh;
+}
+
+.cis-editor-body {
+    max-height: calc(90vh - 110px);
+    overflow-y: auto;
+}
+
+.cis-editor-top {
+    display: grid;
+    grid-template-columns: 1fr 1.4fr;
+    gap: 16px;
+}
+
+.cis-edit-section {
+    margin: 18px 0;
+    padding: 16px;
+    border: 1px solid #e7e7e7;
+    border-radius: 8px;
+    background: #fafafa;
+}
+
+.cis-edit-section-header {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 14px;
+}
+
+.cis-edit-section-header input,
+.cis-document-title,
+.cis-document-note,
+.cis-section-checklist,
+#cisHelpTitle,
+#cisHelpSourceUrl {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+}
+
+.cis-documents-editor-title {
+    margin: 12px 0 10px;
+    font-weight: 700;
+    color: #2c3e50;
+}
+
+.cis-document-edit {
+    display: grid;
+    grid-template-columns: 1fr 180px;
+    gap: 14px;
+    margin-bottom: 12px;
+    padding: 12px;
+    border: 1px solid #ececec;
+    border-radius: 8px;
+    background: #fff;
+}
+
+.cis-document-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.cis-image-upload-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+    font-size: 0.9rem;
+}
+
+.cis-muted {
+    color: #777;
+}
+
+.cis-document-preview {
+    position: relative;
+    min-height: 130px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    background: #f5f5f5;
+    overflow: hidden;
+}
+
+.cis-document-preview img {
+    max-width: 100%;
+    max-height: 160px;
+    object-fit: contain;
+}
+
+.cis-document-preview .delete-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+}
+
+.cis-editor-actions {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 18px;
+}
+
+.cis-help-modal-content {
+    max-width: 900px;
+    width: 95%;
+    max-height: 88vh;
+}
+
+.cis-help-body {
+    max-height: calc(88vh - 110px);
+    overflow-y: auto;
+}
+
+.cis-source-link {
+    margin-bottom: 16px;
+}
+
+.cis-source-link a {
+    display: inline-flex;
+    gap: 8px;
+    align-items: center;
+    color: #A42C30;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.cis-help-section {
+    margin-bottom: 24px;
+    padding-bottom: 18px;
+    border-bottom: 1px solid #eee;
+}
+
+.cis-help-section h4 {
+    margin: 0 0 14px;
+    color: #2c3e50;
+    font-size: 1.35rem;
+}
+
+.cis-help-checklist {
+    margin: 0 0 18px 22px;
+    line-height: 1.7;
+}
+
+.cis-documents-grid {
+    display: grid;
+    gap: 12px;
+}
+
+.cis-help-document {
+    display: grid;
+    grid-template-columns: minmax(180px, 0.9fr) minmax(220px, 1.1fr);
+    gap: 14px;
+    align-items: stretch;
+    border: 1px solid #ececec;
+    border-radius: 8px;
+    background: #fff;
+    overflow: hidden;
+}
+
+.cis-help-document-text {
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 8px;
+}
+
+.cis-help-document-text p {
+    margin: 0;
+    color: #555;
+    line-height: 1.5;
+}
+
+.cis-help-document-image {
+    min-height: 170px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px;
+    background: #f8f8f8;
+}
+
+.cis-help-document-image img {
+    max-width: 100%;
+    max-height: 280px;
+    object-fit: contain;
+    cursor: zoom-in;
+    border-radius: 6px;
+}
+
+.cis-image-placeholder {
+    width: 100%;
+    min-height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #999;
+    border: 1px dashed #ccc;
+    border-radius: 8px;
+    background: #fafafa;
+}
+
+.cis-image-modal {
+    z-index: 10050;
+    background: rgba(0, 0, 0, 0.82);
+}
+
+.cis-image-modal-content {
+    position: relative;
+    max-width: 94vw;
+    max-height: 94vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+.cis-image-modal-content img {
+    max-width: 94vw;
+    max-height: 84vh;
+    object-fit: contain;
+    border-radius: 8px;
+    background: #fff;
+}
+
+.cis-image-title {
+    color: #fff;
+    font-weight: 700;
+}
+
+.cis-image-close {
+    position: absolute;
+    top: -12px;
+    right: -12px;
+    background: #fff;
+    color: #333;
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+}
+
+@media (max-width: 768px) {
+    .cis-editor-top,
+    .cis-document-edit,
+    .cis-help-document {
+        grid-template-columns: 1fr;
+    }
+
+    .cis-editor-actions {
+        flex-direction: column;
+    }
+}
+
 /* Стили для вкладок РФ/СНГ */
 .citizenship-tabs {
     margin-top: 10px;

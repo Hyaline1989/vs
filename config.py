@@ -20,6 +20,13 @@ BITRIX_WEBHOOK_URL = os.environ.get('BITRIX_WEBHOOK_URL')
 if not BITRIX_WEBHOOK_URL:
     raise ValueError("BITRIX_WEBHOOK_URL не установлен в переменных окружения!")
 
+# ========== UIS / CoMagic Data API ==========
+UIS_BASE_URL = os.environ.get('UIS_BASE_URL', 'https://dataapi.comagic.ru/v2.0')
+UIS_SYSTEMS = {
+    'Поток': os.environ.get('UIS_POTOK_API_KEY', ''),
+    'Комплект': os.environ.get('UIS_KOMPLEKT_API_KEY', '')
+}
+
 # Поля Bitrix24
 FIELD_DATE_DIRECTED = "UF_CRM_1684488775220"  # Дата направлен на объект
 FIELD_COMPANY = "UF_CRM_642A972B79B02"        # Объект (компания)

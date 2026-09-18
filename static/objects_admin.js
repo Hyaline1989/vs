@@ -451,6 +451,246 @@ function closeObjectModal() {
     document.getElementById('objectModal').style.display = 'none';
 }
 
+// ========== РЕДАКТОР ШПАРГАЛКИ "ДОКУМЕНТЫ СНГ" ==========
+let cisHelpCardData = null;
+
+async function openCisDocumentsEditor() {
+    let modal = document.getElementById('cisDocumentsEditorModal');
+    if (modal) modal.remove();
+
+    modal = document.createElement('div');
+    modal.id = 'cisDocumentsEditorModal';
+    modal.className = 'modal modal-large';
+    modal.style.display = 'flex';
+    modal.innerHTML = `
+        <div class="modal-content cis-editor-modal">
+            <div class="modal-header">
+                <h3><i class="fas fa-passport"></i> Документы СНГ</h3>
+                <button class="modal-close" onclick="closeCisDocumentsEditor()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="cisDocumentsEditorBody" class="cis-editor-body">
+                    <div class="loading">Загрузка шпаргалки...</div>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    await loadCisDocumentsEditor();
+}
+
+function closeCisDocumentsEditor() {
+    const modal = document.getElementById('cisDocumentsEditorModal');
+    if (modal) modal.remove();
+}
+
+async function loadCisDocumentsEditor() {
+    const container = document.getElementById('cisDocumentsEditorBody');
+    if (!container) return;
+
+    try {
+        const response = await fetch('/api/admin/objects/help-cards/cis-documents', { credentials: 'include' });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        cisHelpCardData = await response.json();
+        renderCisDocumentsEditor();
+    } catch (error) {
+        console.error('Ошибка загрузки шпаргалки:', error);
+        container.innerHTML = '<div class="error-state">Не удалось загрузить шпаргалку</div>';
+    }
+}
+
+function renderCisDocumentsEditor() {
+    const container = document.getElementById('cisDocumentsEditorBody');
+    if (!container || !cisHelpCardData) return;
+
+    const sections = cisHelpCardData.content?.sections || [];
+    container.innerHTML = `
+        <div class="cis-editor-top">
+            <div class="form-group">
+                <label>Заголовок</label>
+                <input type="text" id="cisHelpTitle" value="${escapeHtml(cisHelpCardData.title || 'Документы для СНГ')}" autocomplete="off">
+            </div>
+            <div class="form-group">
+                <label>Ссылка на исходный Google Docs</label>
+                <input type="url" id="cisHelpSourceUrl" value="${escapeHtml(cisHelpCardData.sourceUrl || '')}" autocomplete="off" placeholder="https://docs.google.com/...">
+            </div>
+        </div>
+        <div id="cisSectionsEditor">
+            ${sections.map((section, index) => renderCisSectionEditor(section, index)).join('')}
+        </div>
+        <div class="cis-editor-actions">
+            <button type="button" class="btn-cancel" onclick="addCisSection()"><i class="fas fa-plus"></i> Добавить раздел</button>
+            <button type="button" class="btn-save" onclick="saveCisDocumentsHelpCard()"><i class="fas fa-save"></i> Сохранить шпаргалку</button>
+        </div>
+    `;
+}
+
+function renderCisSectionEditor(section, index) {
+    const checklist = Array.isArray(section.checklist) ? section.checklist.join('\n') : '';
+    const documents = Array.isArray(section.documents) ? section.documents : [];
+
+    return `
+        <div class="cis-edit-section" data-section-index="${index}">
+            <div class="cis-edit-section-header">
+                <input type="text" class="cis-section-title" value="${escapeHtml(section.title || '')}" placeholder="Название раздела, например Белоруссия">
+                <button type="button" class="action-btn delete-btn" onclick="removeCisSection(${index})" title="Удалить раздел"><i class="fas fa-trash"></i></button>
+            </div>
+            <div class="form-group">
+                <label>Список документов</label>
+                <textarea class="cis-section-checklist" rows="5" placeholder="Каждый пункт с новой строки">${escapeHtml(checklist)}</textarea>
+            </div>
+            <div class="cis-documents-editor">
+                <div class="cis-documents-editor-title">Примеры документов с картинками</div>
+                <div class="cis-document-list">
+                    ${documents.map((documentItem, docIndex) => renderCisDocumentEditor(documentItem, index, docIndex)).join('')}
+                </div>
+                <button type="button" class="btn-cancel" onclick="addCisDocument(${index})"><i class="fas fa-plus"></i> Добавить документ</button>
+            </div>
+        </div>
+    `;
+}
+
+function renderCisDocumentEditor(documentItem, sectionIndex, docIndex) {
+    const imageUrl = documentItem.image_url || '';
+    return `
+        <div class="cis-document-edit" data-doc-index="${docIndex}">
+            <div class="cis-document-fields">
+                <input type="text" class="cis-document-title" value="${escapeHtml(documentItem.title || '')}" placeholder="Название документа">
+                <textarea class="cis-document-note" rows="2" placeholder="Комментарий или что проверить">${escapeHtml(documentItem.note || '')}</textarea>
+                <input type="hidden" class="cis-document-image-url" value="${escapeHtml(imageUrl)}">
+                <div class="cis-image-upload-row">
+                    <input type="file" accept="image/*" onchange="uploadCisDocumentImage(this)">
+                    ${imageUrl ? `<a href="${escapeHtml(imageUrl)}" target="_blank">Открыть картинку</a>` : '<span class="cis-muted">Картинка не загружена</span>'}
+                </div>
+            </div>
+            <div class="cis-document-preview">
+                ${imageUrl ? `<img src="${escapeHtml(imageUrl)}" alt="">` : '<div class="cis-image-placeholder">Нет картинки</div>'}
+                <button type="button" class="action-btn delete-btn" onclick="removeCisDocument(${sectionIndex}, ${docIndex})" title="Удалить документ"><i class="fas fa-trash"></i></button>
+            </div>
+        </div>
+    `;
+}
+
+function collectCisDocumentsEditorData() {
+    const sections = [];
+    document.querySelectorAll('#cisSectionsEditor .cis-edit-section').forEach(sectionEl => {
+        const title = sectionEl.querySelector('.cis-section-title')?.value.trim() || '';
+        const checklistText = sectionEl.querySelector('.cis-section-checklist')?.value || '';
+        const checklist = checklistText.split('\n').map(item => item.trim()).filter(Boolean);
+        const documents = [];
+
+        sectionEl.querySelectorAll('.cis-document-edit').forEach(docEl => {
+            const docTitle = docEl.querySelector('.cis-document-title')?.value.trim() || '';
+            const note = docEl.querySelector('.cis-document-note')?.value.trim() || '';
+            const imageUrl = docEl.querySelector('.cis-document-image-url')?.value.trim() || '';
+
+            if (docTitle || note || imageUrl) {
+                documents.push({ title: docTitle, note, image_url: imageUrl });
+            }
+        });
+
+        if (title || checklist.length || documents.length) {
+            sections.push({ title, checklist, documents });
+        }
+    });
+
+    return {
+        title: document.getElementById('cisHelpTitle')?.value.trim() || 'Документы для СНГ',
+        sourceUrl: document.getElementById('cisHelpSourceUrl')?.value.trim() || '',
+        content: { sections }
+    };
+}
+
+function refreshCisHelpDataFromForm() {
+    cisHelpCardData = {
+        ...(cisHelpCardData || {}),
+        ...collectCisDocumentsEditorData()
+    };
+}
+
+function addCisSection() {
+    refreshCisHelpDataFromForm();
+    if (!cisHelpCardData.content) cisHelpCardData.content = { sections: [] };
+    cisHelpCardData.content.sections.push({ title: '', checklist: [], documents: [] });
+    renderCisDocumentsEditor();
+}
+
+function removeCisSection(index) {
+    refreshCisHelpDataFromForm();
+    cisHelpCardData.content.sections.splice(index, 1);
+    renderCisDocumentsEditor();
+}
+
+function addCisDocument(sectionIndex) {
+    refreshCisHelpDataFromForm();
+    const section = cisHelpCardData.content.sections[sectionIndex];
+    if (!section.documents) section.documents = [];
+    section.documents.push({ title: '', note: '', image_url: '' });
+    renderCisDocumentsEditor();
+}
+
+function removeCisDocument(sectionIndex, docIndex) {
+    refreshCisHelpDataFromForm();
+    cisHelpCardData.content.sections[sectionIndex].documents.splice(docIndex, 1);
+    renderCisDocumentsEditor();
+}
+
+async function uploadCisDocumentImage(input) {
+    const file = input.files?.[0];
+    if (!file) return;
+
+    const row = input.closest('.cis-document-edit');
+    const formData = new FormData();
+    formData.append('image', file);
+    input.disabled = true;
+
+    try {
+        const response = await fetch('/api/admin/objects/help-cards/cis-documents/images', {
+            method: 'POST',
+            credentials: 'include',
+            body: formData
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success) {
+            throw new Error(result.error || 'Ошибка загрузки');
+        }
+
+        row.querySelector('.cis-document-image-url').value = result.url;
+        showNotification('✅ Картинка загружена', 'success');
+        refreshCisHelpDataFromForm();
+        renderCisDocumentsEditor();
+    } catch (error) {
+        console.error('Ошибка загрузки картинки:', error);
+        showNotification('❌ ' + error.message, 'error');
+    } finally {
+        input.disabled = false;
+    }
+}
+
+async function saveCisDocumentsHelpCard() {
+    const payload = collectCisDocumentsEditorData();
+
+    try {
+        const response = await fetch('/api/admin/objects/help-cards/cis-documents', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(payload)
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success) {
+            throw new Error(result.error || 'Ошибка сохранения');
+        }
+
+        cisHelpCardData = payload;
+        showNotification('✅ Шпаргалка сохранена', 'success');
+        closeCisDocumentsEditor();
+    } catch (error) {
+        console.error('Ошибка сохранения шпаргалки:', error);
+        showNotification('❌ ' + error.message, 'error');
+    }
+}
+
 // Следим за изменением размера окна
 let resizeTimerObjects;
 window.addEventListener('resize', function() {

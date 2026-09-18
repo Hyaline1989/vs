@@ -1,6 +1,6 @@
 # routes/dashboard.py - добавлен эндпоинт для фиксации дня
 # -*- coding: utf-8 -*-
-from flask import Blueprint, request, jsonify, redirect
+from flask import Blueprint, request, jsonify, redirect, Response, send_file
 from flask_login import current_user, login_required
 from datetime import datetime, timedelta
 import re
@@ -11,6 +11,8 @@ from database import get_user_module_permissions, get_plan_requirements_for_date
 from bitrix_api import BitrixAPI, ShiftReportAPI
 from comparer import DataComparer
 from config import BITRIX_WEBHOOK_URL
+from manager_efficiency import calculate_efficiency_rating, save_rating_csv, build_rating_png, add_display_colors
+from uis_api import UISAPI, validate_report_date
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +20,7 @@ dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/api')
 
 bitrix_api = None
 comparer = None
+uis_api = UISAPI()
 
 _data_cache = {}
 _cache_timestamps = {}
@@ -44,6 +47,25 @@ def init_dashboard_apis(bitrix, comp):
     global bitrix_api, comparer
     bitrix_api = bitrix
     comparer = comp
+
+
+def _check_dashboard_access():
+    if not current_user.is_authenticated:
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    module_perms = get_user_module_permissions(current_user.id)
+    if not module_perms.get('dashboard', False):
+        return jsonify({'error': 'Forbidden'}), 403
+
+    return None
+
+
+def _get_manager_efficiency_for_date(date_str):
+    validate_report_date(date_str)
+    cache_key = f'manager_efficiency_{date_str}'
+    rows = get_cached_data(cache_key, uis_api.get_calls_for_date, date_str)
+    rating = add_display_colors(calculate_efficiency_rating(rows))
+    return rows, rating
 
 
 def get_date_range(start, end):
@@ -929,4 +951,78 @@ def get_first_shift_by_staff():
         
     except Exception as e:
         logger.error(f"Ошибка в get_first_shift_by_staff: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+# ========== ОТЧЁТЫ UIS: ЭФФЕКТИВНОСТЬ МЕНЕДЖЕРОВ ==========
+
+@dashboard_bp.route('/reports/manager-efficiency', methods=['GET'])
+@login_required
+def get_manager_efficiency_report():
+    access_error = _check_dashboard_access()
+    if access_error:
+        return access_error
+
+    try:
+        date_str = request.args.get('date') or datetime.now().strftime('%Y-%m-%d')
+        rows, rating = _get_manager_efficiency_for_date(date_str)
+        date_ru = datetime.strptime(date_str, '%Y-%m-%d').strftime('%d.%m.%Y')
+
+        return jsonify({
+            'success': True,
+            'date': date_str,
+            'date_ru': date_ru,
+            'total_calls': len({(row.get('system'), row.get('id')) for row in rows}),
+            'rows': rating
+        })
+    except Exception as e:
+        logger.error(f"Ошибка в get_manager_efficiency_report: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@dashboard_bp.route('/reports/manager-efficiency.csv', methods=['GET'])
+@login_required
+def download_manager_efficiency_csv():
+    access_error = _check_dashboard_access()
+    if access_error:
+        return access_error
+
+    try:
+        date_str = request.args.get('date') or datetime.now().strftime('%Y-%m-%d')
+        _, rating = _get_manager_efficiency_for_date(date_str)
+        csv_content = save_rating_csv(rating)
+        filename = f'combined_efficiency_rating_{date_str}.csv'
+
+        return Response(
+            csv_content,
+            mimetype='text/csv; charset=utf-8',
+            headers={'Content-Disposition': f'attachment; filename="{filename}"'}
+        )
+    except Exception as e:
+        logger.error(f"Ошибка в download_manager_efficiency_csv: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@dashboard_bp.route('/reports/manager-efficiency.png', methods=['GET'])
+@login_required
+def download_manager_efficiency_png():
+    access_error = _check_dashboard_access()
+    if access_error:
+        return access_error
+
+    try:
+        date_str = request.args.get('date') or datetime.now().strftime('%Y-%m-%d')
+        _, rating = _get_manager_efficiency_for_date(date_str)
+        date_ru = datetime.strptime(date_str, '%Y-%m-%d').strftime('%d.%m.%Y')
+        image = build_rating_png(rating, date_ru)
+        filename = f'combined_efficiency_rating_{date_str}.png'
+
+        return send_file(
+            image,
+            mimetype='image/png',
+            as_attachment=True,
+            download_name=filename
+        )
+    except Exception as e:
+        logger.error(f"Ошибка в download_manager_efficiency_png: {e}", exc_info=True)
         return jsonify({'error': str(e)}), 500

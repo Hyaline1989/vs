@@ -224,6 +224,21 @@ def init_db():
                 FOREIGN KEY (uploaded_by) REFERENCES users(id) ON DELETE SET NULL
             )
         ''')
+
+        # ========== ТАБЛИЦА РЕДАКТИРУЕМЫХ ШПАРГАЛОК ==========
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS help_cards (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                slug TEXT NOT NULL UNIQUE,
+                title TEXT NOT NULL,
+                content_json TEXT NOT NULL DEFAULT '{}',
+                source_url TEXT DEFAULT '',
+                updated_by INTEGER,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL
+            )
+        ''')
         
         # ========== ТАБЛИЦА ЕЖЕДНЕВНЫХ СНИПШОТОВ ==========
         cursor.execute('''
@@ -274,6 +289,7 @@ def init_db():
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_worker_deal_date ON worker_statuses (deal_date)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_worker_lead_id ON worker_statuses (lead_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_route_sheets_object ON object_route_sheets (object_id)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_help_cards_slug ON help_cards (slug)')
         
         conn.commit()
         

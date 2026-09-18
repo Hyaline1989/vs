@@ -252,6 +252,12 @@ function displayResults(objectsToDisplay) {
         
         const orderNumber = window.isAdmin ? `<span class="order-badge">${idx + 1}</span>` : '';
         const dragHandle = window.isAdmin ? '<div class="drag-handle-main">⋮⋮</div>' : '';
+        const hasCis = obj.allowedNationalities?.includes('СНГ');
+        const cisDocumentsButton = hasCis ? `
+            <button class="cis-documents-btn" onclick="openCisDocumentsHelp(event)">
+                <i class="fas fa-passport"></i> Документы СНГ
+            </button>
+        ` : '';
         
         let nationalityText = '';
         if (obj.allowedNationalities?.length > 0) {
@@ -278,6 +284,7 @@ function displayResults(objectsToDisplay) {
                     ${regionText ? `<p><strong> Регион:</strong> ${escapeHtml(obj.region)}</p>` : ''}
                     <p><strong>Гражданство:</strong> ${nationalityText}</p>
                     <p><strong>Судимость:</strong> ${obj.allowsConviction ? 'Принимают' : 'Не принимают'}</p>
+                    ${cisDocumentsButton}
                     <div class="card-buttons">
                         <button class="direction-btn" onclick="openDirectionForm(${obj.id}, '${escapeHtml(obj.name)}', '')">
                             <i class="fas fa-paper-plane"></i> Направить сотрудника
@@ -296,6 +303,138 @@ function displayResults(objectsToDisplay) {
         `;
         container.appendChild(card);
     });
+}
+
+// ========== ШПАРГАЛКА "ДОКУМЕНТЫ СНГ" ==========
+async function openCisDocumentsHelp(event) {
+    if (event) event.stopPropagation();
+
+    let modal = document.getElementById('cisDocumentsHelpModal');
+    if (modal) modal.remove();
+
+    modal = document.createElement('div');
+    modal.id = 'cisDocumentsHelpModal';
+    modal.className = 'modal cis-help-modal';
+    modal.style.display = 'flex';
+    modal.innerHTML = `
+        <div class="modal-content cis-help-modal-content">
+            <div class="modal-header" style="background: linear-gradient(135deg, #A42C30 0%, #C14A4E 100%);">
+                <h3><i class="fas fa-passport"></i> Документы СНГ</h3>
+                <button class="modal-close" onclick="closeCisDocumentsHelp()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="cisDocumentsHelpBody" class="cis-help-body">
+                    <div class="loading">Загрузка шпаргалки...</div>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    try {
+        const response = await fetch('/api/admin/objects/help-cards/cis-documents', { credentials: 'include' });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const card = await response.json();
+        document.querySelector('#cisDocumentsHelpModal .modal-header h3').innerHTML =
+            `<i class="fas fa-passport"></i> ${escapeHtml(card.title || 'Документы для СНГ')}`;
+        document.getElementById('cisDocumentsHelpBody').innerHTML = renderCisDocumentsHelp(card);
+    } catch (error) {
+        console.error('Ошибка загрузки шпаргалки:', error);
+        document.getElementById('cisDocumentsHelpBody').innerHTML = '<div class="error-state">Не удалось загрузить шпаргалку</div>';
+    }
+}
+
+function closeCisDocumentsHelp() {
+    const modal = document.getElementById('cisDocumentsHelpModal');
+    if (modal) modal.remove();
+}
+
+function renderCisDocumentsHelp(card) {
+    const sections = card.content?.sections || [];
+    if (!sections.length) {
+        return '<div class="empty-state">Шпаргалка пока не заполнена</div>';
+    }
+
+    let html = '';
+    if (card.sourceUrl) {
+        html += `
+            <div class="cis-source-link">
+                <a href="${escapeHtml(card.sourceUrl)}" target="_blank" rel="noopener">
+                    <i class="fas fa-external-link-alt"></i> Открыть исходный Google Docs
+                </a>
+            </div>
+        `;
+    }
+
+    for (const section of sections) {
+        const checklist = Array.isArray(section.checklist) ? section.checklist : [];
+        const documents = Array.isArray(section.documents) ? section.documents : [];
+
+        html += `
+            <section class="cis-help-section">
+                <h4>${escapeHtml(section.title || 'Раздел')}</h4>
+                ${checklist.length ? `
+                    <ol class="cis-help-checklist">
+                        ${checklist.map(item => `<li>${escapeHtml(item)}</li>`).join('')}
+                    </ol>
+                ` : ''}
+                ${documents.length ? `
+                    <div class="cis-documents-grid">
+                        ${documents.map(documentItem => renderCisHelpDocument(documentItem)).join('')}
+                    </div>
+                ` : ''}
+            </section>
+        `;
+    }
+
+    return html;
+}
+
+function renderCisHelpDocument(documentItem) {
+    const title = documentItem.title || 'Документ';
+    const note = documentItem.note || '';
+    const imageUrl = documentItem.image_url || '';
+
+    return `
+        <article class="cis-help-document">
+            <div class="cis-help-document-text">
+                <strong>${escapeHtml(title)}</strong>
+                ${note ? `<p>${escapeHtml(note)}</p>` : ''}
+            </div>
+            <div class="cis-help-document-image">
+                ${imageUrl
+                    ? `<img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(title)}" data-image-url="${escapeHtml(imageUrl)}" data-title="${escapeHtml(title)}" onclick="openCisDocumentImageFromElement(this)">`
+                    : '<div class="cis-image-placeholder">Нет картинки</div>'}
+            </div>
+        </article>
+    `;
+}
+
+function openCisDocumentImageFromElement(img) {
+    openCisDocumentImage(img.dataset.imageUrl || '', img.dataset.title || 'Документ');
+}
+
+function openCisDocumentImage(imageUrl, title) {
+    let modal = document.getElementById('cisDocumentImageModal');
+    if (modal) modal.remove();
+
+    modal = document.createElement('div');
+    modal.id = 'cisDocumentImageModal';
+    modal.className = 'modal cis-image-modal';
+    modal.style.display = 'flex';
+    modal.innerHTML = `
+        <div class="cis-image-modal-content">
+            <button class="modal-close cis-image-close" onclick="closeCisDocumentImage()">&times;</button>
+            <img src="${imageUrl}" alt="${title}">
+            <div class="cis-image-title">${title}</div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+function closeCisDocumentImage() {
+    const modal = document.getElementById('cisDocumentImageModal');
+    if (modal) modal.remove();
 }
 
 function renderPositions(positions, objectId, objectName) {

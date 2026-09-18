@@ -66,6 +66,11 @@ from database.objects import (
     get_route_sheet_by_id
 )
 
+from database.help_cards import (
+    get_help_card,
+    save_help_card
+)
+
 # Текущие потребности (для подбора объектов)
 from database.requirements import (
     get_current_requirements,
@@ -130,6 +135,7 @@ __all__ = [
     # НОВЫЕ ФУНКЦИИ ДЛЯ МАРШРУТНЫХ ЛИСТОВ
     'get_route_sheets', 'add_route_sheet', 'delete_route_sheet_by_id',
     'delete_all_route_sheets', 'get_route_sheet_by_id',
+    'get_help_card', 'save_help_card',
     
     # requirements
     'get_current_requirements', 'get_current_requirements_for_object',
