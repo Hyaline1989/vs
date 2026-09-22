@@ -2272,6 +2272,15 @@ body {
     background: #f1bebe;
 }
 
+.manager-efficiency-table .metric-total {
+    font-weight: 700;
+    background: #f2f2f2;
+}
+
+.manager-efficiency-table tbody tr:nth-child(even) .metric-total {
+    background: #e3edf7;
+}
+
 .manager-efficiency-table .metric-break {
     font-weight: 600;
 }

@@ -120,6 +120,7 @@ def calculate_efficiency_rating(rows):
         if item['contacts'] == 0 and out_total == 0:
             continue
 
+        total_calls = item['in_accepted'] + item['out_success'] + item['out_failed']
         out_success_rate = item['out_success'] / out_total if out_total else 0
         short_share = item['short_calls'] / item['contacts'] if item['contacts'] else 0
         avg_seconds = item['line_seconds'] / item['contacts'] if item['contacts'] else 0
@@ -137,6 +138,7 @@ def calculate_efficiency_rating(rows):
             'in_accepted': item['in_accepted'],
             'out_success': item['out_success'],
             'out_failed': item['out_failed'],
+            'total_calls': total_calls,
             'line_seconds': item['line_seconds'],
             'avg_seconds': avg_seconds,
             'break_seconds': break_seconds,
@@ -159,13 +161,13 @@ def save_rating_csv(rating):
     output = io.StringIO()
     writer = csv.writer(output, delimiter=';')
     writer.writerow([
-        'Система', 'Менеджер', 'Вх прин', 'Исх усп', 'Исх неусп',
+        'Система', 'Менеджер', 'Вх прин', 'Исх усп', 'Исх неусп', 'Итого',
         'Время', 'Средн', 'Перерыв', '% дозв', '% кор', 'Индекс'
     ])
     for item in rating:
         writer.writerow([
             item['system'], item['manager'], item['in_accepted'], item['out_success'],
-            item['out_failed'], item['line_time'], item['avg_time'], item['break_time'],
+            item['out_failed'], item['total_calls'], item['line_time'], item['avg_time'], item['break_time'],
             item['out_success_rate_text'], item['short_share_text'], decimal_comma(item['index'])
         ])
     return '\ufeff' + output.getvalue()
@@ -280,8 +282,8 @@ def add_display_colors(rating):
 
 def build_rating_png(rating, date_ru):
     f = fonts()
-    headers = ['Система', 'Менеджер', 'Вх прин', 'Исх усп', 'Исх неусп', 'Время', 'Средн', 'Перерыв', '% дозв', '% кор', 'Индекс']
-    widths = [86, 300, 70, 70, 80, 90, 75, 80, 70, 65, 70]
+    headers = ['Система', 'Менеджер', 'Вх прин', 'Исх усп', 'Исх неусп', 'Итого', 'Время', 'Средн', 'Перерыв', '% дозв', '% кор', 'Индекс']
+    widths = [86, 300, 70, 70, 80, 70, 90, 75, 80, 70, 65, 70]
     row_h = 28
     top = 44
     note_h = 88
@@ -318,7 +320,7 @@ def build_rating_png(rating, date_ru):
             fill = colors['green']
         if index == 4:
             fill = colors['red']
-        if index in (5, 6, 7, 8, 9, 10):
+        if index in (5, 6, 7, 8, 9, 10, 11):
             fill = colors['neutral']
         draw.rectangle([x, y, x + widths[index], y + row_h], fill=fill, outline=colors['grid'])
         draw.text((x + 5, y + 7), header, fill=colors['text'], font=f['bold'])
@@ -328,7 +330,7 @@ def build_rating_png(rating, date_ru):
         y += row_h
         row = [
             item['system'], item['manager'], item['in_accepted'], item['out_success'],
-            item['out_failed'], item['line_time'], item['avg_time'], item['break_time'],
+            item['out_failed'], item['total_calls'], item['line_time'], item['avg_time'], item['break_time'],
             item['out_success_rate_text'], item['short_share_text'], item['index_text']
         ]
         x = 1
@@ -340,15 +342,15 @@ def build_rating_png(rating, date_ru):
                 fill = colors['green']
             if index == 4:
                 fill = colors['red']
-            if index == 6:
-                fill = red_green_scale(item['avg_seconds'], min_avg, max_avg)
             if index == 7:
+                fill = red_green_scale(item['avg_seconds'], min_avg, max_avg)
+            if index == 8:
                 fill = break_fill(item, min_break, max_break, colors)
-            if index in (5, 8, 9, 10):
+            if index in (5, 6, 9, 10, 11):
                 fill = colors['neutral']
             draw.rectangle([x, y, x + widths[index], y + row_h], fill=fill, outline=colors['grid'])
             text = str(value)
-            font = f['bold'] if index == 10 else f['regular']
+            font = f['bold'] if index == 11 else f['regular']
             tx = x + 5 if index in (0, 1) else x + widths[index] - draw.textlength(text, font=font) - 6
             draw.text((tx, y + 7), text, fill=colors['text'], font=font)
             x += widths[index]

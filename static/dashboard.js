@@ -744,6 +744,7 @@ function renderManagerEfficiencyReport(data) {
                         <th>Вх прин</th>
                         <th>Исх усп</th>
                         <th>Исх неусп</th>
+                        <th>Итого</th>
                         <th>Время</th>
                         <th>Средн</th>
                         <th>Перерыв</th>
@@ -769,6 +770,7 @@ function renderManagerEfficiencyRow(item) {
             <td class="metric-in">${item.in_accepted}</td>
             <td class="metric-out-success">${item.out_success}</td>
             <td class="metric-out-failed">${item.out_failed}</td>
+            <td class="metric-total">${item.total_calls}</td>
             <td>${escapeHtml(item.line_time)}</td>
             <td>${escapeHtml(item.avg_time)}</td>
             <td class="metric-break" style="background-color: ${escapeHtml(breakFill)};">${escapeHtml(item.break_time)}</td>
