@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Вектор | Руководство пользователя</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="icon" href="{{ url_for('static', filename='images/favicon.png') }}">
+    <style>
+        .app-logo-img{max-width:180px;height:auto}.faq-container{max-width:1200px;margin:0 auto;padding:30px;background:#fff;border-radius:28px;box-shadow:0 12px 30px rgba(0,0,0,.08)}
+        .faq-header{margin-bottom:24px;padding-bottom:20px;text-align:center;border-bottom:2px solid var(--primary)}.faq-header h2{margin:0;color:var(--dark);font-size:1.8rem}.faq-header h2 i{margin-right:10px;color:var(--primary)}.faq-header p{margin:10px 0 0;color:var(--gray)}
+        .faq-categories{display:flex;justify-content:center;flex-wrap:wrap;gap:10px;margin-bottom:26px}.category-btn{padding:9px 17px;border:0;border-radius:24px;color:var(--dark);background:#f2f4f6;cursor:pointer}.category-btn.active{color:#fff;background:var(--primary)}
+        .faq-list{display:flex;flex-direction:column;gap:14px}.faq-item{overflow:hidden;border:1px solid #e3e7eb;border-radius:14px}.faq-question{display:flex;justify-content:space-between;align-items:center;gap:12px;width:100%;padding:17px 19px;border:0;color:var(--dark);background:#fff;font-size:1rem;font-weight:600;text-align:left;cursor:pointer}.faq-question:hover{background:#fafafa}.faq-question i{color:var(--primary);transition:transform .2s}.faq-item.open .faq-question i{transform:rotate(90deg)}
+        .faq-answer{display:none;padding:17px 20px 20px;color:#4c535a;line-height:1.65;border-top:1px solid #e9ecef}.faq-item.open .faq-answer{display:block}.faq-answer p{margin:0 0 12px}.faq-answer ul,.faq-answer ol{margin:8px 0 14px;padding-left:25px}.faq-answer li{margin:6px 0}.faq-note{margin:12px 0;padding:12px 15px;background:#fff3cd;border-left:4px solid #ffc107;border-radius:7px}
+        .faq-image{margin:16px 0;text-align:center}.faq-image img{display:block;max-width:min(100%,850px);max-height:520px;margin:0 auto;border:1px solid #dfe3e8;border-radius:10px;cursor:zoom-in}.faq-image figcaption{margin-top:7px;color:var(--gray);font-size:.85rem}.faq-empty,.faq-loading{padding:35px;text-align:center;color:var(--gray)}.faq-return{display:block;margin-top:28px;color:var(--primary);text-align:center;text-decoration:none}
+        .faq-lightbox{position:fixed;z-index:10000;inset:0;display:flex;align-items:center;justify-content:center;padding:25px;background:rgba(0,0,0,.82);cursor:zoom-out}.faq-lightbox img{max-width:96vw;max-height:92vh;object-fit:contain;border-radius:8px}
+        @media(max-width:768px){.faq-container{margin:8px;padding:18px;border-radius:18px}.faq-header h2{font-size:1.35rem}.category-btn{padding:7px 12px;font-size:.8rem}.faq-question{padding:14px;font-size:.92rem}.faq-answer{padding:14px;font-size:.9rem}}
+    </style>
+</head>
+<body>
+<div class="app-container">
+    <div class="app-header">
+        <div class="logo-container"><img src="{{ url_for('static', filename='images/logo.png') }}" alt="Вектор" class="app-logo-img"><p class="app-subtitle">Управление вахтовым персоналом</p></div>
+        <div class="header-right"><div class="system-switcher">
+            <button class="system-btn" onclick="location.href='/dashboard'"><i class="fas fa-chart-line"></i><span>Дашборд</span></button>
+            <button class="system-btn" onclick="location.href='/selection'"><i class="fas fa-user-check"></i><span>Подбор объектов</span></button>
+            {% if current_user.can_view_worker_status() %}<button class="system-btn" onclick="location.href='/worker-status'"><i class="fas fa-users"></i><span>Вахтовики</span></button>{% endif %}
+            {% if current_user.role == 'admin' or current_user.role == 'manager' %}<button class="system-btn" onclick="location.href='/admin'"><i class="fas fa-users-cog"></i><span>Админ-панель</span></button>{% endif %}
+        </div><div class="user-info" id="userInfo"></div></div>
+    </div>
+    <main class="faq-container">
+        <div class="faq-header"><h2><i class="fas fa-book-open"></i> Руководство пользователя</h2><p>Пошаговые инструкции по работе с системой «Вектор»</p></div>
+        <div class="faq-categories" id="faqCategories"></div>
+        <div class="faq-list" id="faqList"><div class="faq-loading">Загрузка руководства...</div></div>
+        <a href="/welcome" class="faq-return"><i class="fas fa-arrow-left"></i> Вернуться на главную</a>
+    </main>
+</div>
+<script src="{{ url_for('static', filename='common.js') }}"></script>
+<script src="{{ url_for('static', filename='faq.js') }}"></script>
+</body>
+</html>

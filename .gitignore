@@ -6,3 +6,4 @@ __pycache__/
 .venv/
 venv/
 static/uploads/help_cards/
+static/uploads/faq/

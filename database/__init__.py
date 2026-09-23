@@ -7,6 +7,14 @@
 
 from database.db_core import DB_NAME, get_db_connection, init_db
 
+from database.faq import (
+    ensure_default_faq,
+    get_faq_articles,
+    create_faq_article,
+    update_faq_article,
+    delete_faq_article,
+)
+
 # Инициализация таблиц (все функции init_* теперь в db_core)
 from database.db_core import (
     init_objects_settings,
@@ -136,6 +144,9 @@ __all__ = [
     'get_route_sheets', 'add_route_sheet', 'delete_route_sheet_by_id',
     'delete_all_route_sheets', 'get_route_sheet_by_id',
     'get_help_card', 'save_help_card',
+    # faq
+    'ensure_default_faq', 'get_faq_articles', 'create_faq_article',
+    'update_faq_article', 'delete_faq_article',
     
     # requirements
     'get_current_requirements', 'get_current_requirements_for_object',

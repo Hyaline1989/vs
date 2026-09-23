@@ -23,13 +23,13 @@ def get_moscow_date():
 from config import *
 from bitrix_api import BitrixAPI, ShiftReportAPI
 from comparer import DataComparer
-from database import init_db, cleanup_old_records, init_objects_settings, init_vacancy_tables, cleanup_old_unused_avatars, init_current_requirements_table, init_passports_table, init_daily_snapshots_table
+from database import init_db, cleanup_old_records, init_objects_settings, init_vacancy_tables, cleanup_old_unused_avatars, init_current_requirements_table, init_passports_table, init_daily_snapshots_table, ensure_default_faq
 from models import User
 
 # Импортируем blueprint'ы
 from routes import (
     auth_bp, admin_bp, dashboard_bp, selection_bp, admin_pages_bp, objects_admin_bp,
-    init_dashboard_apis, worker_status_bp
+    init_dashboard_apis, worker_status_bp, faq_bp
 )
 from routes.requirements_admin import requirements_admin_bp
 from routes.profile import profile_bp
@@ -137,6 +137,8 @@ if init_db():
     logger.info("✅ Таблица паспортов объектов инициализирована")
     init_daily_snapshots_table()
     logger.info("✅ Таблица ежедневных снапшотов инициализирована")
+    ensure_default_faq()
+    logger.info("✅ Руководство FAQ инициализировано")
 else:
     logger.error("❌ Ошибка при инициализации базы данных")
 
@@ -150,6 +152,7 @@ app.register_blueprint(objects_admin_bp)
 app.register_blueprint(requirements_admin_bp)
 app.register_blueprint(profile_bp)
 app.register_blueprint(worker_status_bp)
+app.register_blueprint(faq_bp)
 
 # ========== СТРАНИЦЫ ==========
 @app.route('/')
@@ -215,7 +218,7 @@ def profile_page():
 @login_required
 def faq_page():
     """Страница часто задаваемых вопросов - руководство пользователя"""
-    return render_template('faq.html')
+    return render_template('faq_new.html')
 
 @app.route('/worker-status')
 @login_required

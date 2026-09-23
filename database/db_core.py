@@ -239,6 +239,25 @@ def init_db():
                 FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL
             )
         ''')
+
+        # ========== РЕДАКТИРУЕМОЕ РУКОВОДСТВО FAQ ==========
+        # Отдельная таблица: существующие данные приложения не затрагиваются.
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS faq_articles (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                category_slug TEXT NOT NULL,
+                category_title TEXT NOT NULL,
+                title TEXT NOT NULL,
+                blocks_json TEXT NOT NULL DEFAULT '[]',
+                category_order INTEGER NOT NULL DEFAULT 1,
+                sort_order INTEGER NOT NULL DEFAULT 1,
+                is_published INTEGER NOT NULL DEFAULT 1,
+                updated_by INTEGER,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL
+            )
+        ''')
         
         # ========== ТАБЛИЦА ЕЖЕДНЕВНЫХ СНИПШОТОВ ==========
         cursor.execute('''
@@ -290,6 +309,7 @@ def init_db():
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_worker_lead_id ON worker_statuses (lead_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_route_sheets_object ON object_route_sheets (object_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_help_cards_slug ON help_cards (slug)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_faq_order ON faq_articles (category_order, sort_order)')
         
         conn.commit()
         
