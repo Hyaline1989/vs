@@ -71,7 +71,7 @@ class User(UserMixin):
     
     def _ensure_required_permissions(self):
         """Проверяет и создаёт недостающие записи прав для пользователя"""
-        required_modules = ['dashboard', 'selection', 'worker_status']
+        required_modules = ['dashboard', 'selection', 'worker_status', 'reports']
         
         for module in required_modules:
             if module not in self._module_permissions:
@@ -151,6 +151,10 @@ class User(UserMixin):
     def can_view_worker_status(self):
         """Проверяет доступ к модулю Вахтовики"""
         return self.can_view_module('worker_status')
+
+    def can_view_reports(self):
+        """Проверяет доступ к разделу отчётов."""
+        return self.can_view_module('reports')
     
     def can_view_object(self, object_id, context='selection'):
         """Проверяет доступ к конкретному объекту"""

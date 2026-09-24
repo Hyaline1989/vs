@@ -985,6 +985,9 @@
                         <span>Вахтовики</span>
                     </button>
                     {% endif %}
+                    {% if current_user.can_view_reports() %}
+                    <button class="system-btn" onclick="window.location.href='/reports'"><i class="fas fa-file-alt"></i><span>Отчёты</span></button>
+                    {% endif %}
                     <button class="system-btn active" onclick="window.location.href='/admin'">
                         <i class="fas fa-users-cog"></i>
                         <span>Админ-панель</span>

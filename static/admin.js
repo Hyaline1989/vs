@@ -501,11 +501,12 @@ async function editPermissions(userId) {
         console.log('Загруженные права на модули:', modulePerms);
         
         // Получаем модули, доступные текущему пользователю (для manager)
-        let availableModules = ['dashboard', 'selection', 'worker_status'];
+        let availableModules = ['dashboard', 'selection', 'worker_status', 'reports'];
         let moduleLabels = {
             'dashboard': '📊 Дашборд План/Факт',
             'selection': '🎯 Подбор объектов',
-            'worker_status': '👥 Вахтовики'
+            'worker_status': '👥 Вахтовики',
+            'reports': '📋 Отчёты'
         };
         
         if (window.currentUser?.role === 'manager') {
@@ -596,10 +597,12 @@ async function savePermissions() {
     const permDashboard = document.getElementById('perm_dashboard');
     const permSelection = document.getElementById('perm_selection');
     const permWorkerStatus = document.getElementById('perm_worker_status');
+    const permReports = document.getElementById('perm_reports');
     
     if (permDashboard) modulePerms.dashboard = permDashboard.checked;
     if (permSelection) modulePerms.selection = permSelection.checked;
     if (permWorkerStatus) modulePerms.worker_status = permWorkerStatus.checked;
+    if (permReports) modulePerms.reports = permReports.checked;
     
     console.log('Сохраняемые права на модули:', modulePerms);
     

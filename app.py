@@ -214,6 +214,15 @@ def admin_panel():
 def profile_page():
     return render_template('profile.html')
 
+@app.route('/reports')
+@login_required
+def reports_page():
+    if not current_user.can_view_reports():
+        return render_template('no_access.html',
+                               message='У вас нет доступа к отчётам',
+                               return_url='/welcome'), 403
+    return render_template('reports.html')
+
 @app.route('/faq')
 @login_required
 def faq_page():

@@ -607,7 +607,7 @@ function updatePeriodDisplay() {
 // ========== ПЕРЕКЛЮЧЕНИЕ ВНУТРЕННИХ ВКЛАДОК ДАШБОРДА ==========
 function switchDashboardInnerTab(tabName) {
     // Скрываем все контейнеры
-    const containers = ['planFactContainer', 'firstShiftObjectContainer', 'firstShiftStaffContainer', 'reportsContainer'];
+    const containers = ['planFactContainer', 'reportsContainer'];
     containers.forEach(containerId => {
         const el = document.getElementById(containerId);
         if (el) {
@@ -627,20 +627,6 @@ function switchDashboardInnerTab(tabName) {
         // Обновляем данные план/факт
         const date = document.getElementById('date-picker')?.value || getTodayDate();
         loadDashboardForDate(date);
-    } else if (tabName === 'first-shift-object') {
-        selectedContainer = document.getElementById('firstShiftObjectContainer');
-        if (selectedContainer) {
-            selectedContainer.style.display = 'block';
-            selectedContainer.classList.add('active');
-        }
-        loadFirstShiftByObject();
-    } else if (tabName === 'first-shift-staff') {
-        selectedContainer = document.getElementById('firstShiftStaffContainer');
-        if (selectedContainer) {
-            selectedContainer.style.display = 'block';
-            selectedContainer.classList.add('active');
-        }
-        loadFirstShiftByStaff();
     } else if (tabName === 'reports') {
         selectedContainer = document.getElementById('reportsContainer');
         if (selectedContainer) {

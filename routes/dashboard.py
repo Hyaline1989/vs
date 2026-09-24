@@ -53,8 +53,7 @@ def _check_dashboard_access():
     if not current_user.is_authenticated:
         return jsonify({'error': 'Unauthorized'}), 401
 
-    module_perms = get_user_module_permissions(current_user.id)
-    if not module_perms.get('dashboard', False):
+    if not current_user.can_view_dashboard():
         return jsonify({'error': 'Forbidden'}), 403
 
     return None
@@ -349,8 +348,7 @@ def dashboard_today():
     if not current_user.is_authenticated:
         return jsonify({'error': 'Unauthorized'}), 401
     
-    module_perms = get_user_module_permissions(current_user.id)
-    if not module_perms.get('dashboard', False):
+    if not current_user.can_view_dashboard():
         return jsonify({'error': 'Forbidden'}), 403
     
     today = datetime.now().strftime('%Y-%m-%d')
@@ -872,8 +870,7 @@ def get_first_shift_by_object():
     if not current_user.is_authenticated:
         return jsonify({'error': 'Unauthorized'}), 401
     
-    module_perms = get_user_module_permissions(current_user.id)
-    if not module_perms.get('dashboard', False):
+    if not current_user.can_view_reports():
         return jsonify({'error': 'Forbidden'}), 403
     
     try:
@@ -918,8 +915,7 @@ def get_first_shift_by_staff():
     if not current_user.is_authenticated:
         return jsonify({'error': 'Unauthorized'}), 401
     
-    module_perms = get_user_module_permissions(current_user.id)
-    if not module_perms.get('dashboard', False):
+    if not current_user.can_view_reports():
         return jsonify({'error': 'Forbidden'}), 403
     
     try:

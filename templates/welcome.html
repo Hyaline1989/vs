@@ -306,6 +306,16 @@
                 `;
             }
             
+            if (permissions.reports === true || window.currentUser.role === 'admin') {
+                cardsHtml += `
+                    <a href="/reports" class="welcome-card">
+                        <div class="welcome-card-icon"><i class="fas fa-file-alt"></i></div>
+                        <div class="welcome-card-title">Отчёты</div>
+                        <div class="welcome-card-desc">Первая смена по объектам и сотрудникам</div>
+                    </a>
+                `;
+            }
+
             // Админ-панель (только для admin и manager)
             if (window.currentUser.role === 'admin' || window.currentUser.role === 'manager') {
                 cardsHtml += `

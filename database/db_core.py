@@ -82,7 +82,7 @@ def init_db():
             CREATE TABLE IF NOT EXISTS user_module_permissions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL,
-                module_name TEXT NOT NULL CHECK(module_name IN ('dashboard', 'selection', 'worker_status')),
+                module_name TEXT NOT NULL CHECK(module_name IN ('dashboard', 'selection', 'worker_status', 'reports')),
                 can_view INTEGER DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -223,6 +223,33 @@ def init_db():
                 FOREIGN KEY (object_id) REFERENCES objects_settings(id) ON DELETE CASCADE,
                 FOREIGN KEY (uploaded_by) REFERENCES users(id) ON DELETE SET NULL
             )
+        ''')
+
+        # Новый раздел по умолчанию закрыт для существующих пользователей.
+        cursor.execute("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'user_module_permissions'")
+        permissions_schema = cursor.fetchone()[0]
+        if "'reports'" not in permissions_schema:
+            cursor.execute('''
+                CREATE TABLE user_module_permissions_new (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    module_name TEXT NOT NULL CHECK(module_name IN ('dashboard', 'selection', 'worker_status', 'reports')),
+                    can_view INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                    UNIQUE(user_id, module_name)
+                )
+            ''')
+            cursor.execute('''
+                INSERT INTO user_module_permissions_new (id, user_id, module_name, can_view, created_at)
+                SELECT id, user_id, module_name, can_view, created_at FROM user_module_permissions
+            ''')
+            cursor.execute('DROP TABLE user_module_permissions')
+            cursor.execute('ALTER TABLE user_module_permissions_new RENAME TO user_module_permissions')
+        cursor.execute('''
+            INSERT OR IGNORE INTO user_module_permissions (user_id, module_name, can_view)
+            SELECT id, 'reports', 0
+            FROM users
         ''')
 
         # ========== ТАБЛИЦА РЕДАКТИРУЕМЫХ ШПАРГАЛОК ==========

@@ -381,6 +381,9 @@
                         <span>Вахтовики</span>
                     </button>
                     {% endif %}
+                    {% if current_user.can_view_reports() %}
+                    <button class="system-btn" onclick="window.location.href='/reports'"><i class="fas fa-file-alt"></i><span>Отчёты</span></button>
+                    {% endif %}
                     {% if current_user.is_authenticated and (current_user.role == 'admin' or current_user.role == 'manager') %}
                     <button class="system-btn" onclick="window.location.href='/admin'">
                         <i class="fas fa-users-cog"></i>
@@ -396,12 +399,6 @@
         <div class="dashboard-inner-tabs">
             <button class="dashboard-inner-tab active" data-inner-tab="plan-fact" onclick="switchDashboardInnerTab('plan-fact')">
                 <i class="fas fa-chart-line"></i> План/Факт
-            </button>
-            <button class="dashboard-inner-tab" data-inner-tab="first-shift-object" onclick="switchDashboardInnerTab('first-shift-object')">
-                <i class="fas fa-building"></i> 1 смена по объектам
-            </button>
-            <button class="dashboard-inner-tab" data-inner-tab="first-shift-staff" onclick="switchDashboardInnerTab('first-shift-staff')">
-                <i class="fas fa-users"></i> 1 смена по сотрудникам
             </button>
             <button class="dashboard-inner-tab" data-inner-tab="reports" onclick="switchDashboardInnerTab('reports')">
                 <i class="fas fa-file-alt"></i> Отчёт по звонкам
@@ -491,68 +488,6 @@
                             Скачать отчёт
                         </button>
                     </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Контейнер для отчёта "1 смена по объектам" -->
-        <div id="firstShiftObjectContainer" class="dashboard-tab-content">
-            <div class="panel-card">
-                <h2 class="panel-title">
-                    <i class="fas fa-building"></i> 1 смена по объектам
-                </h2>
-                <div class="first-shift-filters">
-                    <div class="export-date-field">
-                        <label for="fsObjectFrom">С:</label>
-                        <input type="date" id="fsObjectFrom" class="date-picker small">
-                    </div>
-                    <div class="export-date-field">
-                        <label for="fsObjectTo">По:</label>
-                        <input type="date" id="fsObjectTo" class="date-picker small">
-                    </div>
-                    <button class="refresh-btn" onclick="loadFirstShiftByObject()">
-                        <i class="fas fa-search"></i> Показать
-                    </button>
-                    <button class="export-btn" onclick="exportFirstShiftByObject()" style="padding: 8px 16px; font-size: 0.85rem;">
-                        <i class="fas fa-download"></i> CSV
-                    </button>
-                </div>
-                <div class="summary-block" id="fsObjectSummary">
-                    <div class="loading">Загрузка...</div>
-                </div>
-                <div id="fsObjectContent">
-                    <div class="loading">Загрузка...</div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Контейнер для отчёта "1 смена по сотрудникам" -->
-        <div id="firstShiftStaffContainer" class="dashboard-tab-content">
-            <div class="panel-card">
-                <h2 class="panel-title">
-                    <i class="fas fa-users"></i> 1 смена по сотрудникам
-                </h2>
-                <div class="first-shift-filters">
-                    <div class="export-date-field">
-                        <label for="fsStaffFrom">С:</label>
-                        <input type="date" id="fsStaffFrom" class="date-picker small">
-                    </div>
-                    <div class="export-date-field">
-                        <label for="fsStaffTo">По:</label>
-                        <input type="date" id="fsStaffTo" class="date-picker small">
-                    </div>
-                    <button class="refresh-btn" onclick="loadFirstShiftByStaff()">
-                        <i class="fas fa-search"></i> Показать
-                    </button>
-                    <button class="export-btn" onclick="exportFirstShiftByStaff()" style="padding: 8px 16px; font-size: 0.85rem;">
-                        <i class="fas fa-download"></i> CSV
-                    </button>
-                </div>
-                <div class="summary-block" id="fsStaffSummary">
-                    <div class="loading">Загрузка...</div>
-                </div>
-                <div id="fsStaffContent">
-                    <div class="loading">Загрузка...</div>
                 </div>
             </div>
         </div>

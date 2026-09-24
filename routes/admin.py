@@ -80,6 +80,7 @@ def create_user_api():
     set_user_module_permission(user_id, 'dashboard', True)
     set_user_module_permission(user_id, 'selection', True)
     set_user_module_permission(user_id, 'worker_status', True)
+    set_user_module_permission(user_id, 'reports', False)
     
     if role == 'admin':
         grant_all_objects_access(user_id, True, True)
@@ -230,13 +231,13 @@ def update_user_module_perms(user_id):
         # Проверяем constraint
         cursor.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='user_module_permissions'")
         create_sql = cursor.fetchone()
-        if create_sql and "worker_status" not in create_sql[0]:
-            logger.warning("Таблица user_module_permissions не имеет worker_status в CHECK, обновляем...")
+        if create_sql and "reports" not in create_sql[0]:
+            logger.warning("Таблица user_module_permissions не имеет reports в CHECK, обновляем...")
             # Пересоздаём таблицу с правильным CHECK
             cursor.execute("CREATE TABLE user_module_permissions_new (" +
                 "id INTEGER PRIMARY KEY AUTOINCREMENT," +
                 "user_id INTEGER NOT NULL," +
-                "module_name TEXT NOT NULL CHECK(module_name IN ('dashboard', 'selection', 'worker_status'))," +
+                "module_name TEXT NOT NULL CHECK(module_name IN ('dashboard', 'selection', 'worker_status', 'reports'))," +
                 "can_view INTEGER DEFAULT 0," +
                 "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP," +
                 "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE," +
@@ -253,7 +254,7 @@ def update_user_module_perms(user_id):
         logger.error(f"Ошибка при проверке структуры таблицы: {e}")
     
     for module, can_view in data.items():
-        if module in ['dashboard', 'selection', 'worker_status']:
+        if module in ['dashboard', 'selection', 'worker_status', 'reports']:
             if current_user.role == 'manager':
                 if not my_module_perms.get(module, False):
                     logger.warning(f"Manager {current_user.id} пытается выдать доступ к модулю {module}")
@@ -357,7 +358,7 @@ def debug_db_check():
         'columns': columns,
         'create_sql': create_sql[0] if create_sql else None,
         'existing_modules': existing_modules,
-        'expected_modules': ['dashboard', 'selection', 'worker_status']
+        'expected_modules': ['dashboard', 'selection', 'worker_status', 'reports']
     })
 
 
