@@ -12,12 +12,16 @@ from PIL import Image, ImageDraw, ImageFont
 SHORT_CALL_SECONDS = 15
 ANALYTICS_EXCLUDED_NAME_PARTS = ['Без менеджера', 'Тарасов Максим']
 EXCLUDED_MANAGER_PREFIXES = ['сервис', 'без менеджера']
+EXCLUDED_MANAGER_NAME_PARTS = ['тройнов максим', 'тарасов максим']
 
 
 def is_excluded_manager(manager_name):
     manager_name = (manager_name or '').strip().casefold()
     manager_name = re.sub(r'^\([^)]*\)\s*', '', manager_name)
-    return any(manager_name.startswith(prefix) for prefix in EXCLUDED_MANAGER_PREFIXES)
+    return (
+        any(manager_name.startswith(prefix) for prefix in EXCLUDED_MANAGER_PREFIXES)
+        or any(name_part in manager_name for name_part in EXCLUDED_MANAGER_NAME_PARTS)
+    )
 
 
 def secfmt(seconds):
