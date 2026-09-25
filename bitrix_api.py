@@ -1,6 +1,8 @@
 # bitrix_api.py - полная версия с получением данных из сделки и отчётами по 1 смене
 # -*- coding: utf-8 -*-
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util import Retry
 import re
 import base64
 from datetime import datetime
@@ -850,6 +852,102 @@ class ShiftReportAPI:
     
     def __init__(self, webhook_url=BITRIX_WEBHOOK_URL):
         self.webhook_url = webhook_url
+
+    def get_object_stage_report(self, stage, start_date_str, end_date_str):
+        """Направления или заселения по объектам за период события."""
+        date_field = {
+            'directed': FIELD_DATE_DIRECTED,
+            'checked_in': CHECK_IN_FIELD,
+        }.get(stage)
+        if not date_field:
+            raise ValueError('Неизвестный этап отчёта')
+
+        deals = []
+        start = 0
+        retries = Retry(total=2, connect=2, read=0, status=0,
+                        backoff_factor=0.5, allowed_methods={'POST'})
+        with requests.Session() as session:
+            session.mount('https://', HTTPAdapter(max_retries=retries))
+            while True:
+                params = {
+                    'filter': {
+                        f'>={date_field}': start_date_str,
+                        f'<={date_field}': end_date_str,
+                    },
+                    'select': [
+                        'ID', date_field, FIELD_COMPANY, 'SOURCE_ID',
+                        FIELD_CC_OPERATOR, FIELD_CC_OPERATOR_REPORT, FIELD_AGENT_FIO,
+                    ],
+                    'start': start,
+                }
+                try:
+                    response = session.post(
+                        f'{self.webhook_url}crm.deal.list', json=params, timeout=(5, 30)
+                    )
+                    response.raise_for_status()
+                except requests.exceptions.RequestException as exc:
+                    raise RuntimeError(f'Сбой запроса сделок Битрикс24 ({type(exc).__name__})') from None
+                result = response.json()
+                if result.get('error'):
+                    raise RuntimeError(result.get('error_description') or result['error'])
+                deals.extend(result.get('result') or [])
+                next_start = result.get('next')
+                if next_start is None:
+                    break
+                if next_start == start:
+                    raise RuntimeError('Битрикс вернул повторную страницу сделок')
+                start = next_start
+
+        filtered = [
+            deal for deal in deals
+            if deal.get(date_field) and deal.get(date_field) != 'N'
+            and not deal.get(FIELD_AGENT_FIO)
+            and not is_operator(deal.get(FIELD_CC_OPERATOR, ''))
+            and not is_operator(deal.get(FIELD_CC_OPERATOR_REPORT, ''))
+            and not (deal.get(FIELD_CC_OPERATOR_REPORT, '') or '').strip().casefold().startswith('спутник')
+        ]
+        return self._group_by_companies(filtered)
+
+    def get_manager_result_deals(self, start_date_str, end_date_str):
+        """Сделки когорты по дате направления с текущими датами последующих этапов."""
+        deals = []
+        start = 0
+        retries = Retry(
+            total=2, connect=2, read=0, status=0,
+            backoff_factor=0.5, allowed_methods={'POST'}
+        )
+        with requests.Session() as session:
+            session.mount('https://', HTTPAdapter(max_retries=retries))
+            while True:
+                params = {
+                    'filter': {
+                        f'>={FIELD_DATE_DIRECTED}': start_date_str,
+                        f'<={FIELD_DATE_DIRECTED}': end_date_str
+                    },
+                    'select': [
+                        'ID', 'SOURCE_ID', FIELD_DATE_DIRECTED, FIELD_CC_OPERATOR_REPORT,
+                        FIELD_AGENT_FIO, CHECK_IN_FIELD, SHIFT_1_FIELD, SHIFT_5_FIELD
+                    ],
+                    'start': start
+                }
+                try:
+                    response = session.post(
+                        f'{self.webhook_url}crm.deal.list', json=params, timeout=(5, 30)
+                    )
+                    response.raise_for_status()
+                except requests.exceptions.RequestException as exc:
+                    raise RuntimeError(f'Сбой запроса сделок Битрикс24 ({type(exc).__name__})') from None
+                result = response.json()
+                if result.get('error'):
+                    raise RuntimeError(result.get('error_description') or result['error'])
+                deals.extend(result.get('result') or [])
+                next_start = result.get('next')
+                if next_start is None:
+                    break
+                if next_start == start:
+                    raise RuntimeError('Битрикс вернул повторную страницу сделок')
+                start = next_start
+        return deals
     
     def _get_filtered_deals(self, start_date_str, end_date_str):
         """

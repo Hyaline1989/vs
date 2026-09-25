@@ -15,8 +15,22 @@
         .reports-content.active { display: block; }
         .first-shift-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 15px; margin-bottom: 20px; }
         #fsObjectContent .office-header, #fsStaffContent .office-header,
-        #fsObjectSummary .summary-row, #fsStaffSummary .summary-row { width: 100%; max-width: 700px; }
-        #fsObjectContent .office-objects, #fsStaffContent .office-objects { width: calc(100% - 32px); max-width: 668px; }
+        #directedObjectContent .office-header, #checkedInObjectContent .office-header,
+        #fsObjectSummary .summary-row, #fsStaffSummary .summary-row,
+        #directedObjectSummary .summary-row, #checkedInObjectSummary .summary-row { width: 100%; max-width: 700px; }
+        #fsObjectContent .office-objects, #fsStaffContent .office-objects,
+        #directedObjectContent .office-objects, #checkedInObjectContent .office-objects { width: calc(100% - 32px); max-width: 668px; }
+        #fsObjectContent .object-row, #fsStaffContent .object-row,
+        #directedObjectContent .object-row, #checkedInObjectContent .object-row { padding: 7px 8px; border-radius: 4px; }
+        #fsObjectContent .object-row:nth-child(even), #fsStaffContent .object-row:nth-child(even),
+        #directedObjectContent .object-row:nth-child(even), #checkedInObjectContent .object-row:nth-child(even) { background: #f0f6ff; }
+        .manager-results-wrap { overflow-x: auto; }
+        .manager-results-table { border-collapse: collapse; width: 100%; min-width: 1050px; }
+        .manager-results-table th, .manager-results-table td { border: 1px solid #ddd; padding: 8px; text-align: right; }
+        .manager-results-table th:first-child, .manager-results-table td:first-child { text-align: left; }
+        .manager-results-table tbody tr:nth-child(even) { background: #f0f6ff; }
+        .manager-results-table tfoot { font-weight: bold; background: #f5e8e8; }
+        .manager-results-table small { display: block; color: #666; font-weight: normal; }
     </style>
 </head>
 <body>
@@ -33,11 +47,14 @@
     </div>
 
     <div class="reports-tabs">
-        <button class="reports-tab active" type="button" data-report="object"><i class="fas fa-building"></i> 1 смена по объектам</button>
+        <button class="reports-tab active" type="button" data-report="directed"><i class="fas fa-arrow-right"></i> Направлены по объектам</button>
+        <button class="reports-tab" type="button" data-report="checked_in"><i class="fas fa-house-user"></i> Заселены по объектам</button>
+        <button class="reports-tab" type="button" data-report="object"><i class="fas fa-building"></i> 1 смена по объектам</button>
         <button class="reports-tab" type="button" data-report="staff"><i class="fas fa-users"></i> 1 смена по сотрудникам</button>
+        <button class="reports-tab" type="button" data-report="manager"><i class="fas fa-chart-bar"></i> Результативность менеджеров</button>
     </div>
 
-    <div id="firstShiftObjectContainer" class="reports-content active">
+    <div id="firstShiftObjectContainer" class="reports-content">
         <div class="panel-card">
             <h2 class="panel-title"><i class="fas fa-building"></i> 1 смена по объектам</h2>
             <div class="first-shift-filters">
@@ -46,8 +63,32 @@
                 <button class="refresh-btn" onclick="loadFirstShiftByObject()"><i class="fas fa-search"></i> Показать</button>
                 <button class="export-btn" onclick="exportFirstShiftByObject()"><i class="fas fa-download"></i> CSV</button>
             </div>
-            <div class="summary-block" id="fsObjectSummary"><div class="loading">Загрузка...</div></div>
-            <div id="fsObjectContent"><div class="loading">Загрузка...</div></div>
+            <div class="summary-block" id="fsObjectSummary"></div>
+            <div id="fsObjectContent">Выберите даты и нажмите «Показать».</div>
+        </div>
+    </div>
+    <div id="directedObjectContainer" class="reports-content active">
+        <div class="panel-card">
+            <h2 class="panel-title">Направлены по объектам</h2>
+            <div class="first-shift-filters">
+                <div class="export-date-field"><label for="directedObjectFrom">С:</label><input type="date" id="directedObjectFrom" class="date-picker small"></div>
+                <div class="export-date-field"><label for="directedObjectTo">По:</label><input type="date" id="directedObjectTo" class="date-picker small"></div>
+                <button class="refresh-btn" type="button" onclick="loadObjectStageReport('directed')"><i class="fas fa-search"></i> Показать</button>
+            </div>
+            <div class="summary-block" id="directedObjectSummary"></div>
+            <div id="directedObjectContent">Выберите даты и нажмите «Показать».</div>
+        </div>
+    </div>
+    <div id="checkedInObjectContainer" class="reports-content">
+        <div class="panel-card">
+            <h2 class="panel-title">Заселены по объектам</h2>
+            <div class="first-shift-filters">
+                <div class="export-date-field"><label for="checkedInObjectFrom">С:</label><input type="date" id="checkedInObjectFrom" class="date-picker small"></div>
+                <div class="export-date-field"><label for="checkedInObjectTo">По:</label><input type="date" id="checkedInObjectTo" class="date-picker small"></div>
+                <button class="refresh-btn" type="button" onclick="loadObjectStageReport('checked_in')"><i class="fas fa-search"></i> Показать</button>
+            </div>
+            <div class="summary-block" id="checkedInObjectSummary"></div>
+            <div id="checkedInObjectContent">Выберите даты и нажмите «Показать».</div>
         </div>
     </div>
     <div id="firstShiftStaffContainer" class="reports-content">
@@ -63,6 +104,19 @@
             <div id="fsStaffContent"><div class="loading">Загрузка...</div></div>
         </div>
     </div>
+    <div id="managerResultsContainer" class="reports-content">
+        <div class="panel-card">
+            <h2 class="panel-title">Результативность менеджеров</h2>
+            <div class="first-shift-filters">
+                <div class="export-date-field"><label for="managerResultsFrom">С:</label><input type="date" id="managerResultsFrom" class="date-picker small"></div>
+                <div class="export-date-field"><label for="managerResultsTo">По:</label><input type="date" id="managerResultsTo" class="date-picker small"></div>
+                <label><input type="checkbox" id="managerResultsCompare"> Сравнить с предыдущим периодом</label>
+                <button class="refresh-btn" type="button" onclick="loadManagerResults(true)">Показать</button>
+            </div>
+            <p>Заселения и смены относятся к выбранному периоду направления, даже если произошли позже. Все проценты считаются от звонков.</p>
+            <div id="managerResultsContent">Выберите даты и нажмите «Показать».</div>
+        </div>
+    </div>
 </div>
 <footer class="app-footer"><div class="footer-links"><a href="/faq"><i class="fas fa-question-circle"></i> FAQ</a></div><div class="footer-copyright"><p>© 2026 Вектор — Управление вахтовым персоналом.</p></div></footer>
 <script src="{{ url_for('static', filename='common.js') }}"></script>
@@ -73,17 +127,67 @@ document.addEventListener('DOMContentLoaded', () => {
     const monthAgo = new Date();
     monthAgo.setMonth(monthAgo.getMonth() - 1);
     const from = monthAgo.toISOString().split('T')[0];
-    for (const id of ['fsObjectFrom', 'fsStaffFrom']) document.getElementById(id).value = from;
-    for (const id of ['fsObjectTo', 'fsStaffTo']) document.getElementById(id).value = today;
-    loadFirstShiftByObject();
+    for (const id of ['fsObjectFrom', 'fsStaffFrom', 'directedObjectFrom', 'checkedInObjectFrom']) document.getElementById(id).value = from;
+    for (const id of ['fsObjectTo', 'fsStaffTo', 'directedObjectTo', 'checkedInObjectTo']) document.getElementById(id).value = today;
+    const weekAgo = new Date(`${today}T12:00:00`);
+    weekAgo.setDate(weekAgo.getDate() - 6);
+    document.getElementById('managerResultsFrom').value = weekAgo.toISOString().slice(0, 10);
+    document.getElementById('managerResultsTo').value = today;
     document.querySelectorAll('.reports-tab').forEach(button => button.addEventListener('click', () => {
         document.querySelectorAll('.reports-tab').forEach(item => item.classList.toggle('active', item === button));
-        const staff = button.dataset.report === 'staff';
-        document.getElementById('firstShiftObjectContainer').classList.toggle('active', !staff);
-        document.getElementById('firstShiftStaffContainer').classList.toggle('active', staff);
-        if (staff && document.getElementById('fsStaffContent').textContent.includes('Загрузка...')) loadFirstShiftByStaff();
+        const report = button.dataset.report;
+        const containers = {
+            object: 'firstShiftObjectContainer',
+            directed: 'directedObjectContainer',
+            checked_in: 'checkedInObjectContainer',
+            staff: 'firstShiftStaffContainer',
+            manager: 'managerResultsContainer'
+        };
+        Object.entries(containers).forEach(([key, id]) => {
+            document.getElementById(id).classList.toggle('active', key === report);
+        });
+        if (report === 'staff' && document.getElementById('fsStaffContent').textContent.includes('Загрузка...')) loadFirstShiftByStaff();
     }));
 });
+async function loadManagerResults(retry = false) {
+    const from = document.getElementById('managerResultsFrom').value;
+    const to = document.getElementById('managerResultsTo').value;
+    const compare = document.getElementById('managerResultsCompare').checked;
+    const periodKey = `${from}_${to}_${compare}`;
+    const target = document.getElementById('managerResultsContent');
+    if (!from || !to || from > to) { target.textContent = 'Укажите корректный период.'; return; }
+    if (target.dataset.loading === periodKey) return;
+    target.dataset.loading = periodKey;
+    target.textContent = 'Загрузка отчёта...';
+    try {
+        let data;
+        const started = Date.now();
+        do {
+            const url = `/api/reports/manager-results?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&compare=${compare ? 1 : 0}${retry ? '&retry=1' : ''}`;
+            retry = false;
+            const response = await fetch(url);
+            data = await response.json();
+            if (!response.ok) throw new Error(data.error || 'Не удалось загрузить отчёт');
+            if (data.status !== 'loading') break;
+            target.textContent = `${data.phase || 'Загрузка данных'}... Это может занять несколько минут.`;
+            if (Date.now() - started > 10 * 60 * 1000) throw new Error('Отчёт рассчитывается слишком долго. Проверьте терминал Вектора.');
+            await new Promise(resolve => setTimeout(resolve, 2000));
+        } while (true);
+        const escape = value => String(value ?? '').replace(/[&<>"']/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[character]));
+        const metrics = [['calls','Звонки'],['directed','Направлено'],['checked_in','Заселено'],['shift_1','1 смена'],['shift_5','5 смена']];
+        const cell = (row, metric) => {
+            const rate = metric === 'calls' ? '' : `<small>${(row.rates[metric] * 100).toFixed(2)}% от звонков</small>`;
+            const change = metric === 'calls' || row.change?.[metric] == null ? '' : `<small>${row.change[metric] >= 0 ? '+' : ''}${(row.change[metric] * 100).toFixed(1)}% к предыдущему периоду</small>`;
+            return `<td>${row[metric] ?? 0}${rate}${change}</td>`;
+        };
+        target.innerHTML = `<div class="manager-results-wrap"><table class="manager-results-table"><thead><tr><th>Менеджер</th>${metrics.map(([,label]) => `<th>${label}</th>`).join('')}<th>Рейтинг</th></tr></thead><tbody>${data.rows.map(row => `<tr><td>${escape(row.manager)} <small>${escape(row.system)}</small></td>${metrics.map(([metric]) => cell(row, metric)).join('')}<td>${row.rating}</td></tr>`).join('')}</tbody><tfoot><tr><td>Итого</td>${metrics.map(([metric]) => cell(data.totals, metric)).join('')}<td>—</td></tr></tfoot></table></div>`;
+        target.dataset.loaded = periodKey;
+    } catch (error) {
+        target.textContent = `Ошибка загрузки: ${error.message}`;
+    } finally {
+        delete target.dataset.loading;
+    }
+}
 </script>
 </body>
 </html>

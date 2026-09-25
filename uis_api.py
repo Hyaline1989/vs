@@ -1,9 +1,13 @@
 # uis_api.py
 # -*- coding: utf-8 -*-
 import logging
-from datetime import datetime
+from collections import defaultdict
+from datetime import datetime, timedelta
+from threading import local
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util import Retry
 
 from config import UIS_BASE_URL, UIS_SYSTEMS
 
@@ -28,6 +32,24 @@ class UISAPI:
     def __init__(self, base_url=UIS_BASE_URL, systems=None):
         self.base_url = base_url.rstrip('/')
         self.systems = systems or UIS_SYSTEMS
+        self._daily_call_counts = {}
+        self._session_local = local()
+
+    def _get_session(self):
+        session = getattr(self._session_local, 'session', None)
+        if session is None:
+            session = requests.Session()
+            retries = Retry(
+                total=2,
+                connect=2,
+                read=0,
+                status=0,
+                backoff_factor=0.5,
+                allowed_methods={'POST'},
+            )
+            session.mount('https://', HTTPAdapter(max_retries=retries))
+            self._session_local.session = session
+        return session
 
     def get_calls_for_date(self, date_str):
         start = f'{date_str} 00:00:00'
@@ -43,6 +65,71 @@ class UISAPI:
             rows.extend(self._normalize_calls(system_name, calls))
 
         return rows
+
+    def get_calls_for_period(self, date_from, date_till):
+        """Звонки за включительный период небольшими порциями для UIS."""
+        rows = []
+        first = datetime.strptime(date_from, '%Y-%m-%d').date()
+        last = datetime.strptime(date_till, '%Y-%m-%d').date()
+        for system_name, access_token in self.systems.items():
+            if access_token:
+                current = first
+                while current <= last:
+                    chunk_end = min(current + timedelta(days=6), last)
+                    calls = self._fetch_calls_split_on_timeout(system_name, access_token, current, chunk_end)
+                    rows.extend(self._normalize_calls(system_name, calls))
+                    current = chunk_end + timedelta(days=1)
+        return rows
+
+    def get_call_counts_for_period(self, date_from, date_till, progress=None):
+        """Месячные счётчики звонков без хранения всех звонков в отчёте."""
+        first = datetime.strptime(date_from, '%Y-%m-%d').date()
+        last = min(datetime.strptime(date_till, '%Y-%m-%d').date(), datetime.now().date())
+        totals = defaultdict(int)
+        days = (last - first).days + 1
+        for system_name, access_token in self.systems.items():
+            if not access_token:
+                continue
+            for index in range(max(days, 0)):
+                day = first + timedelta(days=index)
+                cache_key = (system_name, day.isoformat())
+                if progress:
+                    progress(system_name, day.isoformat(), index + 1, days)
+                if cache_key not in self._daily_call_counts or day == datetime.now().date():
+                    calls = self._fetch_calls(
+                        system_name, access_token,
+                        f'{day.isoformat()} 00:00:00', f'{day.isoformat()} 23:59:59'
+                    )
+                    day_counts = defaultdict(int)
+                    for row in self._normalize_calls(system_name, calls):
+                        direction = row['direction']
+                        duration = row['clean_talk_duration']
+                        if (direction == 'in' and row['is_talked'] and duration > 0) or direction == 'out':
+                            day_counts[row['employee_name']] += 1
+                    self._daily_call_counts[cache_key] = dict(day_counts)
+                for employee_name, count in self._daily_call_counts[cache_key].items():
+                    totals[(system_name, employee_name)] += count
+        return [
+            {'system': system, 'employee_name': name, 'count': count}
+            for (system, name), count in totals.items()
+        ]
+
+    def _fetch_calls_split_on_timeout(self, system_name, access_token, first, last):
+        try:
+            return self._fetch_calls(
+                system_name, access_token,
+                f'{first.isoformat()} 00:00:00',
+                f'{last.isoformat()} 23:59:59'
+            )
+        except requests.exceptions.Timeout:
+            if first == last:
+                raise
+            middle = first + timedelta(days=(last - first).days // 2)
+            logger.warning('UIS timeout за %s—%s; делим период', first, last)
+            return (
+                self._fetch_calls_split_on_timeout(system_name, access_token, first, middle)
+                + self._fetch_calls_split_on_timeout(system_name, access_token, middle + timedelta(days=1), last)
+            )
 
     def _fetch_calls(self, system_name, access_token, date_from, date_till):
         result = []
@@ -65,7 +152,7 @@ class UISAPI:
                 }
             }
 
-            response = requests.post(self.base_url, json=payload, timeout=40)
+            response = self._get_session().post(self.base_url, json=payload, timeout=(5, 40))
             response.raise_for_status()
             data = response.json()
 

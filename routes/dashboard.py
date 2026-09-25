@@ -6,12 +6,15 @@ from datetime import datetime, timedelta
 import re
 import logging
 import sqlite3
+from concurrent.futures import ThreadPoolExecutor
+from threading import Lock
 
 from database import get_user_module_permissions, get_plan_requirements_for_date, DB_NAME
 from bitrix_api import BitrixAPI, ShiftReportAPI
 from comparer import DataComparer
 from config import BITRIX_WEBHOOK_URL
 from manager_efficiency import calculate_efficiency_rating, save_rating_csv, build_rating_png, add_display_colors
+from manager_results import build_manager_results
 from uis_api import UISAPI, validate_report_date
 
 logger = logging.getLogger(__name__)
@@ -25,6 +28,9 @@ uis_api = UISAPI()
 _data_cache = {}
 _cache_timestamps = {}
 CACHE_DURATION = 60
+_manager_results_executor = ThreadPoolExecutor(max_workers=1)
+_manager_results_jobs = {}
+_manager_results_lock = Lock()
 
 def get_cached_data(cache_key, fetch_func, *args, **kwargs):
     now = datetime.now()
@@ -860,6 +866,41 @@ def generate_snapshot_range():
 
 # ========== ОТЧЁТЫ ПО ОТРАБОТАВШИМ 1 СМЕНУ (ИЗ ТЕЛЕГРАМ БОТА) ==========
 
+@dashboard_bp.route('/object-stage-report', methods=['GET'])
+@login_required
+def get_object_stage_report():
+    if not current_user.can_view_reports():
+        return jsonify({'error': 'Forbidden'}), 403
+
+    stage = request.args.get('stage')
+    from_date = request.args.get('from', '')
+    to_date = request.args.get('to', '')
+    if stage not in ('directed', 'checked_in'):
+        return jsonify({'error': 'Неизвестный вид отчёта'}), 400
+    try:
+        if not re.fullmatch(r'\d{4}-\d{2}-\d{2}', from_date) or not re.fullmatch(r'\d{4}-\d{2}-\d{2}', to_date):
+            raise ValueError()
+        if datetime.strptime(from_date, '%Y-%m-%d') > datetime.strptime(to_date, '%Y-%m-%d'):
+            raise ValueError()
+    except ValueError:
+        return jsonify({'error': 'Укажите корректный период'}), 400
+
+    try:
+        data = ShiftReportAPI(BITRIX_WEBHOOK_URL).get_object_stage_report(
+            stage, from_date, to_date
+        )
+        totals = {
+            category: sum(data.get(category, {}).values())
+            for category in ('Поток', 'Комплект', 'Бишкек')
+        }
+        return jsonify({
+            'success': True, 'from_date': from_date, 'to_date': to_date,
+            'data': data, 'totals': totals, 'total_all': sum(totals.values()),
+        })
+    except Exception:
+        logger.exception('Ошибка отчёта по объектам: %s', stage)
+        return jsonify({'error': 'Не удалось загрузить отчёт по объектам'}), 502
+
 @dashboard_bp.route('/first-shift-by-object', methods=['GET'])
 @login_required
 def get_first_shift_by_object():
@@ -951,6 +992,93 @@ def get_first_shift_by_staff():
 
 
 # ========== ОТЧЁТЫ UIS: ЭФФЕКТИВНОСТЬ МЕНЕДЖЕРОВ ==========
+
+@dashboard_bp.route('/reports/manager-results', methods=['GET'])
+@login_required
+def get_manager_results():
+    if not current_user.can_view_reports():
+        return jsonify({'error': 'Forbidden'}), 403
+    from_date = request.args.get('from', '')
+    to_date = request.args.get('to', '')
+    try:
+        if not re.fullmatch(r'\d{4}-\d{2}-\d{2}', from_date) or not re.fullmatch(r'\d{4}-\d{2}-\d{2}', to_date):
+            raise ValueError()
+        first = datetime.strptime(from_date, '%Y-%m-%d').date()
+        last = datetime.strptime(to_date, '%Y-%m-%d').date()
+        if first > last:
+            raise ValueError()
+    except ValueError:
+        return jsonify({'error': 'Укажите корректный период: дата «С» не позже даты «По»'}), 400
+    compare = request.args.get('compare') == '1'
+    job_key = (from_date, to_date, compare)
+    with _manager_results_lock:
+        job = _manager_results_jobs.get(job_key)
+        if job and job['future'].done() and (
+            (request.args.get('retry') == '1' and job['future'].exception())
+            or (datetime.now() - job['created']).total_seconds() > 900
+        ):
+            del _manager_results_jobs[job_key]
+            job = None
+        if job is None:
+            state = {'phase': 'Подготовка данных'}
+            future = _manager_results_executor.submit(_calculate_manager_results, first, last, compare, state)
+            job = {'future': future, 'state': state, 'created': datetime.now()}
+            _manager_results_jobs[job_key] = job
+
+    if not job['future'].done():
+        return jsonify({'success': True, 'status': 'loading', 'phase': job['state']['phase']}), 202
+    try:
+        return jsonify(job['future'].result())
+    except Exception:
+        logger.exception('Ошибка отчёта результативности менеджеров')
+        return jsonify({'error': 'Не удалось загрузить отчёт результативности'}), 502
+
+
+def _calculate_manager_results(first, last, compare, state):
+    try:
+        def period_data(start, end):
+            start_str, end_str = start.isoformat(), end.isoformat()
+            calls = uis_api.get_call_counts_for_period(
+                start_str, end_str,
+                progress=lambda system, day, current, total: state.update(
+                    phase=f'Звонки {system}: {day} (день {current} из {total})'
+                )
+            )
+            state['phase'] = f'Направления и смены: {start_str} — {end_str}'
+            deals = get_cached_data(
+                f'bitrix_results_{start_str}', ShiftReportAPI(BITRIX_WEBHOOK_URL).get_manager_result_deals,
+                start_str, end_str
+            )
+            return build_manager_results(calls, deals)
+
+        state['phase'] = 'Загружаем данные за выбранный период'
+        current_rows, totals = period_data(first, last)
+        previous_period = None
+        if compare:
+            previous_last = first - timedelta(days=1)
+            previous_first = previous_last - (last - first)
+            state['phase'] = 'Загружаем данные за предыдущий период'
+            previous_rows, previous_totals = period_data(previous_first, previous_last)
+            previous_rates = {(r['system'], r['key']): r['rates'] for r in previous_rows}
+            for row in current_rows:
+                prior = previous_rates.get((row['system'], row['key']))
+                row['change'] = {
+                    metric: row['rates'][metric] / prior[metric] - 1 if prior and prior.get(metric) else None
+                    for metric in row['rates']
+                }
+            totals['change'] = {
+                metric: totals['rates'][metric] / previous_totals['rates'][metric] - 1
+                if previous_totals['rates'].get(metric) else None
+                for metric in totals['rates']
+            }
+            previous_period = {'from': previous_first.isoformat(), 'to': previous_last.isoformat()}
+        return {
+            'success': True, 'status': 'ready', 'from': first.isoformat(), 'to': last.isoformat(),
+            'previous_period': previous_period, 'rows': current_rows, 'totals': totals
+        }
+    except Exception:
+        logger.exception('Ошибка отчёта результативности менеджеров')
+        raise
 
 @dashboard_bp.route('/reports/manager-efficiency', methods=['GET'])
 @login_required

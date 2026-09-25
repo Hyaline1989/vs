@@ -831,8 +831,8 @@ async function loadFirstShiftByObject() {
     }
 }
 
-function renderFirstShiftByObject(data, totals) {
-    const container = document.getElementById('fsObjectContent');
+function renderFirstShiftByObject(data, totals, containerId = 'fsObjectContent') {
+    const container = document.getElementById(containerId);
     if (!container) return;
     
     const categories = ['Поток', 'Комплект', 'Бишкек'];
@@ -872,7 +872,7 @@ function renderFirstShiftByObject(data, totals) {
     container.innerHTML = html;
     
     // Добавляем обработчики для сворачивания/разворачивания
-    document.querySelectorAll('#fsObjectContent .office-header').forEach(header => {
+    container.querySelectorAll('.office-header').forEach(header => {
         header.addEventListener('click', function() {
             const objectsDiv = this.nextElementSibling;
             const toggle = this.querySelector('.toggle');
@@ -885,6 +885,35 @@ function renderFirstShiftByObject(data, totals) {
             }
         });
     });
+}
+
+async function loadObjectStageReport(stage) {
+    const prefix = stage === 'directed' ? 'directedObject' : 'checkedInObject';
+    const fromDate = document.getElementById(`${prefix}From`).value;
+    const toDate = document.getElementById(`${prefix}To`).value;
+    const content = document.getElementById(`${prefix}Content`);
+    const summary = document.getElementById(`${prefix}Summary`);
+
+    if (!fromDate || !toDate || fromDate > toDate) {
+        content.textContent = 'Укажите корректный период.';
+        return;
+    }
+    content.innerHTML = '<div class="loading">Загрузка данных...</div>';
+    summary.textContent = '';
+    try {
+        const params = new URLSearchParams({ stage, from: fromDate, to: toDate });
+        const response = await fetch(`/api/object-stage-report?${params}`, { credentials: 'include' });
+        const result = await response.json();
+        if (!response.ok || result.error) throw new Error(result.error || 'Не удалось загрузить отчёт');
+        summary.innerHTML = `
+            <div class="summary-row"><span>Период:</span><span class="summary-value">${formatDateForDisplay(fromDate)} - ${formatDateForDisplay(toDate)}</span></div>
+            <div class="summary-row"><span>Всего сделок:</span><span class="summary-value" style="background: #ffd700; color: #2c3e50;">${result.total_all || 0}</span></div>
+        `;
+        renderFirstShiftByObject(result.data, result.totals, `${prefix}Content`);
+    } catch (error) {
+        console.error('Ошибка отчёта по объектам:', error);
+        content.textContent = `Ошибка загрузки: ${error.message}`;
+    }
 }
 
 // ========== ОТЧЁТ: ОТРАБОТАВШИЕ 1 СМЕНУ ПО СОТРУДНИКАМ ==========
