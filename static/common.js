@@ -461,6 +461,34 @@ async function stopImpersonation() {
     }
 }
 
+function setupHeaderMenu() {
+    const header = document.querySelector('.app-header');
+    const navigation = header?.querySelector('.system-switcher');
+    if (!header || !navigation || header.querySelector('.header-menu-toggle')) return;
+
+    navigation.id ||= 'main-navigation';
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'header-menu-toggle';
+    toggle.setAttribute('aria-controls', navigation.id);
+    toggle.setAttribute('aria-expanded', 'false');
+    toggle.innerHTML = '<i class="fas fa-bars" aria-hidden="true"></i><span>Меню</span>';
+    header.insertBefore(toggle, header.querySelector('.header-right'));
+    header.classList.add('has-mobile-nav');
+
+    toggle.addEventListener('click', () => {
+        const isOpen = header.classList.toggle('nav-open');
+        toggle.setAttribute('aria-expanded', String(isOpen));
+    });
+    document.addEventListener('keydown', event => {
+        if (event.key === 'Escape' && header.classList.contains('nav-open')) {
+            header.classList.remove('nav-open');
+            toggle.setAttribute('aria-expanded', 'false');
+            toggle.focus();
+        }
+    });
+}
+
 // ========== ИНИЦИАЛИЗАЦИЯ ПРИ ЗАГРУЗКЕ СТРАНИЦЫ ==========
 async function initPage() {
     const path = window.location.pathname;
@@ -470,6 +498,8 @@ async function initPage() {
     if (path === '/') {
         return;
     }
+
+    setupHeaderMenu();
     
     // Добавляем кнопку "Наверх"
     addScrollTopButton();

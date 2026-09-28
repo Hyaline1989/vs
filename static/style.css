@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Unicase:wght@400;500;600;700&display=swap');
+
 /* static/style.css - полная версия с вертикальным меню на мобильных (≤1050px) */
 /* ========== ОСНОВНЫЕ СТИЛИ ========== */
 
@@ -18,12 +20,21 @@
     margin: 0;
     padding: 0;
     box-sizing: border-box;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
 body {
     background: #bab7b7;
     min-height: 100vh;
+    font-family: 'Cormorant Unicase', Georgia, serif;
+}
+
+button, input, select, textarea {
+    font-family: inherit;
+}
+
+/* В окнах паспортов оставляем прежний шрифт и авторское форматирование текста. */
+#passportViewModal, #passportEditorModal {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
 .app-container {
@@ -32,22 +43,28 @@ body {
     padding: 20px;
 }
 
-/* Шапка с переключателем */
+/* Единая верхняя панель сайта */
 .app-header {
-    background: rgba(255, 255, 255, 0.95);
-    border-radius: 20px;
-    padding: 20px 30px;
-    margin-bottom: 30px;
+    background: #fff;
+    border-radius: 0;
+    border-bottom: 1px solid #e4e6e9;
+    padding: 12px 28px;
+    margin: -20px -20px 30px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    flex-wrap: wrap;
-    gap: 20px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    gap: 24px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
 }
 
 .logo-container {
     text-align: left;
+    flex-shrink: 0;
+}
+
+.app-header .logo-container {
+    display: flex;
+    align-items: center;
 }
 
 .app-logo {
@@ -58,57 +75,66 @@ body {
 }
 
 .app-logo-img {
-    max-width: 180px;
+    max-width: 250px;
     height: auto;
-}
-
-.app-subtitle {
-    color: var(--gray);
-    font-size: 0.85rem;
-    margin-top: 5px;
+    display: block;
 }
 
 .header-right {
     display: flex;
     align-items: center;
-    gap: 20px;
+    justify-content: space-between;
+    flex: 1;
+    min-width: 0;
+    gap: 16px;
 }
 
 .system-switcher {
     display: flex;
-    gap: 15px;
-    background: var(--light-gray);
-    padding: 5px;
-    border-radius: 50px;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 4px 18px;
+    background: transparent;
+    padding: 0;
+    border-radius: 0;
 }
 
 .system-btn {
     background: transparent;
     border: none;
-    padding: 10px 24px;
-    border-radius: 40px;
-    font-size: 1rem;
+    border-bottom: 3px solid transparent;
+    padding: 10px 2px 7px;
+    border-radius: 0;
+    font-size: 0.92rem;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: color 0.2s ease, border-color 0.2s ease;
     display: flex;
     align-items: center;
-    gap: 8px;
+    white-space: nowrap;
     color: var(--dark);
 }
 
-.system-btn i {
-    font-size: 1.1rem;
+.app-header .system-btn i {
+    display: none;
 }
 
 .system-btn.active {
-    background: var(--primary);
-    color: white;
-    box-shadow: 0 2px 10px rgba(164, 44, 48, 0.3);
+    background: transparent;
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+    box-shadow: none;
 }
 
 .system-btn:hover:not(.active) {
-    background: rgba(164, 44, 48, 0.1);
+    background: transparent;
+    color: var(--primary);
+    border-bottom-color: rgba(164, 44, 48, 0.35);
+}
+
+.header-menu-toggle {
+    display: none;
 }
 
 .user-info {
@@ -2874,4 +2900,67 @@ body {
 @media (max-width: 700px) {
     .faq-order-row { grid-template-columns: 1fr; }
     .faq-admin-row { align-items: flex-start; }
+}
+
+/* Верхнее меню: на узких экранах раскрывается по кнопке. */
+@media (max-width: 1250px) {
+    .app-header {
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        text-align: left;
+        padding: 12px 20px;
+        gap: 10px;
+    }
+
+    .app-header .logo-container { text-align: left; }
+    .app-header .header-right {
+        flex: 0 0 100%;
+        width: 100%;
+        flex-direction: column;
+        gap: 10px;
+    }
+    .app-header .system-switcher {
+        width: 100%;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0;
+        background: transparent;
+        padding: 0;
+    }
+    .app-header.has-mobile-nav .system-switcher { display: none; }
+    .app-header.has-mobile-nav.nav-open .system-switcher { display: flex; }
+    .app-header .system-btn {
+        justify-content: flex-start;
+        background: transparent;
+        border-radius: 0;
+        border-bottom: 1px solid #eceeef;
+        padding: 12px 8px;
+        font-size: 0.92rem;
+        color: var(--dark);
+    }
+    .app-header .system-btn.active {
+        background: transparent;
+        border-bottom-color: var(--primary);
+        color: var(--primary);
+    }
+    .app-header .user-info { justify-content: flex-end; width: 100%; }
+    .app-header .user-info-container { justify-content: flex-end; flex-wrap: wrap; }
+    .header-menu-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 9px 12px;
+        border: 1px solid #d9dcdf;
+        border-radius: 8px;
+        background: #fff;
+        color: var(--dark);
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+    }
+    .header-menu-toggle:focus-visible, .app-header .system-btn:focus-visible {
+        outline: 2px solid var(--primary);
+        outline-offset: 2px;
+    }
 }

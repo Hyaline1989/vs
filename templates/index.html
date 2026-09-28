@@ -6,7 +6,7 @@
     <title>Вектор | Вход в систему</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/favicon.png') }}">
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/favicon4.png') }}">
     <style>
         .login-page {
             min-height: 100vh;
@@ -43,14 +43,10 @@
         }
         
         .login-logo img {
-            max-width: 200px;
+            max-width: 250px;
             height: auto;
-        }
-        
-        .login-logo p {
-            color: var(--gray);
-            font-size: 0.85rem;
-            margin-top: 10px;
+            display: block;
+            margin: 0 auto;
         }
         
         .login-title {
@@ -159,8 +155,7 @@
     <div class="login-page">
         <div class="login-container">
             <div class="login-logo">
-                <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Вектор">
-                <p>Управление вахтовым персоналом</p>
+                <img src="{{ url_for('static', filename='images/logo2.png') }}" alt="Вектор">
             </div>
             
             <div class="login-title">Добро пожаловать!</div>

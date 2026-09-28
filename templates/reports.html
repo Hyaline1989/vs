@@ -6,7 +6,7 @@
     <title>Вектор | Отчёты</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/favicon.png') }}">
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/favicon4.png') }}">
     <style>
         .reports-tabs { display: flex; flex-wrap: wrap; gap: 0; margin: 0 0 25px; border-bottom: 2px solid var(--primary); }
         .reports-tab { padding: 11px 24px; border: 1px solid rgba(164,44,48,.25); border-bottom: 0; background: rgba(164,44,48,.08); cursor: pointer; }
@@ -32,12 +32,15 @@
         .manager-results-table tbody tr:nth-child(even) { background: #f0f6ff; }
         .manager-results-table tfoot { font-weight: bold; background: #f5e8e8; }
         .manager-results-table small { display: block; color: #666; font-weight: normal; }
+        .manager-results-table .rate-below-total { background: #f4cccc; border-radius: 3px; }
+        .manager-results-table .change-positive { background: #b7e1cd; border-radius: 3px; }
+        .manager-results-table .change-negative { background: #fce5cd; border-radius: 3px; }
     </style>
 </head>
 <body>
 <div class="app-container">
     <div class="app-header">
-        <div class="logo-container"><img src="{{ url_for('static', filename='images/logo.png') }}" alt="Вектор" class="app-logo-img"><p class="app-subtitle">Управление вахтовым персоналом</p></div>
+        <div class="logo-container"><img src="{{ url_for('static', filename='images/logo2.png') }}" alt="Вектор" class="app-logo-img"></div>
         <div class="header-right"><div class="system-switcher">
             {% if current_user.can_view_dashboard() %}<button class="system-btn" onclick="location.href='/dashboard'"><i class="fas fa-chart-line"></i><span>Дашборд</span></button>{% endif %}
             {% if current_user.can_view_selection() %}<button class="system-btn" onclick="location.href='/selection'"><i class="fas fa-user-check"></i><span>Подбор объектов</span></button>{% endif %}
@@ -181,12 +184,24 @@ async function loadManagerResults(retry = false) {
         } while (true);
         const escape = value => String(value ?? '').replace(/[&<>"']/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[character]));
         const metrics = [['calls','Звонки'],['directed','Направлено'],['checked_in','Заселено'],['shift_1','1 смена'],['shift_5','5 смена']];
-        const cell = (row, metric) => {
-            const rate = metric === 'calls' ? '' : `<small>${(row.rates[metric] * 100).toFixed(2)}% от звонков</small>`;
-            const change = metric === 'calls' || row.change?.[metric] == null ? '' : `<small>${row.change[metric] >= 0 ? '+' : ''}${(row.change[metric] * 100).toFixed(1)}% к предыдущему периоду</small>`;
+        const totalRates = data.totals.rates;
+        const ratings = data.rows.map(row => Number(row.rating)).filter(Number.isFinite);
+        const minRating = ratings.length ? Math.min(...ratings) : 0;
+        const maxRating = ratings.length ? Math.max(...ratings) : 0;
+        const ratingColor = value => {
+            const fraction = maxRating === minRating ? 0 : Math.max(0, Math.min(1, (Number(value) - minRating) / (maxRating - minRating)));
+            const end = [230, 124, 115]; // Excel: белый → #E67C73.
+            return `rgb(${end.map(channel => Math.round(255 + (channel - 255) * fraction)).join(',')})`;
+        };
+        const cell = (row, metric, isTotal = false) => {
+            const belowTotal = !isTotal && metric !== 'calls' && row.rates[metric] < totalRates[metric];
+            const rate = metric === 'calls' ? '' : `<small class="${belowTotal ? 'rate-below-total' : ''}">${(row.rates[metric] * 100).toFixed(2)}% от звонков</small>`;
+            const changeValue = row.change?.[metric];
+            const changeClass = changeValue >= 1e-8 ? 'change-positive' : changeValue <= -1e-8 ? 'change-negative' : '';
+            const change = metric === 'calls' || changeValue == null ? '' : `<small class="${changeClass}">${changeValue >= 0 ? '+' : ''}${(changeValue * 100).toFixed(1)}% к предыдущему периоду</small>`;
             return `<td>${row[metric] ?? 0}${rate}${change}</td>`;
         };
-        target.innerHTML = `<div class="manager-results-wrap"><table class="manager-results-table"><thead><tr><th>Менеджер</th>${metrics.map(([,label]) => `<th>${label}</th>`).join('')}<th>Рейтинг</th></tr></thead><tbody>${data.rows.map(row => `<tr><td>${escape(row.manager)} <small>${escape(row.system)}</small></td>${metrics.map(([metric]) => cell(row, metric)).join('')}<td>${row.rating}</td></tr>`).join('')}</tbody><tfoot><tr><td>Итого</td>${metrics.map(([metric]) => cell(data.totals, metric)).join('')}<td>—</td></tr></tfoot></table></div>`;
+        target.innerHTML = `<div class="manager-results-wrap"><table class="manager-results-table"><thead><tr><th>Менеджер</th>${metrics.map(([,label]) => `<th>${label}</th>`).join('')}<th>Рейтинг</th></tr></thead><tbody>${data.rows.map(row => `<tr><td>${escape(row.manager)} <small>${escape(row.system)}</small></td>${metrics.map(([metric]) => cell(row, metric)).join('')}<td style="background-color: ${ratingColor(row.rating)}">${row.rating}</td></tr>`).join('')}</tbody><tfoot><tr><td>Итого</td>${metrics.map(([metric]) => cell(data.totals, metric, true)).join('')}<td>—</td></tr></tfoot></table></div>`;
         target.dataset.loaded = periodKey;
     } catch (error) {
         target.textContent = `Ошибка загрузки: ${error.message}`;
