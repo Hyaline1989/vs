@@ -26,6 +26,7 @@ body {
     background: #bab7b7;
     min-height: 100vh;
     font-family: 'Cormorant Unicase', Georgia, serif;
+    font-weight: 500;
 }
 
 button, input, select, textarea {
@@ -35,6 +36,7 @@ button, input, select, textarea {
 /* В окнах паспортов оставляем прежний шрифт и авторское форматирование текста. */
 #passportViewModal, #passportEditorModal {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-weight: 400;
 }
 
 .app-container {
