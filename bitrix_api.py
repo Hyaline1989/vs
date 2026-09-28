@@ -898,14 +898,7 @@ class ShiftReportAPI:
                     raise RuntimeError('Битрикс вернул повторную страницу сделок')
                 start = next_start
 
-        filtered = [
-            deal for deal in deals
-            if deal.get(date_field) and deal.get(date_field) != 'N'
-            and not deal.get(FIELD_AGENT_FIO)
-            and not is_operator(deal.get(FIELD_CC_OPERATOR, ''))
-            and not is_operator(deal.get(FIELD_CC_OPERATOR_REPORT, ''))
-            and not (deal.get(FIELD_CC_OPERATOR_REPORT, '') or '').strip().casefold().startswith('спутник')
-        ]
+        filtered = [deal for deal in deals if deal.get(date_field) and deal.get(date_field) != 'N']
         return self._group_by_companies(filtered)
 
     def get_manager_result_deals(self, start_date_str, end_date_str):
@@ -949,7 +942,7 @@ class ShiftReportAPI:
                 start = next_start
         return deals
     
-    def _get_filtered_deals(self, start_date_str, end_date_str):
+    def _get_filtered_deals(self, start_date_str, end_date_str, include_all=False):
         """
         Возвращает сделки, прошедшие все фильтры, но без группировки.
         ДОБАВЛЕНА ОТЛАДКА: логирует каждый этап фильтрации.
@@ -960,6 +953,9 @@ class ShiftReportAPI:
         # Оставляем только с отработанной сменой (заполненное и не 'N')
         worked = [d for d in deals if d.get(FIELD_WORKED_1_SHIFT) and d.get(FIELD_WORKED_1_SHIFT) != 'N']
         logger.info(f"📊 [1 смена] После фильтра 'отработал 1 смену': {len(worked)}")
+
+        if include_all:
+            return worked
         
         # Без заполненного ФИО агента
         no_agent = [d for d in worked if not d.get(FIELD_AGENT_FIO)]
@@ -1025,42 +1021,33 @@ class ShiftReportAPI:
     
     def get_shift_report(self, start_date_str, end_date_str):
         """Отчёт по отработавшим 1 смену с разбивкой по компаниям."""
-        deals = self._get_filtered_deals(start_date_str, end_date_str)
+        deals = self._get_filtered_deals(start_date_str, end_date_str, include_all=True)
         result = self._group_by_companies(deals)
         logger.info(f"📊 [1 смена] Итоговый отчёт по объектам: {sum(sum(v.values()) for v in result.values()) if result else 0} записей")
         return result
     
     def _group_by_companies(self, deals):
         """Группировка по компаниям (для отчёта по объектам)."""
-        categories = {'Поток': [], 'Бишкек': [], 'Комплект': []}
-        exclude = {SOURCE_AGENT}
-        
-        for d in deals:
-            src = d.get('SOURCE_ID')
-            if src in exclude:
+        report = {'Основной': {}, 'Агенты': {}, 'Опер и Спутник': {}}
+        company_ids = list({d.get(FIELD_COMPANY) for d in deals if d.get(FIELD_COMPANY)})
+        companies_info = self._get_companies_info(company_ids)
+
+        for deal in deals:
+            company = companies_info.get(deal.get(FIELD_COMPANY))
+            if not company:
                 continue
-            if src == SOURCE_POTOK:
-                categories['Поток'].append(d)
-            elif src == SOURCE_BISHKEK:
-                categories['Бишкек'].append(d)
+            operator_names = [
+                (deal.get(field) or '').strip().casefold()
+                for field in (FIELD_CC_OPERATOR, FIELD_CC_OPERATOR_REPORT)
+            ]
+            if deal.get(FIELD_AGENT_FIO) or deal.get('SOURCE_ID') == SOURCE_AGENT:
+                category = 'Агенты'
+            elif any(name.startswith(('опер', 'спутник')) for name in operator_names):
+                category = 'Опер и Спутник'
             else:
-                categories['Комплект'].append(d)
-        
-        report = {}
-        for cat_name, deal_list in categories.items():
-            if not deal_list:
-                report[cat_name] = {}
-                continue
-            company_ids = list({d.get(FIELD_COMPANY) for d in deal_list if d.get(FIELD_COMPANY)})
-            companies_info = self._get_companies_info(company_ids)
-            
-            grouped = {}
-            for d in deal_list:
-                cid = d.get(FIELD_COMPANY)
-                if cid and cid in companies_info:
-                    cname = companies_info[cid]
-                    grouped[cname] = grouped.get(cname, 0) + 1
-            report[cat_name] = grouped
+                category = 'Основной'
+            grouped = report[category]
+            grouped[company] = grouped.get(company, 0) + 1
         return report
     
     def get_staff_report(self, start_date_str, end_date_str):

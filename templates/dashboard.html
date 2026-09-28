@@ -6,7 +6,7 @@
     <title>Вектор | Дашборд</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='images/favicon.png') }}">
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/favicon.png') }}">
     <style>
         .app-logo-img {
             max-width: 180px;
@@ -467,26 +467,6 @@
                         <div class="discrepancy-list" id="plan-fact-container">
                             <div class="loading">Загрузка...</div>
                         </div>
-                    </div>
-                    <div class="export-container">
-                        <h3 class="export-title">📥 Выгрузка отчёта</h3>
-                        <div class="export-period-selector">
-                            <div class="export-date-field">
-                                <label for="report-from">С:</label>
-                                <input type="date" id="report-from" class="date-picker small" value="">
-                            </div>
-                            <div class="export-date-field">
-                                <label for="report-to">По:</label>
-                                <input type="date" id="report-to" class="date-picker small" value="">
-                            </div>
-                        </div>
-                        <div class="export-period-info" id="exportPeriodInfo">
-                            Период: <span id="periodDisplay">сегодня</span>
-                        </div>
-                        <button id="export-full-report" class="export-btn" onclick="exportFullReport()">
-                            <span class="export-icon">📊</span>
-                            Скачать отчёт
-                        </button>
                     </div>
                 </div>
             </div>

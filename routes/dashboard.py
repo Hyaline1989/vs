@@ -891,7 +891,7 @@ def get_object_stage_report():
         )
         totals = {
             category: sum(data.get(category, {}).values())
-            for category in ('Поток', 'Комплект', 'Бишкек')
+            for category in ('Основной', 'Агенты', 'Опер и Спутник')
         }
         return jsonify({
             'success': True, 'from_date': from_date, 'to_date': to_date,
@@ -926,7 +926,7 @@ def get_first_shift_by_object():
         
         # Подсчёт итогов
         totals = {}
-        for cat in ['Поток', 'Комплект', 'Бишкек']:
+        for cat in ['Основной', 'Агенты', 'Опер и Спутник']:
             cat_data = data.get(cat, {})
             totals[cat] = sum(cat_data.values()) if cat_data else 0
         

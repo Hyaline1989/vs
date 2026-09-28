@@ -6,7 +6,7 @@
     <title>Вектор | Отчёты</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <link rel="icon" href="{{ url_for('static', filename='images/favicon.png') }}">
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/favicon.png') }}">
     <style>
         .reports-tabs { display: flex; flex-wrap: wrap; gap: 0; margin: 0 0 25px; border-bottom: 2px solid var(--primary); }
         .reports-tab { padding: 11px 24px; border: 1px solid rgba(164,44,48,.25); border-bottom: 0; background: rgba(164,44,48,.08); cursor: pointer; }
@@ -14,6 +14,7 @@
         .reports-content { display: none; }
         .reports-content.active { display: block; }
         .first-shift-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 15px; margin-bottom: 20px; }
+        .report-date-hint { margin: -8px 0 18px; color: #666; font-size: 13px; }
         #fsObjectContent .office-header, #fsStaffContent .office-header,
         #directedObjectContent .office-header, #checkedInObjectContent .office-header,
         #fsObjectSummary .summary-row, #fsStaffSummary .summary-row,
@@ -63,6 +64,7 @@
                 <button class="refresh-btn" onclick="loadFirstShiftByObject()"><i class="fas fa-search"></i> Показать</button>
                 <button class="export-btn" onclick="exportFirstShiftByObject()"><i class="fas fa-download"></i> CSV</button>
             </div>
+            <p class="report-date-hint">Фильтр по датам строится по полю «Дата направлен».</p>
             <div class="summary-block" id="fsObjectSummary"></div>
             <div id="fsObjectContent">Выберите даты и нажмите «Показать».</div>
         </div>
@@ -75,6 +77,7 @@
                 <div class="export-date-field"><label for="directedObjectTo">По:</label><input type="date" id="directedObjectTo" class="date-picker small"></div>
                 <button class="refresh-btn" type="button" onclick="loadObjectStageReport('directed')"><i class="fas fa-search"></i> Показать</button>
             </div>
+            <p class="report-date-hint">Фильтр по датам строится по полю «Дата направлен».</p>
             <div class="summary-block" id="directedObjectSummary"></div>
             <div id="directedObjectContent">Выберите даты и нажмите «Показать».</div>
         </div>
@@ -87,6 +90,7 @@
                 <div class="export-date-field"><label for="checkedInObjectTo">По:</label><input type="date" id="checkedInObjectTo" class="date-picker small"></div>
                 <button class="refresh-btn" type="button" onclick="loadObjectStageReport('checked_in')"><i class="fas fa-search"></i> Показать</button>
             </div>
+            <p class="report-date-hint">Фильтр отбора строится по полю «Дата заселен».</p>
             <div class="summary-block" id="checkedInObjectSummary"></div>
             <div id="checkedInObjectContent">Выберите даты и нажмите «Показать».</div>
         </div>
@@ -100,6 +104,7 @@
                 <button class="refresh-btn" onclick="loadFirstShiftByStaff()"><i class="fas fa-search"></i> Показать</button>
                 <button class="export-btn" onclick="exportFirstShiftByStaff()"><i class="fas fa-download"></i> CSV</button>
             </div>
+            <p class="report-date-hint">Фильтр по датам строится по полю «Дата направлен».</p>
             <div class="summary-block" id="fsStaffSummary"><div class="loading">Загрузка...</div></div>
             <div id="fsStaffContent"><div class="loading">Загрузка...</div></div>
         </div>
@@ -113,6 +118,7 @@
                 <label><input type="checkbox" id="managerResultsCompare"> Сравнить с предыдущим периодом</label>
                 <button class="refresh-btn" type="button" onclick="loadManagerResults(true)">Показать</button>
             </div>
+            <p class="report-date-hint">Фильтр отбора выбирает даты по календарю.</p>
             <p>Заселения и смены относятся к выбранному периоду направления, даже если произошли позже. Все проценты считаются от звонков.</p>
             <div id="managerResultsContent">Выберите даты и нажмите «Показать».</div>
         </div>

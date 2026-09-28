@@ -823,7 +823,7 @@ async function loadFirstShiftByObject() {
             `;
         }
         
-        renderFirstShiftByObject(data.data, data.totals);
+        renderFirstShiftByObject(data.data);
         
     } catch (error) {
         console.error('Ошибка:', error);
@@ -831,60 +831,37 @@ async function loadFirstShiftByObject() {
     }
 }
 
-function renderFirstShiftByObject(data, totals, containerId = 'fsObjectContent') {
+function renderFirstShiftByObject(data, containerId = 'fsObjectContent') {
     const container = document.getElementById(containerId);
     if (!container) return;
-    
-    const categories = ['Поток', 'Комплект', 'Бишкек'];
-    let html = '';
-    
-    for (const cat of categories) {
-        const catData = data[cat] || {};
-        const catTotal = totals[cat] || 0;
-        const items = Object.entries(catData).sort((a, b) => b[1] - a[1]);
-        
-        html += `
+
+    const blocks = [
+        ['Основной', 'Подбор'],
+        ['Агенты', 'Агенты'],
+        ['Опер и Спутник', 'Операции']
+    ];
+    container.innerHTML = blocks.map(([key, title]) => {
+        const items = Object.entries(data?.[key] || {})
+            .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'ru'));
+        const total = items.reduce((sum, [, count]) => sum + Number(count), 0);
+        const rows = items.length
+            ? items.map(([company, count]) => `
+                <div class="object-row">
+                    <span class="object-name">${escapeHtml(company)}</span>
+                    <span class="object-value">${count}</span>
+                </div>
+            `).join('')
+            : '<div class="empty-objects">Нет сделок</div>';
+        return `
             <div class="office-item" style="margin-bottom: 20px;">
                 <div class="office-header">
-                    <span class="toggle">▼</span>
-                    <span class="office-name">${escapeHtml(cat)}</span>
-                    <span class="office-count">${catTotal}</span>
+                    <span class="office-name">${title}</span>
+                    <span class="office-count">${total}</span>
                 </div>
-                <div class="office-objects">
+                <div class="office-objects">${rows}</div>
+            </div>
         `;
-        
-        if (items.length === 0) {
-            html += `<div class="empty-objects">✘ Нет сделок</div>`;
-        } else {
-            for (const [company, count] of items) {
-                html += `
-                    <div class="object-row">
-                        <span class="object-name">${escapeHtml(company)}</span>
-                        <span class="object-value">${count}</span>
-                    </div>
-                `;
-            }
-        }
-        
-        html += `</div></div>`;
-    }
-    
-    container.innerHTML = html;
-    
-    // Добавляем обработчики для сворачивания/разворачивания
-    container.querySelectorAll('.office-header').forEach(header => {
-        header.addEventListener('click', function() {
-            const objectsDiv = this.nextElementSibling;
-            const toggle = this.querySelector('.toggle');
-            if (objectsDiv.style.display === 'none') {
-                objectsDiv.style.display = 'block';
-                toggle.textContent = '▼';
-            } else {
-                objectsDiv.style.display = 'none';
-                toggle.textContent = '▶';
-            }
-        });
-    });
+    }).join('');
 }
 
 async function loadObjectStageReport(stage) {
@@ -909,7 +886,7 @@ async function loadObjectStageReport(stage) {
             <div class="summary-row"><span>Период:</span><span class="summary-value">${formatDateForDisplay(fromDate)} - ${formatDateForDisplay(toDate)}</span></div>
             <div class="summary-row"><span>Всего сделок:</span><span class="summary-value" style="background: #ffd700; color: #2c3e50;">${result.total_all || 0}</span></div>
         `;
-        renderFirstShiftByObject(result.data, result.totals, `${prefix}Content`);
+        renderFirstShiftByObject(result.data, `${prefix}Content`);
     } catch (error) {
         console.error('Ошибка отчёта по объектам:', error);
         content.textContent = `Ошибка загрузки: ${error.message}`;
