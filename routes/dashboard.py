@@ -886,7 +886,7 @@ def get_object_stage_report():
         return jsonify({'error': 'Укажите корректный период'}), 400
 
     try:
-        data = ShiftReportAPI(BITRIX_WEBHOOK_URL).get_object_stage_report(
+        data, staff = ShiftReportAPI(BITRIX_WEBHOOK_URL).get_object_stage_report(
             stage, from_date, to_date
         )
         totals = {
@@ -895,7 +895,7 @@ def get_object_stage_report():
         }
         return jsonify({
             'success': True, 'from_date': from_date, 'to_date': to_date,
-            'data': data, 'totals': totals, 'total_all': sum(totals.values()),
+            'data': data, 'staff': staff, 'totals': totals, 'total_all': sum(totals.values()),
         })
     except Exception:
         logger.exception('Ошибка отчёта по объектам: %s', stage)

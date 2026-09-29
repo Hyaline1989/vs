@@ -25,6 +25,15 @@
         #directedObjectContent .object-row, #checkedInObjectContent .object-row { padding: 7px 8px; border-radius: 4px; }
         #fsObjectContent .object-row:nth-child(even), #fsStaffContent .object-row:nth-child(even),
         #directedObjectContent .object-row:nth-child(even), #checkedInObjectContent .object-row:nth-child(even) { background: #f0f6ff; }
+        .stage-report-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+        .stage-report-toggle { display: inline-flex; padding: 3px; border-radius: 20px; background: rgba(164,44,48,.1); }
+        .stage-report-view-btn { border: 0; border-radius: 17px; padding: 6px 12px; background: transparent; color: var(--primary-dark); font-weight: 600; cursor: pointer; }
+        .stage-report-view-btn.active { background: var(--primary); color: #fff; }
+        .stage-report-staff[hidden], .stage-report-offices[hidden] { display: none; }
+        .stage-report-staff .office-header { width: 100%; max-width: 700px; }
+        .stage-report-staff .office-item { max-width: 700px; }
+        .stage-report-staff .object-row { padding: 7px 8px; border-radius: 4px; }
+        .stage-report-staff .object-row:nth-child(even) { background: #f0f6ff; }
         .manager-results-wrap { overflow-x: auto; }
         .manager-results-table { border-collapse: collapse; width: 100%; min-width: 1050px; }
         .manager-results-table th, .manager-results-table td { border: 1px solid #ddd; padding: 8px; text-align: right; }
@@ -51,8 +60,8 @@
     </div>
 
     <div class="reports-tabs">
-        <button class="reports-tab active" type="button" data-report="directed"><i class="fas fa-arrow-right"></i> Направлены по объектам</button>
-        <button class="reports-tab" type="button" data-report="checked_in"><i class="fas fa-house-user"></i> Заселены по объектам</button>
+        <button class="reports-tab active" type="button" data-report="directed"><i class="fas fa-arrow-right"></i> Направлены</button>
+        <button class="reports-tab" type="button" data-report="checked_in"><i class="fas fa-house-user"></i> Заселены</button>
         <button class="reports-tab" type="button" data-report="object"><i class="fas fa-building"></i> 1 смена по объектам</button>
         <button class="reports-tab" type="button" data-report="staff"><i class="fas fa-users"></i> 1 смена по сотрудникам</button>
         <button class="reports-tab" type="button" data-report="manager"><i class="fas fa-chart-bar"></i> Результативность менеджеров</button>
@@ -74,7 +83,13 @@
     </div>
     <div id="directedObjectContainer" class="reports-content active">
         <div class="panel-card">
-            <h2 class="panel-title">Направлены по объектам</h2>
+            <div class="stage-report-header">
+                <h2 class="panel-title">Направлены</h2>
+                <div class="stage-report-toggle" role="group" aria-label="Группировка направленных">
+                    <button type="button" class="stage-report-view-btn active" data-stage-view="offices" onclick="switchObjectStageView('directed', 'offices')" aria-pressed="true">Офисы</button>
+                    <button type="button" class="stage-report-view-btn" data-stage-view="staff" onclick="switchObjectStageView('directed', 'staff')" aria-pressed="false">Сотрудники</button>
+                </div>
+            </div>
             <div class="first-shift-filters">
                 <div class="export-date-field"><label for="directedObjectFrom">С:</label><input type="date" id="directedObjectFrom" class="date-picker small"></div>
                 <div class="export-date-field"><label for="directedObjectTo">По:</label><input type="date" id="directedObjectTo" class="date-picker small"></div>
@@ -82,12 +97,19 @@
             </div>
             <p class="report-date-hint">Фильтр по датам строится по полю «Дата направлен».</p>
             <div class="summary-block" id="directedObjectSummary"></div>
-            <div id="directedObjectContent">Выберите даты и нажмите «Показать».</div>
+            <div id="directedObjectContent" class="stage-report-offices">Выберите даты и нажмите «Показать».</div>
+            <div id="directedStaffContent" class="stage-report-staff" hidden>Выберите даты и нажмите «Показать».</div>
         </div>
     </div>
     <div id="checkedInObjectContainer" class="reports-content">
         <div class="panel-card">
-            <h2 class="panel-title">Заселены по объектам</h2>
+            <div class="stage-report-header">
+                <h2 class="panel-title">Заселены</h2>
+                <div class="stage-report-toggle" role="group" aria-label="Группировка заселённых">
+                    <button type="button" class="stage-report-view-btn active" data-stage-view="offices" onclick="switchObjectStageView('checked_in', 'offices')" aria-pressed="true">Офисы</button>
+                    <button type="button" class="stage-report-view-btn" data-stage-view="staff" onclick="switchObjectStageView('checked_in', 'staff')" aria-pressed="false">Сотрудники</button>
+                </div>
+            </div>
             <div class="first-shift-filters">
                 <div class="export-date-field"><label for="checkedInObjectFrom">С:</label><input type="date" id="checkedInObjectFrom" class="date-picker small"></div>
                 <div class="export-date-field"><label for="checkedInObjectTo">По:</label><input type="date" id="checkedInObjectTo" class="date-picker small"></div>
@@ -95,7 +117,8 @@
             </div>
             <p class="report-date-hint">Фильтр отбора строится по полю «Дата заселен».</p>
             <div class="summary-block" id="checkedInObjectSummary"></div>
-            <div id="checkedInObjectContent">Выберите даты и нажмите «Показать».</div>
+            <div id="checkedInObjectContent" class="stage-report-offices">Выберите даты и нажмите «Показать».</div>
+            <div id="checkedInStaffContent" class="stage-report-staff" hidden>Выберите даты и нажмите «Показать».</div>
         </div>
     </div>
     <div id="firstShiftStaffContainer" class="reports-content">

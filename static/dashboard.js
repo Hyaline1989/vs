@@ -864,18 +864,72 @@ function renderFirstShiftByObject(data, containerId = 'fsObjectContent') {
     }).join('');
 }
 
+function switchObjectStageView(stage, view) {
+    const prefix = stage === 'directed' ? 'directed' : 'checkedIn';
+    const container = document.getElementById(`${prefix}ObjectContainer`);
+    if (!container) return;
+
+    const showStaff = view === 'staff';
+    document.getElementById(`${prefix}ObjectContent`).hidden = showStaff;
+    document.getElementById(`${prefix}StaffContent`).hidden = !showStaff;
+    container.querySelectorAll('.stage-report-view-btn').forEach(button => {
+        const active = button.dataset.stageView === (showStaff ? 'staff' : 'offices');
+        button.classList.toggle('active', active);
+        button.setAttribute('aria-pressed', String(active));
+    });
+}
+
+function renderObjectStageStaff(staff, containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    const blocks = [
+        ['Основной', 'Подбор'],
+        ['Агенты', 'Агенты'],
+        ['Опер и Спутник', 'Операции']
+    ];
+    container.innerHTML = blocks.map(([key, title]) => {
+        const items = Object.entries(staff?.[key] || {}).sort(([nameA], [nameB]) => {
+            if (nameA === 'Без сотрудника') return 1;
+            if (nameB === 'Без сотрудника') return -1;
+            return nameA.localeCompare(nameB, 'ru');
+        });
+        const total = items.reduce((sum, [, count]) => sum + Number(count), 0);
+        const rows = items.length
+            ? items.map(([name, count]) => `
+                <div class="object-row">
+                    <span class="object-name">${escapeHtml(name)}</span>
+                    <span class="object-value">${count}</span>
+                </div>
+            `).join('')
+            : '<div class="empty-objects">Нет сделок</div>';
+        return `
+            <div class="office-item" style="margin-bottom: 20px;">
+                <div class="office-header">
+                    <span class="office-name">${title}</span>
+                    <span class="office-count">${total}</span>
+                </div>
+                <div class="office-objects">${rows}</div>
+            </div>
+        `;
+    }).join('');
+}
+
 async function loadObjectStageReport(stage) {
     const prefix = stage === 'directed' ? 'directedObject' : 'checkedInObject';
     const fromDate = document.getElementById(`${prefix}From`).value;
     const toDate = document.getElementById(`${prefix}To`).value;
     const content = document.getElementById(`${prefix}Content`);
+    const staffContent = document.getElementById(`${stage === 'directed' ? 'directed' : 'checkedIn'}StaffContent`);
     const summary = document.getElementById(`${prefix}Summary`);
 
     if (!fromDate || !toDate || fromDate > toDate) {
         content.textContent = 'Укажите корректный период.';
+        staffContent.textContent = 'Укажите корректный период.';
         return;
     }
     content.innerHTML = '<div class="loading">Загрузка данных...</div>';
+    staffContent.innerHTML = '<div class="loading">Загрузка данных...</div>';
     summary.textContent = '';
     try {
         const params = new URLSearchParams({ stage, from: fromDate, to: toDate });
@@ -887,9 +941,11 @@ async function loadObjectStageReport(stage) {
             <div class="summary-row"><span>Всего сделок:</span><span class="summary-value" style="background: #ffd700; color: #2c3e50;">${result.total_all || 0}</span></div>
         `;
         renderFirstShiftByObject(result.data, `${prefix}Content`);
+        renderObjectStageStaff(result.staff, staffContent.id);
     } catch (error) {
         console.error('Ошибка отчёта по объектам:', error);
         content.textContent = `Ошибка загрузки: ${error.message}`;
+        staffContent.textContent = `Ошибка загрузки: ${error.message}`;
     }
 }
 

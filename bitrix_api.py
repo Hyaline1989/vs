@@ -899,7 +899,7 @@ class ShiftReportAPI:
                 start = next_start
 
         filtered = [deal for deal in deals if deal.get(date_field) and deal.get(date_field) != 'N']
-        return self._group_by_companies(filtered)
+        return self._group_by_companies(filtered, include_staff=True)
 
     def get_manager_result_deals(self, start_date_str, end_date_str):
         """Сделки когорты по дате направления с текущими датами последующих этапов."""
@@ -1026,9 +1026,10 @@ class ShiftReportAPI:
         logger.info(f"📊 [1 смена] Итоговый отчёт по объектам: {sum(sum(v.values()) for v in result.values()) if result else 0} записей")
         return result
     
-    def _group_by_companies(self, deals):
+    def _group_by_companies(self, deals, include_staff=False):
         """Группировка по компаниям (для отчёта по объектам)."""
         report = {'Основной': {}, 'Агенты': {}, 'Опер и Спутник': {}}
+        staff_report = {'Основной': {}, 'Агенты': {}, 'Опер и Спутник': {}}
         company_ids = list({d.get(FIELD_COMPANY) for d in deals if d.get(FIELD_COMPANY)})
         companies_info = self._get_companies_info(company_ids)
 
@@ -1048,6 +1049,21 @@ class ShiftReportAPI:
                 category = 'Основной'
             grouped = report[category]
             grouped[company] = grouped.get(company, 0) + 1
+            if include_staff:
+                name_fields = (
+                    (FIELD_AGENT_FIO, FIELD_CC_OPERATOR_REPORT, FIELD_CC_OPERATOR)
+                    if category == 'Агенты'
+                    else (FIELD_CC_OPERATOR_REPORT, FIELD_CC_OPERATOR, FIELD_AGENT_FIO)
+                )
+                staff_name = next(
+                    ((deal.get(field) or '').strip() for field in name_fields
+                     if (deal.get(field) or '').strip()),
+                    'Без сотрудника'
+                )
+                staff_group = staff_report[category]
+                staff_group[staff_name] = staff_group.get(staff_name, 0) + 1
+        if include_staff:
+            return report, staff_report
         return report
     
     def get_staff_report(self, start_date_str, end_date_str):
