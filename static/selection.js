@@ -529,7 +529,7 @@ async function openDirectionForm(objectId, objectName, positionName) {
                     <div class="form-group">
                         <label>ФИО агента *</label>
                         <input type="text" id="agentName" required value="${escapeHtml(agentName)}" placeholder="Петров Петр Петрович" readonly style="background: #f5f5f5; cursor: default;">
-                        <div class="info-text" style="font-size: 0.7rem; color: #27ae60; margin-top: 4px;">
+                        <div class="info-text" style="font-size: calc(0.7rem * var(--ui-font-scale)); color: #27ae60; margin-top: 4px;">
                             <i class="fas fa-user-check"></i> Автоматически из вашего профиля
                         </div>
                     </div>
@@ -537,7 +537,7 @@ async function openDirectionForm(objectId, objectName, positionName) {
                     <div class="form-group">
                         <label>Email агента</label>
                         <input type="email" id="agentEmail" value="${escapeHtml(agentEmail)}" placeholder="example@mail.ru" readonly style="background: #f5f5f5; cursor: default;">
-                        <div class="info-text" style="font-size: 0.7rem; color: var(--gray);">
+                        <div class="info-text" style="font-size: calc(0.7rem * var(--ui-font-scale)); color: var(--gray);">
                             <i class="fas fa-envelope"></i> Для обратной связи (из профиля)
                         </div>
                     </div>
@@ -545,7 +545,7 @@ async function openDirectionForm(objectId, objectName, positionName) {
                     <div class="form-group">
                         <label>Объект *</label>
                         <input type="text" id="agentObject" required value="${escapeHtml(objectName)}" placeholder="Название объекта" autocomplete="off">
-                        <div class="info-text" style="font-size: 0.7rem; color: var(--gray);">
+                        <div class="info-text" style="font-size: calc(0.7rem * var(--ui-font-scale)); color: var(--gray);">
                             <i class="fas fa-building"></i> Укажите объект, куда направляется кандидат
                         </div>
                     </div>
@@ -600,7 +600,7 @@ function addFileInput() {
     wrapper.style.cssText = 'display: flex; gap: 8px; margin-bottom: 8px; align-items: center;';
     wrapper.innerHTML = `
         <input type="file" name="attachments" class="file-input" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" style="flex: 1; padding: 6px; border: 1px solid #ddd; border-radius: 6px;">
-        <button type="button" class="remove-file-btn" onclick="this.parentElement.remove()" style="background: #e74c3c; color: white; border: none; width: 30px; height: 30px; border-radius: 4px; cursor: pointer; font-size: 14px;">✕</button>
+        <button type="button" class="remove-file-btn" onclick="this.parentElement.remove()" style="background: #e74c3c; color: white; border: none; width: 30px; height: 30px; border-radius: 4px; cursor: pointer; font-size: calc(14px * var(--ui-font-scale));">✕</button>
     `;
     fileList.appendChild(wrapper);
 }
@@ -738,7 +738,7 @@ function renderRequirementsTable() {
                         <button class="btn-add-object" onclick="showAddObjectModal()" style="background: #27ae60; color: white; border: none; padding: 6px 12px; border-radius: 4px; margin-right: 10px; cursor: pointer;">
                             + Добавить объект
                         </button>
-                        <span class="requirements-modal-close" onclick="closeRequirementsModal()" style="cursor: pointer; font-size: 28px;">&times;</span>
+                        <span class="requirements-modal-close" onclick="closeRequirementsModal()" style="cursor: pointer; font-size: calc(28px * var(--ui-font-scale));">&times;</span>
                     </div>
                 </div>
                 <div class="requirements-modal-body">
@@ -787,16 +787,16 @@ function renderRequirementsTable() {
             // Если это единственная должность — кнопка удаления скрыта (заменена на иконку 🔒)
             const isLastPosition = totalPositions <= 1;
             const deleteButtonHtml = isLastPosition 
-                ? `<span style="color: #999; font-size: 0.7rem; margin-left: 8px;" title="Нельзя удалить последнюю должность">🔒</span>`
-                : `<button onclick="deletePosition('${safeObjNameForJs}','${safePosName}')" style="margin-left:8px; background:#e74c3c; color:white; border:none; padding:2px 6px; border-radius:3px; font-size:10px; cursor:pointer;" title="Удалить должность">✕</button>`;
+                ? `<span style="color: #999; font-size: calc(0.7rem * var(--ui-font-scale)); margin-left: 8px;" title="Нельзя удалить последнюю должность">🔒</span>`
+                : `<button onclick="deletePosition('${safeObjNameForJs}','${safePosName}')" style="margin-left:8px; background:#e74c3c; color:white; border:none; padding:2px 6px; border-radius:3px; font-size:calc(10px * var(--ui-font-scale)); cursor:pointer;" title="Удалить должность">✕</button>`;
             // ===========================================================
             
             tableHtml += `<tr data-obj="${escapeHtml(objName)}" data-pos="${escapeHtml(pos.name)}">
                 ${i === 0 ? `<td rowspan="${rowCount}" style="vertical-align:middle; background:#f9f9f9;">
                     ${escapeHtml(objName)}
-                    ${window.isSystemAdmin ? `<button onclick="resetObjectRequirements('${safeObjNameForJs}')" style="display:block; margin-top:5px; background:#f39c12; color:white; border:none; padding:3px 8px; border-radius:3px; font-size:11px; cursor:pointer;" title="Обнулить потребность в БД (страховка от случайных ошибок)">⭕️ Обнулить потребность</button>` : ''}
-                    <button onclick="deleteObject('${safeObjNameForJs}')" style="display:block; margin-top:8px; background:#e74c3c; color:white; border:none; padding:3px 8px; border-radius:3px; font-size:11px; cursor:pointer;">🗑 Удалить объект</button>
-                    <button onclick="showAddPositionModal('${safeObjNameForJs}')" style="display:block; margin-top:5px; background:#3498db; color:white; border:none; padding:3px 8px; border-radius:3px; font-size:11px; cursor:pointer;">+ Добавить должность</button>
+                    ${window.isSystemAdmin ? `<button onclick="resetObjectRequirements('${safeObjNameForJs}')" style="display:block; margin-top:5px; background:#f39c12; color:white; border:none; padding:3px 8px; border-radius:3px; font-size:calc(11px * var(--ui-font-scale)); cursor:pointer;" title="Обнулить потребность в БД (страховка от случайных ошибок)">⭕️ Обнулить потребность</button>` : ''}
+                    <button onclick="deleteObject('${safeObjNameForJs}')" style="display:block; margin-top:8px; background:#e74c3c; color:white; border:none; padding:3px 8px; border-radius:3px; font-size:calc(11px * var(--ui-font-scale)); cursor:pointer;">🗑 Удалить объект</button>
+                    <button onclick="showAddPositionModal('${safeObjNameForJs}')" style="display:block; margin-top:5px; background:#3498db; color:white; border:none; padding:3px 8px; border-radius:3px; font-size:calc(11px * var(--ui-font-scale)); cursor:pointer;">+ Добавить должность</button>
                     </td>` : ''}
                 <td>${escapeHtml(pos.name)} ${deleteButtonHtml}</td>
                 <td><input type="number" class="editable rf-men" data-obj="${escapeHtml(objName)}" data-pos="${escapeHtml(pos.name)}" value="${pos.rf?.men||0}" min="0" style="width:60px; text-align:center;"></td>

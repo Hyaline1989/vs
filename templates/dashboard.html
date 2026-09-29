@@ -28,7 +28,7 @@
         .plan-fact-table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 0.95rem;
+            font-size: calc(0.95rem * var(--ui-font-scale));
         }
 
         .plan-fact-table th,
@@ -167,7 +167,7 @@
             border: 1px solid rgba(164, 44, 48, 0.25);
             border-bottom: none;
             padding: 11px 24px;
-            font-size: 0.95rem;
+            font-size: calc(0.95rem * var(--ui-font-scale));
             font-weight: 600;
             cursor: pointer;
             color: var(--primary-dark);
@@ -218,7 +218,7 @@
             padding: 8px 18px;
             border-radius: 30px;
             font-weight: 600;
-            font-size: 0.9rem;
+            font-size: calc(0.9rem * var(--ui-font-scale));
             cursor: pointer;
             display: flex;
             align-items: center;
@@ -239,7 +239,7 @@
         }
 
         .fix-day-btn i {
-            font-size: 0.9rem;
+            font-size: calc(0.9rem * var(--ui-font-scale));
         }
 
         @media (max-width: 768px) {
@@ -273,7 +273,7 @@
             .plan-fact-table {
                 width: 100%;
                 table-layout: fixed;
-                font-size: 0.72rem;
+                font-size: calc(0.72rem * var(--ui-font-scale));
             }
 
             .plan-fact-table th,
@@ -331,7 +331,7 @@
 
             .fix-day-btn {
                 padding: 6px 14px;
-                font-size: 0.8rem;
+                font-size: calc(0.8rem * var(--ui-font-scale));
                 width: 100%;
                 justify-content: center;
             }
@@ -352,7 +352,7 @@
 
         @media (max-width: 480px) {
             .fix-day-btn {
-                font-size: 0.7rem;
+                font-size: calc(0.7rem * var(--ui-font-scale));
                 padding: 6px 10px;
             }
         }
@@ -486,10 +486,10 @@
                     <button class="refresh-btn" onclick="loadManagerEfficiencyReport()">
                         <i class="fas fa-search"></i> Показать
                     </button>
-                    <button id="managerEfficiencyCsvBtn" class="export-btn" onclick="downloadManagerEfficiencyCsv()" style="padding: 8px 16px; font-size: 0.85rem;" disabled>
+                    <button id="managerEfficiencyCsvBtn" class="export-btn" onclick="downloadManagerEfficiencyCsv()" style="padding: 8px 16px; font-size: calc(0.85rem * var(--ui-font-scale));" disabled>
                         <i class="fas fa-download"></i> CSV
                     </button>
-                    <button id="managerEfficiencyPngBtn" class="export-btn" onclick="downloadManagerEfficiencyPng()" style="padding: 8px 16px; font-size: 0.85rem;" disabled>
+                    <button id="managerEfficiencyPngBtn" class="export-btn" onclick="downloadManagerEfficiencyPng()" style="padding: 8px 16px; font-size: calc(0.85rem * var(--ui-font-scale));" disabled>
                         <i class="fas fa-image"></i> PNG
                     </button>
                 </div>

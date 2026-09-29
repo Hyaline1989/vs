@@ -57,7 +57,7 @@
         }
         
         .filter-group label {
-            font-size: 0.8rem;
+            font-size: calc(0.8rem * var(--ui-font-scale));
             font-weight: 600;
             color: var(--dark);
         }
@@ -66,7 +66,7 @@
             padding: 8px 12px;
             border: 1px solid #ddd;
             border-radius: 8px;
-            font-size: 0.9rem;
+            font-size: calc(0.9rem * var(--ui-font-scale));
         }
         
         .filter-group input:focus {
@@ -134,7 +134,7 @@
         .status-table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 0.9rem;
+            font-size: calc(0.9rem * var(--ui-font-scale));
         }
         
         .status-table th {
@@ -160,7 +160,7 @@
             display: inline-block;
             padding: 4px 10px;
             border-radius: 20px;
-            font-size: 0.75rem;
+            font-size: calc(0.75rem * var(--ui-font-scale));
             font-weight: 600;
         }
         
@@ -181,7 +181,7 @@
         
         .date-cell {
             font-family: monospace;
-            font-size: 0.85rem;
+            font-size: calc(0.85rem * var(--ui-font-scale));
         }
         
         .no-data {
@@ -194,7 +194,7 @@
             background: var(--primary-bg);
             padding: 8px 16px;
             border-radius: 30px;
-            font-size: 0.9rem;
+            font-size: calc(0.9rem * var(--ui-font-scale));
             display: inline-flex;
             align-items: center;
             gap: 8px;
@@ -236,7 +236,7 @@
         .video-modal-header h3 {
             color: white;
             margin: 0;
-            font-size: 1.2rem;
+            font-size: calc(1.2rem * var(--ui-font-scale));
         }
 
         .video-modal-header h3 i {
@@ -247,7 +247,7 @@
             background: none;
             border: none;
             color: white;
-            font-size: 28px;
+            font-size: calc(28px * var(--ui-font-scale));
             cursor: pointer;
             line-height: 1;
             transition: opacity 0.2s;
@@ -285,7 +285,7 @@
             padding: 12px 15px;
             border-radius: 10px;
             margin-top: 15px;
-            font-size: 0.85rem;
+            font-size: calc(0.85rem * var(--ui-font-scale));
             color: var(--dark);
             border-left: 3px solid var(--primary);
         }
@@ -301,7 +301,7 @@
             border: none;
             padding: 10px 24px;
             border-radius: 40px;
-            font-size: 0.9rem;
+            font-size: calc(0.9rem * var(--ui-font-scale));
             font-weight: 600;
             cursor: pointer;
             transition: all 0.3s;
@@ -317,7 +317,7 @@
         }
 
         .video-guide-btn i {
-            font-size: 1.1rem;
+            font-size: calc(1.1rem * var(--ui-font-scale));
         }
 
         @keyframes fadeInUp {
@@ -353,11 +353,11 @@
             .status-table th,
             .status-table td {
                 padding: 8px 10px;
-                font-size: 0.8rem;
+                font-size: calc(0.8rem * var(--ui-font-scale));
             }
             
             .video-modal-header h3 {
-                font-size: 0.9rem;
+                font-size: calc(0.9rem * var(--ui-font-scale));
             }
             
             .video-modal-body {
@@ -365,7 +365,7 @@
             }
             
             .video-description {
-                font-size: 0.75rem;
+                font-size: calc(0.75rem * var(--ui-font-scale));
             }
         }
         
@@ -375,7 +375,7 @@
             padding: 12px 15px;
             margin: 15px 0;
             border-radius: 8px;
-            font-size: 0.85rem;
+            font-size: calc(0.85rem * var(--ui-font-scale));
         }
         
         /* Стили для уведомлений */
@@ -581,9 +581,9 @@
             if (!statuses || statuses.length === 0) {
                 container.innerHTML = `
                     <div class="no-data">
-                        <i class="fas fa-info-circle" style="font-size: 48px; margin-bottom: 15px;"></i>
+                        <i class="fas fa-info-circle" style="font-size: calc(48px * var(--ui-font-scale)); margin-bottom: 15px;"></i>
                         <p>Нет данных о направленных вахтовиках</p>
-                        <p style="font-size: 0.8rem;">Попробуйте изменить фильтр или нажмите "Синхронизировать"</p>
+                        <p style="font-size: calc(0.8rem * var(--ui-font-scale));">Попробуйте изменить фильтр или нажмите "Синхронизировать"</p>
                     </div>
                 `;
                 return;
@@ -639,7 +639,7 @@
             html += `
                     </tbody>
                 </table>
-                <div style="margin-top: 15px; font-size: 0.75rem; color: var(--gray); text-align: center;">
+                <div style="margin-top: 15px; font-size: calc(0.75rem * var(--ui-font-scale)); color: var(--gray); text-align: center;">
                     <i class="fas fa-info-circle"></i> Всего: ${statuses.length} направлений
                 </div>
             `;

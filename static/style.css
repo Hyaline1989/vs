@@ -4,6 +4,7 @@
 /* ========== ОСНОВНЫЕ СТИЛИ ========== */
 
 :root {
+    --ui-font-scale: 1.2;
     --primary: #A42C30;
     --primary-dark: #8B2529;
     --primary-light: #C14A4E;
@@ -26,16 +27,20 @@ body {
     background: #bab7b7;
     min-height: 100vh;
     font-family: 'Cormorant Unicase', Georgia, serif;
+    font-size: calc(16px * var(--ui-font-scale));
     font-weight: 700;
 }
 
 button, input, select, textarea {
     font-family: inherit;
+    font-size: inherit;
 }
 
 /* В окнах паспортов оставляем прежний шрифт и авторское форматирование текста. */
 #passportViewModal, #passportEditorModal {
+    --ui-font-scale: 1;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 16px;
     font-weight: 400;
 }
 
@@ -70,7 +75,7 @@ button, input, select, textarea {
 }
 
 .app-logo {
-    font-size: 2rem;
+    font-size: calc(2rem * var(--ui-font-scale));
     color: var(--primary);
     margin: 0;
     letter-spacing: 1px;
@@ -108,7 +113,7 @@ button, input, select, textarea {
     border-bottom: 3px solid transparent;
     padding: 10px 2px 7px;
     border-radius: 0;
-    font-size: 0.92rem;
+    font-size: calc(0.92rem * var(--ui-font-scale));
     font-weight: 600;
     cursor: pointer;
     transition: color 0.2s ease, border-color 0.2s ease;
@@ -158,7 +163,7 @@ button, input, select, textarea {
     background: var(--primary-bg);
     padding: 8px 16px;
     border-radius: 40px;
-    font-size: 0.9rem;
+    font-size: calc(0.9rem * var(--ui-font-scale));
     font-weight: 500;
     color: var(--dark);
 }
@@ -184,7 +189,7 @@ button, input, select, textarea {
 }
 
 .user-role {
-    font-size: 0.7rem;
+    font-size: calc(0.7rem * var(--ui-font-scale));
     padding: 2px 8px;
     background: rgba(0, 0, 0, 0.1);
     border-radius: 20px;
@@ -197,7 +202,7 @@ button, input, select, textarea {
     padding: 6px 14px;
     border-radius: 30px;
     cursor: pointer;
-    font-size: 13px;
+    font-size: calc(13px * var(--ui-font-scale));
     font-weight: 500;
     transition: all 0.3s ease;
     display: flex;
@@ -212,7 +217,7 @@ button, input, select, textarea {
 }
 
 .logout-button i {
-    font-size: 12px;
+    font-size: calc(12px * var(--ui-font-scale));
 }
 
 /* Системный контент */
@@ -253,14 +258,14 @@ button, input, select, textarea {
 .admin-panel-header h3 {
     color: white;
     margin: 0;
-    font-size: 1.2rem;
+    font-size: calc(1.2rem * var(--ui-font-scale));
     display: flex;
     align-items: center;
     gap: 10px;
 }
 
 .admin-panel-header h3 i {
-    font-size: 1.3rem;
+    font-size: calc(1.3rem * var(--ui-font-scale));
 }
 
 .add-user-btn {
@@ -270,7 +275,7 @@ button, input, select, textarea {
     padding: 8px 16px;
     border-radius: 30px;
     cursor: pointer;
-    font-size: 0.9rem;
+    font-size: calc(0.9rem * var(--ui-font-scale));
     transition: all 0.3s;
     display: flex;
     align-items: center;
@@ -290,7 +295,7 @@ button, input, select, textarea {
 .users-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 0.9rem;
+    font-size: calc(0.9rem * var(--ui-font-scale));
 }
 
 .users-table th {
@@ -316,7 +321,7 @@ button, input, select, textarea {
     display: inline-block;
     padding: 4px 10px;
     border-radius: 20px;
-    font-size: 0.75rem;
+    font-size: calc(0.75rem * var(--ui-font-scale));
     font-weight: 600;
 }
 
@@ -339,7 +344,7 @@ button, input, select, textarea {
     display: inline-block;
     padding: 4px 10px;
     border-radius: 20px;
-    font-size: 0.75rem;
+    font-size: calc(0.75rem * var(--ui-font-scale));
     font-weight: 600;
 }
 
@@ -364,7 +369,7 @@ button, input, select, textarea {
     cursor: pointer;
     border-radius: 6px;
     transition: all 0.2s;
-    font-size: 1rem;
+    font-size: calc(1rem * var(--ui-font-scale));
 }
 
 .action-btn.edit-btn {
@@ -458,14 +463,14 @@ button, input, select, textarea {
 .modal-header h3 {
     color: white;
     margin: 0;
-    font-size: 1.2rem;
+    font-size: calc(1.2rem * var(--ui-font-scale));
 }
 
 .modal-close {
     background: none;
     border: none;
     color: white;
-    font-size: 1.8rem;
+    font-size: calc(1.8rem * var(--ui-font-scale));
     cursor: pointer;
     line-height: 1;
     padding: 0;
@@ -506,7 +511,7 @@ button, input, select, textarea {
     padding: 10px 14px;
     border: 2px solid #e9ecef;
     border-radius: 10px;
-    font-size: 0.95rem;
+    font-size: calc(0.95rem * var(--ui-font-scale));
     transition: border-color 0.2s;
 }
 
@@ -534,7 +539,7 @@ button, input, select, textarea {
 }
 
 .hint {
-    font-size: 0.75rem;
+    font-size: calc(0.75rem * var(--ui-font-scale));
     color: #95a5a6;
     font-weight: normal;
     margin-left: 8px;
@@ -556,7 +561,7 @@ button, input, select, textarea {
     padding: 10px 24px;
     border-radius: 30px;
     cursor: pointer;
-    font-size: 0.9rem;
+    font-size: calc(0.9rem * var(--ui-font-scale));
     transition: all 0.2s;
 }
 
@@ -571,7 +576,7 @@ button, input, select, textarea {
     padding: 10px 28px;
     border-radius: 30px;
     cursor: pointer;
-    font-size: 0.9rem;
+    font-size: calc(0.9rem * var(--ui-font-scale));
     font-weight: 600;
     transition: all 0.2s;
 }
@@ -588,7 +593,7 @@ button, input, select, textarea {
     padding: 6px 14px;
     border-radius: 20px;
     cursor: pointer;
-    font-size: 0.75rem;
+    font-size: calc(0.75rem * var(--ui-font-scale));
     font-weight: 500;
     transition: all 0.2s;
 }
@@ -612,7 +617,7 @@ button, input, select, textarea {
 }
 
 .section-hint {
-    font-size: 0.75rem;
+    font-size: calc(0.75rem * var(--ui-font-scale));
     color: var(--gray);
     font-weight: normal;
     margin-left: 10px;
@@ -655,7 +660,7 @@ button, input, select, textarea {
 }
 
 .perm-hint {
-    font-size: 0.75rem;
+    font-size: calc(0.75rem * var(--ui-font-scale));
     color: var(--gray);
     margin-left: 8px;
 }
@@ -665,7 +670,7 @@ button, input, select, textarea {
     align-items: center;
     gap: 8px;
     cursor: pointer;
-    font-size: 0.85rem;
+    font-size: calc(0.85rem * var(--ui-font-scale));
     padding: 4px 8px;
     border-radius: 6px;
     transition: background 0.2s;
@@ -720,7 +725,7 @@ button, input, select, textarea {
     font-weight: 500;
     color: var(--dark);
     flex: 1;
-    font-size: 0.9rem;
+    font-size: calc(0.9rem * var(--ui-font-scale));
 }
 
 .object-perm-checkboxes {
@@ -757,7 +762,7 @@ button, input, select, textarea {
 .date-field label {
     font-weight: 600;
     color: var(--primary);
-    font-size: 0.9rem;
+    font-size: calc(0.9rem * var(--ui-font-scale));
     background: rgba(164, 44, 48, 0.1);
     padding: 5px 12px;
     border-radius: 20px;
@@ -768,7 +773,7 @@ button, input, select, textarea {
     border: 2px solid var(--primary);
     border-radius: 40px;
     font-family: inherit;
-    font-size: 0.95rem;
+    font-size: calc(0.95rem * var(--ui-font-scale));
     background: white;
     color: var(--dark);
     cursor: pointer;
@@ -795,7 +800,7 @@ button, input, select, textarea {
     padding: 8px 18px;
     border-radius: 30px;
     font-weight: 600;
-    font-size: 0.9rem;
+    font-size: calc(0.9rem * var(--ui-font-scale));
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -809,11 +814,11 @@ button, input, select, textarea {
 }
 
 .refresh-icon {
-    font-size: 1rem;
+    font-size: calc(1rem * var(--ui-font-scale));
 }
 
 .update-time {
-    font-size: 0.75rem;
+    font-size: calc(0.75rem * var(--ui-font-scale));
     color: var(--primary);
     background: rgba(164, 44, 48, 0.1);
     padding: 4px 12px;
@@ -837,7 +842,7 @@ button, input, select, textarea {
 }
 
 .panel-title {
-    font-size: 1.4rem;
+    font-size: calc(1.4rem * var(--ui-font-scale));
     font-weight: 650;
     margin-bottom: 22px;
     display: flex;
@@ -850,7 +855,7 @@ button, input, select, textarea {
     background: rgba(164, 44, 48, 0.1);
     padding: 4px 14px;
     border-radius: 40px;
-    font-size: 0.85rem;
+    font-size: calc(0.85rem * var(--ui-font-scale));
     font-weight: 500;
     color: var(--primary);
 }
@@ -867,7 +872,7 @@ button, input, select, textarea {
     display: flex;
     justify-content: space-between;
     margin-bottom: 10px;
-    font-size: 1rem;
+    font-size: calc(1rem * var(--ui-font-scale));
     font-weight: 500;
 }
 
@@ -922,14 +927,14 @@ button, input, select, textarea {
 .toggle {
     color: var(--primary);
     font-weight: 700;
-    font-size: 1.2rem;
+    font-size: calc(1.2rem * var(--ui-font-scale));
     width: 22px;
     cursor: default;
 }
 
 .office-name {
     font-weight: 650;
-    font-size: 1.1rem;
+    font-size: calc(1.1rem * var(--ui-font-scale));
     color: var(--dark);
 }
 
@@ -937,7 +942,7 @@ button, input, select, textarea {
     background: rgba(164, 44, 48, 0.1);
     padding: 2px 12px;
     border-radius: 30px;
-    font-size: 0.8rem;
+    font-size: calc(0.8rem * var(--ui-font-scale));
     font-weight: 700;
     color: var(--primary);
 }
@@ -953,7 +958,7 @@ button, input, select, textarea {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    font-size: 0.95rem;
+    font-size: calc(0.95rem * var(--ui-font-scale));
     padding: 4px 0;
 }
 
@@ -976,7 +981,7 @@ button, input, select, textarea {
     padding: 4px 14px;
     border-radius: 40px;
     font-weight: 600;
-    font-size: 0.9rem;
+    font-size: calc(0.9rem * var(--ui-font-scale));
 }
 
 .discrepancy-list {
@@ -992,7 +997,7 @@ button, input, select, textarea {
     justify-content: space-between;
     padding: 12px 16px;
     border-bottom: 1px solid rgba(164, 44, 48, 0.1);
-    font-size: 0.95rem;
+    font-size: calc(0.95rem * var(--ui-font-scale));
 }
 
 .discrepancy-item:last-child {
@@ -1016,7 +1021,7 @@ button, input, select, textarea {
     font-weight: 700;
     padding: 4px 12px;
     border-radius: 30px;
-    font-size: 0.8rem;
+    font-size: calc(0.8rem * var(--ui-font-scale));
 }
 
 .badge-red {
@@ -1025,7 +1030,7 @@ button, input, select, textarea {
     font-weight: 700;
     padding: 4px 12px;
     border-radius: 30px;
-    font-size: 0.8rem;
+    font-size: calc(0.8rem * var(--ui-font-scale));
 }
 
 .badge-purple {
@@ -1034,7 +1039,7 @@ button, input, select, textarea {
     font-weight: 700;
     padding: 4px 12px;
     border-radius: 30px;
-    font-size: 0.8rem;
+    font-size: calc(0.8rem * var(--ui-font-scale));
 }
 
 .badge-neutral {
@@ -1043,7 +1048,7 @@ button, input, select, textarea {
     font-weight: 700;
     padding: 4px 12px;
     border-radius: 30px;
-    font-size: 0.8rem;
+    font-size: calc(0.8rem * var(--ui-font-scale));
 }
 
 .export-container {
@@ -1054,7 +1059,7 @@ button, input, select, textarea {
 }
 
 .export-title {
-    font-size: 1.1rem;
+    font-size: calc(1.1rem * var(--ui-font-scale));
     color: var(--dark);
     margin-bottom: 15px;
 }
@@ -1079,12 +1084,12 @@ button, input, select, textarea {
     background: rgba(164, 44, 48, 0.1);
     padding: 4px 10px;
     border-radius: 20px;
-    font-size: 0.85rem;
+    font-size: calc(0.85rem * var(--ui-font-scale));
 }
 
 .date-picker.small {
     padding: 8px 12px;
-    font-size: 0.85rem;
+    font-size: calc(0.85rem * var(--ui-font-scale));
     width: 140px;
 }
 
@@ -1095,7 +1100,7 @@ button, input, select, textarea {
     padding: 12px 28px;
     border-radius: 40px;
     font-weight: 600;
-    font-size: 1rem;
+    font-size: calc(1rem * var(--ui-font-scale));
     cursor: pointer;
     display: inline-flex;
     align-items: center;
@@ -1141,7 +1146,7 @@ button, input, select, textarea {
     padding: 8px 20px;
     border-radius: 30px;
     cursor: pointer;
-    font-size: 14px;
+    font-size: calc(14px * var(--ui-font-scale));
     transition: all 0.3s;
 }
 
@@ -1178,7 +1183,7 @@ button, input, select, textarea {
     padding: 6px 16px;
     border-radius: 20px;
     cursor: pointer;
-    font-size: 12px;
+    font-size: calc(12px * var(--ui-font-scale));
 }
 
 .debug-info {
@@ -1187,7 +1192,7 @@ button, input, select, textarea {
     border-radius: 10px;
     padding: 15px;
     margin-bottom: 15px;
-    font-size: 12px;
+    font-size: calc(12px * var(--ui-font-scale));
     max-height: 300px;
     overflow-y: auto;
 }
@@ -1219,7 +1224,7 @@ button, input, select, textarea {
     padding: 10px;
     border: 2px solid var(--light-gray);
     border-radius: 10px;
-    font-size: 14px;
+    font-size: calc(14px * var(--ui-font-scale));
     transition: border-color 0.3s;
 }
 
@@ -1233,7 +1238,7 @@ button, input, select, textarea {
     text-align: center;
     margin-bottom: 20px;
     color: var(--gray);
-    font-size: 0.9rem;
+    font-size: calc(0.9rem * var(--ui-font-scale));
 }
 
 .results-grid {
@@ -1269,7 +1274,7 @@ button, input, select, textarea {
     padding: 20px;
     box-sizing: border-box;
     overflow-y: auto;
-    font-size: 15px;
+    font-size: calc(15px * var(--ui-font-scale));
 }
 
 .flip-card-front {
@@ -1282,7 +1287,7 @@ button, input, select, textarea {
     background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
     color: white;
     transform: rotateY(180deg);
-    font-size: 14px;
+    font-size: calc(14px * var(--ui-font-scale));
 }
 
 .priority-card .flip-card-front {
@@ -1291,13 +1296,13 @@ button, input, select, textarea {
 }
 
 .flip-card-front h3 {
-    font-size: 1.3rem;
+    font-size: calc(1.3rem * var(--ui-font-scale));
     margin-bottom: 15px;
     margin-top: 0;
 }
 
 .flip-card-front h3 a {
-    font-size: 1.8rem;
+    font-size: calc(1.8rem * var(--ui-font-scale));
     text-decoration: none;
     color: var(--dark);
 }
@@ -1308,7 +1313,7 @@ button, input, select, textarea {
 
 .flip-card-front p {
     margin: 12px 0;
-    font-size: 1.5rem;
+    font-size: calc(1.5rem * var(--ui-font-scale));
     line-height: 1.4;
 }
 
@@ -1327,13 +1332,13 @@ button, input, select, textarea {
 }
 
 .vacancy-value {
-    font-size: 1.8rem;
+    font-size: calc(1.8rem * var(--ui-font-scale));
     font-weight: bold;
     color: var(--dark);
 }
 
 .vacancy-label {
-    font-size: 1.2rem;
+    font-size: calc(1.2rem * var(--ui-font-scale));
     color: var(--gray);
 }
 
@@ -1356,7 +1361,7 @@ button, input, select, textarea {
     padding: 10px 16px;
     border-radius: 25px;
     cursor: pointer;
-    font-size: 13px;
+    font-size: calc(13px * var(--ui-font-scale));
     transition: all 0.3s;
     display: flex;
     align-items: center;
@@ -1378,7 +1383,7 @@ button, input, select, textarea {
     padding: 10px 16px;
     border-radius: 25px;
     cursor: pointer;
-    font-size: 13px;
+    font-size: calc(13px * var(--ui-font-scale));
     transition: all 0.3s;
     display: flex;
     align-items: center;
@@ -1405,12 +1410,12 @@ button, input, select, textarea {
 
 .position-name {
     font-weight: bold;
-    font-size: 1rem;
+    font-size: calc(1rem * var(--ui-font-scale));
     margin-bottom: 8px;
 }
 
 .flip-card-back h3 {
-    font-size: 1.2rem;
+    font-size: calc(1.2rem * var(--ui-font-scale));
     margin-bottom: 15px;
 }
 
@@ -1429,7 +1434,7 @@ button, input, select, textarea {
     padding: 8px 12px;
     border-radius: 4px;
     cursor: pointer;
-    font-size: 12px;
+    font-size: calc(12px * var(--ui-font-scale));
     flex: 1;
     min-width: 120px;
 }
@@ -1516,7 +1521,7 @@ button, input, select, textarea {
     border-radius: 50%;
     text-align: center;
     line-height: 25px;
-    font-size: 12px;
+    font-size: calc(12px * var(--ui-font-scale));
     margin-right: 10px;
 }
 
@@ -1524,7 +1529,7 @@ button, input, select, textarea {
     cursor: grab;
     margin-right: 8px;
     color: #7f8c8d;
-    font-size: 14px;
+    font-size: calc(14px * var(--ui-font-scale));
     user-select: none;
 }
 
@@ -1538,7 +1543,7 @@ button, input, select, textarea {
     right: 15px;
     cursor: grab;
     color: #7f8c8d;
-    font-size: 16px;
+    font-size: calc(16px * var(--ui-font-scale));
     padding: 5px;
     border-radius: 4px;
     transition: background 0.3s;
@@ -1559,7 +1564,7 @@ button, input, select, textarea {
     border-radius: 50%;
     text-align: center;
     line-height: 25px;
-    font-size: 12px;
+    font-size: calc(12px * var(--ui-font-scale));
     margin-right: 10px;
     font-weight: bold;
 }
@@ -1571,7 +1576,7 @@ button, input, select, textarea {
     border-radius: 20px;
     background: white;
     cursor: pointer;
-    font-size: 11px;
+    font-size: calc(11px * var(--ui-font-scale));
     transition: all 0.3s;
 }
 
@@ -1627,7 +1632,7 @@ button, input, select, textarea {
 .login-content h2 {
     color: var(--primary);
     margin-bottom: 20px;
-    font-size: 1.8rem;
+    font-size: calc(1.8rem * var(--ui-font-scale));
 }
 
 .password-input {
@@ -1639,7 +1644,7 @@ button, input, select, textarea {
     padding: 12px 16px;
     border: 2px solid var(--light-gray);
     border-radius: 10px;
-    font-size: 16px;
+    font-size: calc(16px * var(--ui-font-scale));
     margin-bottom: 15px;
     transition: border-color 0.3s;
 }
@@ -1655,7 +1660,7 @@ button, input, select, textarea {
     border: none;
     padding: 12px 30px;
     border-radius: 30px;
-    font-size: 16px;
+    font-size: calc(16px * var(--ui-font-scale));
     font-weight: 600;
     cursor: pointer;
     transition: all 0.3s;
@@ -1677,7 +1682,7 @@ button, input, select, textarea {
     color: var(--danger);
     margin-top: 15px;
     display: none;
-    font-size: 14px;
+    font-size: calc(14px * var(--ui-font-scale));
 }
 
 /* Сообщение об отсутствии доступа */
@@ -1699,7 +1704,7 @@ button, input, select, textarea {
 
 .no-access-message h3 {
     color: var(--primary);
-    font-size: 1.5rem;
+    font-size: calc(1.5rem * var(--ui-font-scale));
     margin-bottom: 15px;
 }
 
@@ -1753,7 +1758,7 @@ button, input, select, textarea {
     margin-top: 15px;
     color: var(--primary);
     font-weight: 600;
-    font-size: 1.2rem;
+    font-size: calc(1.2rem * var(--ui-font-scale));
 }
 
 .empty-objects {
@@ -1763,7 +1768,7 @@ button, input, select, textarea {
     background: #faf5ff;
     padding: 8px 16px;
     border-radius: 40px;
-    font-size: 0.9rem;
+    font-size: calc(0.9rem * var(--ui-font-scale));
     display: inline-block;
     border: 1px dashed #d9c0ff;
 }
@@ -1777,7 +1782,7 @@ button, input, select, textarea {
     color: white;
     padding: 8px 16px;
     border-radius: 30px;
-    font-size: 12px;
+    font-size: calc(12px * var(--ui-font-scale));
     z-index: 9999;
     pointer-events: none;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
@@ -1796,7 +1801,7 @@ button, input, select, textarea {
 }
 
 .error-state i {
-    font-size: 48px;
+    font-size: calc(48px * var(--ui-font-scale));
     color: #e74c3c;
     margin-bottom: 16px;
 }
@@ -1813,7 +1818,7 @@ button, input, select, textarea {
     padding: 8px 24px;
     border-radius: 30px;
     cursor: pointer;
-    font-size: 14px;
+    font-size: calc(14px * var(--ui-font-scale));
     transition: all 0.2s;
 }
 
@@ -1841,7 +1846,7 @@ button, input, select, textarea {
     padding: 6px;
     border: 1px solid #ddd;
     border-radius: 6px;
-    font-size: 0.85rem;
+    font-size: calc(0.85rem * var(--ui-font-scale));
 }
 
 .file-input:hover {
@@ -1856,7 +1861,7 @@ button, input, select, textarea {
     height: 30px;
     border-radius: 4px;
     cursor: pointer;
-    font-size: 14px;
+    font-size: calc(14px * var(--ui-font-scale));
     transition: all 0.2s;
 }
 
@@ -1904,7 +1909,7 @@ button, input, select, textarea {
 
 .app-footer .footer-copyright {
     color: var(--gray);
-    font-size: 0.75rem;
+    font-size: calc(0.75rem * var(--ui-font-scale));
 }
 
 .footer-on-red {
@@ -1939,7 +1944,7 @@ button, input, select, textarea {
 
 .footer-on-red .footer-copyright {
     color: rgba(255, 255, 255, 0.7);
-    font-size: 0.75rem;
+    font-size: calc(0.75rem * var(--ui-font-scale));
 }
 
 /* Стили для возвратной кнопки */
@@ -1974,20 +1979,20 @@ button, input, select, textarea {
 }
 
 .welcome-icon {
-    font-size: 80px;
+    font-size: calc(80px * var(--ui-font-scale));
     color: var(--primary);
     margin-bottom: 20px;
 }
 
 .welcome-title {
-    font-size: 2rem;
+    font-size: calc(2rem * var(--ui-font-scale));
     color: var(--dark);
     margin-bottom: 10px;
 }
 
 .welcome-subtitle {
     color: var(--gray);
-    font-size: 1rem;
+    font-size: calc(1rem * var(--ui-font-scale));
     margin-bottom: 30px;
 }
 
@@ -2017,18 +2022,18 @@ button, input, select, textarea {
 }
 
 .welcome-card-icon {
-    font-size: 48px;
+    font-size: calc(48px * var(--ui-font-scale));
     margin-bottom: 15px;
 }
 
 .welcome-card-title {
-    font-size: 1.2rem;
+    font-size: calc(1.2rem * var(--ui-font-scale));
     font-weight: 600;
     margin-bottom: 10px;
 }
 
 .welcome-card-desc {
-    font-size: 0.85rem;
+    font-size: calc(0.85rem * var(--ui-font-scale));
     color: var(--gray);
 }
 
@@ -2068,7 +2073,7 @@ button, input, select, textarea {
         background: rgba(164, 44, 48, 0.08);
         border-radius: 12px;
         padding: 10px 16px;
-        font-size: 0.9rem;
+        font-size: calc(0.9rem * var(--ui-font-scale));
     }
     
     .system-btn.active {
@@ -2126,16 +2131,16 @@ button, input, select, textarea {
     }
     
     .vacancy-value {
-        font-size: 1.2rem;
+        font-size: calc(1.2rem * var(--ui-font-scale));
     }
     
     .vacancy-label {
-        font-size: 0.65rem;
+        font-size: calc(0.65rem * var(--ui-font-scale));
     }
     
     .direction-btn, .flip-btn {
         padding: 8px 12px;
-        font-size: 12px;
+        font-size: calc(12px * var(--ui-font-scale));
     }
     
     .dashboard-header {
@@ -2193,28 +2198,28 @@ button, input, select, textarea {
     }
     
     .user-badge .user-role {
-        font-size: 0.65rem;
+        font-size: calc(0.65rem * var(--ui-font-scale));
     }
     
     .date-picker {
-        font-size: 0.85rem;
+        font-size: calc(0.85rem * var(--ui-font-scale));
         padding: 6px 10px;
     }
     
     .panel-title {
-        font-size: 1.1rem;
+        font-size: calc(1.1rem * var(--ui-font-scale));
     }
     
     .office-name {
-        font-size: 0.9rem;
+        font-size: calc(0.9rem * var(--ui-font-scale));
     }
     
     .object-name {
-        font-size: 0.8rem;
+        font-size: calc(0.8rem * var(--ui-font-scale));
     }
     
     .system-btn {
-        font-size: 0.8rem;
+        font-size: calc(0.8rem * var(--ui-font-scale));
         padding: 8px 12px;
     }
     
@@ -2244,7 +2249,7 @@ button, input, select, textarea {
 .manager-efficiency-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 0.9rem;
+    font-size: calc(0.9rem * var(--ui-font-scale));
     background: #fff;
 }
 
@@ -2412,7 +2417,7 @@ button, input, select, textarea {
     gap: 10px;
     flex-wrap: wrap;
     align-items: center;
-    font-size: 0.9rem;
+    font-size: calc(0.9rem * var(--ui-font-scale));
 }
 
 .cis-muted {
@@ -2482,7 +2487,7 @@ button, input, select, textarea {
 .cis-help-section h4 {
     margin: 0 0 14px;
     color: #2c3e50;
-    font-size: 1.35rem;
+    font-size: calc(1.35rem * var(--ui-font-scale));
 }
 
 .cis-help-checklist {
@@ -2620,7 +2625,7 @@ button, input, select, textarea {
     padding: 8px 20px;
     border-radius: 30px;
     cursor: pointer;
-    font-size: 0.9rem;
+    font-size: calc(0.9rem * var(--ui-font-scale));
     color: white;
     transition: all 0.3s;
     font-weight: 500;
@@ -2652,7 +2657,7 @@ button, input, select, textarea {
     display: flex;
     gap: 15px;
     margin-top: 5px;
-    font-size: 0.85rem;
+    font-size: calc(0.85rem * var(--ui-font-scale));
     flex-wrap: wrap;
 }
 
@@ -2721,11 +2726,11 @@ button, input, select, textarea {
         width: 100%;
         min-width: 120px;
         padding: 8px 8px;
-        font-size: 0.85rem;
+        font-size: calc(0.85rem * var(--ui-font-scale));
     }
     
     .worker-status-container .filter-group label {
-        font-size: 0.7rem;
+        font-size: calc(0.7rem * var(--ui-font-scale));
         white-space: nowrap;
     }
     
@@ -2739,7 +2744,7 @@ button, input, select, textarea {
     .worker-status-container .btn-reset,
     .worker-status-container .btn-sync {
         padding: 6px 12px;
-        font-size: 0.75rem;
+        font-size: calc(0.75rem * var(--ui-font-scale));
         white-space: nowrap;
     }
 }
@@ -2773,17 +2778,17 @@ button, input, select, textarea {
     .status-table th,
     .status-table td {
         padding: 8px 8px;
-        font-size: 0.75rem;
+        font-size: calc(0.75rem * var(--ui-font-scale));
     }
     
     .status-badge {
         padding: 2px 6px;
-        font-size: 0.65rem;
+        font-size: calc(0.65rem * var(--ui-font-scale));
         white-space: nowrap;
     }
     
     .date-cell {
-        font-size: 0.7rem;
+        font-size: calc(0.7rem * var(--ui-font-scale));
     }
 }
 
@@ -2802,7 +2807,7 @@ button, input, select, textarea {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.5rem;
+    font-size: calc(1.5rem * var(--ui-font-scale));
     opacity: 0;
     visibility: hidden;
     transition: all 0.3s ease;
@@ -2842,20 +2847,20 @@ button, input, select, textarea {
     color: white;
     padding: 2px 8px;
     border-radius: 12px;
-    font-size: 0.65rem;
+    font-size: calc(0.65rem * var(--ui-font-scale));
     margin-left: 5px;
 }
 
 /* ========== РАЗМЕР ШРИФТА ДЛЯ ИНФОРМАЦИИ В КАРТОЧКАХ ========== */
 .flip-card-front > p {
-    font-size: 1rem;
+    font-size: calc(1rem * var(--ui-font-scale));
     margin: 6px 0;
     line-height: 1.5;
     color: #444;
 }
 
 .flip-card-front > p strong {
-    font-size: 1rem;
+    font-size: calc(1rem * var(--ui-font-scale));
     color: #333;
 }
 
@@ -2865,16 +2870,16 @@ button, input, select, textarea {
 }
 
 .flip-card-front .vacancy-stat .vacancy-value {
-    font-size: 1.5rem;
+    font-size: calc(1.5rem * var(--ui-font-scale));
 }
 
 .flip-card-front .vacancy-stat .vacancy-label {
-    font-size: 0.75rem;
+    font-size: calc(0.75rem * var(--ui-font-scale));
 }
 
 .flip-card-front .card-buttons .direction-btn,
 .flip-card-front .card-buttons .flip-btn {
-    font-size: 0.85rem;
+    font-size: calc(0.85rem * var(--ui-font-scale));
     padding: 8px 14px;
 }
 
@@ -2886,7 +2891,7 @@ button, input, select, textarea {
 .faq-admin-order { width: 32px; text-align: center; color: var(--gray); }
 .faq-admin-name { flex: 1; }
 .faq-admin-actions { display: flex; gap: 6px; }
-.faq-draft-badge { margin-left: 8px; padding: 2px 7px; border-radius: 10px; background: #e5e7eb; font-size: .72rem; }
+.faq-draft-badge { margin-left: 8px; padding: 2px 7px; border-radius: 10px; background: #e5e7eb; font-size: calc(.72rem * var(--ui-font-scale)); }
 .faq-editor-modal .modal-content { width: min(920px, 96vw); max-height: 92vh; }
 .faq-editor-modal .modal-body { overflow-y: auto; max-height: calc(92vh - 70px); }
 .faq-order-row { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 12px; }
@@ -2938,7 +2943,7 @@ button, input, select, textarea {
         border-radius: 0;
         border-bottom: 1px solid #eceeef;
         padding: 12px 8px;
-        font-size: 0.92rem;
+        font-size: calc(0.92rem * var(--ui-font-scale));
         color: var(--dark);
     }
     .app-header .system-btn.active {

@@ -31,7 +31,7 @@
         
         .no-access-message h3 {
             color: var(--primary);
-            font-size: 1.5rem;
+            font-size: calc(1.5rem * var(--ui-font-scale));
             margin-bottom: 15px;
         }
         
@@ -46,7 +46,7 @@
             border: none;
             padding: 12px 28px;
             border-radius: 30px;
-            font-size: 1rem;
+            font-size: calc(1rem * var(--ui-font-scale));
             font-weight: 600;
             cursor: pointer;
             margin-top: 20px;
@@ -77,7 +77,7 @@
         
         <div class="no-access-message">
             <div class="no-access-content">
-                <i class="fas fa-lock" style="font-size: 64px; color: var(--primary); margin-bottom: 20px;"></i>
+                <i class="fas fa-lock" style="font-size: calc(64px * var(--ui-font-scale)); color: var(--primary); margin-bottom: 20px;"></i>
                 <h3>⛔ Доступ запрещён</h3>
                 <p>{{ message if message else 'У вас нет прав для просмотра этой страницы.' }}</p>
                 <button onclick="window.location.href='{{ return_url if return_url else '/welcome' }}'" class="return-btn">
@@ -138,7 +138,7 @@
             <i class="fas fa-headset"></i> Поддержка
         </a>
     </div>
-    <div style="color: var(--gray); font-size: 0.7rem;">
+    <div style="color: var(--gray); font-size: calc(0.7rem * var(--ui-font-scale));">
         <p>© 2024 Вектор — Управление вахтовым персоналом</p>
     </div>
 </footer>

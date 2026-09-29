@@ -542,7 +542,7 @@ async function initPage() {
                     <div class="user-badge ${roleClass}">
                         ${roleIcon} ${escapeHtml(currentUser.full_name || currentUser.username)}
                         <span class="user-role">${escapeHtml(currentUser.role_display)}</span>
-                        ${isImpersonating ? '<span style="background: #e67e22; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.65rem; margin-left: 5px;">🔓 ИМПЕРСОНАЦИЯ</span>' : ''}
+                        ${isImpersonating ? '<span style="background: #e67e22; color: white; padding: 2px 8px; border-radius: 12px; font-size: calc(0.65rem * var(--ui-font-scale)); margin-left: 5px;">🔓 ИМПЕРСОНАЦИЯ</span>' : ''}
                     </div>
                 </a>
                 ${isImpersonating ? `<button class="logout-button" onclick="stopImpersonation()" style="background: #e67e22; border-color: #e67e22; color: white;">

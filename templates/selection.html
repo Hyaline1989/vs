@@ -18,7 +18,7 @@
             display: flex;
             gap: 15px;
             margin-top: 5px;
-            font-size: 0.85rem;
+            font-size: calc(0.85rem * var(--ui-font-scale));
             flex-wrap: wrap;
         }
         .position-stats span {
@@ -43,7 +43,7 @@
             background: #fff3cd;
             color: #7a5700;
             border: 1px solid #e6c65c;
-            font-size: 0.85rem;
+            font-size: calc(0.85rem * var(--ui-font-scale));
             font-weight: 700;
         }
         @media (max-width: 768px) {
@@ -87,7 +87,7 @@
         }
         .requirements-modal-close {
             cursor: pointer;
-            font-size: 28px;
+            font-size: calc(28px * var(--ui-font-scale));
             font-weight: bold;
         }
         .requirements-modal-close:hover {
@@ -102,7 +102,7 @@
         .requirements-table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 13px;
+            font-size: calc(13px * var(--ui-font-scale));
         }
         
         .requirements-table thead tr:first-child th {
@@ -165,7 +165,7 @@
             padding: 10px 24px;
             border-radius: 6px;
             cursor: pointer;
-            font-size: 14px;
+            font-size: calc(14px * var(--ui-font-scale));
         }
         .btn-save-req:hover {
             background: #219a52;
@@ -178,7 +178,7 @@
             border-radius: 6px;
             cursor: pointer;
             margin-right: 10px;
-            font-size: 14px;
+            font-size: calc(14px * var(--ui-font-scale));
         }
         .btn-cancel-req:hover {
             background: #5a6268;
