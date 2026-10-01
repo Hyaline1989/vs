@@ -8,6 +8,7 @@ import base64
 from datetime import datetime
 from config import *
 import logging
+from time import monotonic
 from normalizer import ObjectNameNormalizer
 
 logger = logging.getLogger(__name__)
@@ -852,6 +853,29 @@ class ShiftReportAPI:
     
     def __init__(self, webhook_url=BITRIX_WEBHOOK_URL):
         self.webhook_url = webhook_url
+        self._report_deadline = None
+
+    def _report_request(self, session, method, params):
+        """Ограничиваем суммарное ожидание и не возвращаем частичный отчёт."""
+        if self._report_deadline is None:
+            self._report_deadline = monotonic() + 20
+        remaining = self._report_deadline - monotonic()
+        if remaining < 1:
+            raise RuntimeError('Битрикс24 отвечает слишком долго. Попробуйте повторить отчёт позже.')
+        try:
+            response = session.post(
+                f'{self.webhook_url}{method}', json=params,
+                timeout=(min(3, remaining / 2), min(8, remaining / 2))
+            )
+            response.raise_for_status()
+            payload = response.json()
+        except (requests.exceptions.RequestException, ValueError) as exc:
+            logger.warning('Ошибка загрузки отчёта: метод=%s тип=%s', method, type(exc).__name__)
+            raise RuntimeError('Не удалось получить данные из Битрикс24. Повторите загрузку отчёта.') from None
+        if not isinstance(payload, dict) or payload.get('error') or not isinstance(payload.get('result'), list):
+            logger.warning('Некорректный ответ Битрикс24: метод=%s', method)
+            raise RuntimeError('Битрикс24 отклонил запрос отчёта. Повторите загрузку позже.')
+        return payload['result']
 
     def get_object_stage_report(self, stage, start_date_str, end_date_str):
         """Направления или заселения по объектам за период события."""
@@ -981,42 +1005,44 @@ class ShiftReportAPI:
     def _get_deals_by_date(self, start_date_str, end_date_str):
         """Загружает сделки за период только с фильтром по дате направления."""
         all_deals = []
-        start = 0
+        last_id = 0
         limit = 50
+        started = monotonic()
+        self._report_deadline = started + 20
         filter_params = {
             f'>={FIELD_DATE_DIRECTED}': start_date_str,
             f'<={FIELD_DATE_DIRECTED}': end_date_str
         }
-        while True:
-            params = {
-                'filter': filter_params,
-                'select': [
-                    'ID', 'TITLE',
-                    FIELD_DATE_DIRECTED,
-                    FIELD_COMPANY,
-                    'SOURCE_ID',
-                    FIELD_CC_OPERATOR,
-                    FIELD_CC_OPERATOR_REPORT,
-                    FIELD_WORKED_1_SHIFT,
-                    FIELD_AGENT_FIO
-                ],
-                'start': start
-            }
-            try:
-                resp = requests.post(f"{self.webhook_url}crm.deal.list", json=params, timeout=30)
-                result = resp.json()
-                if 'result' in result and result['result']:
-                    batch = result['result']
-                    all_deals.extend(batch)
-                    if len(batch) < limit:
-                        break
-                    start += limit
-                else:
+        with requests.Session() as session:
+            while True:
+                params = {
+                    'filter': {**filter_params, '>ID': last_id},
+                    'order': {'ID': 'ASC'},
+                    'select': [
+                        'ID', 'TITLE',
+                        FIELD_DATE_DIRECTED,
+                        FIELD_COMPANY,
+                        'SOURCE_ID',
+                        FIELD_CC_OPERATOR,
+                        FIELD_CC_OPERATOR_REPORT,
+                        FIELD_WORKED_1_SHIFT,
+                        FIELD_AGENT_FIO
+                    ],
+                    # Не пересчитывать total для каждой страницы; листаем по ID.
+                    'start': -1
+                }
+                batch = self._report_request(session, 'crm.deal.list', params)
+                if not batch:
                     break
-            except Exception as e:
-                logger.error(f"Ошибка запроса к Bitrix24: {e}")
-                break
-        logger.info(f"Получено {len(all_deals)} сделок для отчёта по 1 смене")
+                ids = [int(deal['ID']) for deal in batch]
+                if any(value <= last_id for value in ids) or ids != sorted(set(ids)):
+                    raise RuntimeError('Битрикс24 вернул повторную или неверную страницу сделок.')
+                last_id = ids[-1]
+                all_deals.extend(batch)
+                logger.info('[1 смена] Загружено %s сделок за %.2f с', len(all_deals), monotonic() - started)
+                if len(batch) < limit:
+                    break
+        logger.info('Получено %s сделок для отчёта по 1 смене за %.2f с', len(all_deals), monotonic() - started)
         return all_deals
     
     def get_shift_report(self, start_date_str, end_date_str):
@@ -1116,15 +1142,19 @@ class ShiftReportAPI:
         if not company_ids:
             return {}
         info = {}
-        for cid in company_ids:
-            try:
-                resp = requests.post(f"{self.webhook_url}crm.company.get", json={'id': cid}, timeout=10)
-                data = resp.json()
-                if 'result' in data:
-                    info[cid] = data['result'].get('TITLE', 'Неизвестная компания')
-            except Exception as e:
-                logger.error(f"Ошибка компании {cid}: {e}")
-                info[cid] = 'Ошибка загрузки'
+        started = monotonic()
+        unique_ids = list(dict.fromkeys(str(cid) for cid in company_ids))
+        with requests.Session() as session:
+            for offset in range(0, len(unique_ids), 50):
+                companies = self._report_request(session, 'crm.company.list', {
+                    'filter': {'ID': unique_ids[offset:offset + 50]},
+                    'select': ['ID', 'TITLE'],
+                })
+                for company in companies:
+                    info[str(company['ID'])] = company.get('TITLE', 'Неизвестная компания')
+        # Сохраняем тип ключей исходных сделок (Битрикс может вернуть int или str).
+        info = {cid: info[str(cid)] for cid in company_ids if str(cid) in info}
+        logger.info('[Отчёт] Названия %s объектов загружены за %.2f с', len(info), monotonic() - started)
         return info
     
     def add_emoji(self, company_name):

@@ -783,6 +783,7 @@ function downloadManagerEfficiencyPng() {
 async function loadFirstShiftByObject() {
     const contentDiv = document.getElementById('fsObjectContent');
     const summaryDiv = document.getElementById('fsObjectSummary');
+    if (contentDiv.dataset.loading === 'true') return;
     
     let fromDate = document.getElementById('fsObjectFrom')?.value;
     let toDate = document.getElementById('fsObjectTo')?.value;
@@ -795,6 +796,7 @@ async function loadFirstShiftByObject() {
         if (document.getElementById('fsObjectTo')) document.getElementById('fsObjectTo').value = toDate;
     }
     
+    contentDiv.dataset.loading = 'true';
     contentDiv.innerHTML = '<div class="loading">Загрузка данных...</div>';
     if (summaryDiv) summaryDiv.innerHTML = '<div class="loading">Загрузка...</div>';
     
@@ -802,12 +804,14 @@ async function loadFirstShiftByObject() {
         const response = await fetch(`/api/first-shift-by-object?from=${fromDate}&to=${toDate}`, {
             credentials: 'include'
         });
+        if (!(response.headers.get('content-type') || '').includes('application/json')) {
+            throw new Error(response.status === 502 || response.status === 504
+                ? 'Сервер не дождался ответа Битрикс24. Повторите загрузку позже.'
+                : `Сервер вернул неожиданный ответ (HTTP ${response.status}). Обновите страницу.`);
+        }
         const data = await response.json();
         
-        if (data.error) {
-            contentDiv.innerHTML = `<div class="error-state">❌ ${data.error}</div>`;
-            return;
-        }
+        if (!response.ok || data.error) throw new Error(data.error || 'Не удалось загрузить отчёт.');
         
         // Обновляем сводку
         if (summaryDiv) {
@@ -827,7 +831,10 @@ async function loadFirstShiftByObject() {
         
     } catch (error) {
         console.error('Ошибка:', error);
-        contentDiv.innerHTML = '<div class="error-state">❌ Ошибка загрузки данных</div>';
+        contentDiv.textContent = `Ошибка загрузки: ${error.message}`;
+        if (summaryDiv) summaryDiv.textContent = '';
+    } finally {
+        delete contentDiv.dataset.loading;
     }
 }
 
