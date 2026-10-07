@@ -22,13 +22,7 @@
 <div class="app-container">
     <div class="app-header">
         <div class="logo-container"><img src="{{ url_for('static', filename='images/logo2.png') }}" alt="Вектор" class="app-logo-img"></div>
-        <div class="header-right"><div class="system-switcher">
-            <button class="system-btn" onclick="location.href='/dashboard'"><i class="fas fa-chart-line"></i><span>Дашборд</span></button>
-            <button class="system-btn" onclick="location.href='/selection'"><i class="fas fa-user-check"></i><span>Подбор объектов</span></button>
-            {% if current_user.can_view_worker_status() %}<button class="system-btn" onclick="location.href='/worker-status'"><i class="fas fa-users"></i><span>Вахтовики</span></button>{% endif %}
-            {% if current_user.can_view_reports() %}<button class="system-btn" onclick="location.href='/reports'"><i class="fas fa-file-alt"></i><span>Отчёты</span></button>{% endif %}
-            {% if current_user.role == 'admin' or current_user.role == 'manager' %}<button class="system-btn" onclick="location.href='/admin'"><i class="fas fa-users-cog"></i><span>Админ-панель</span></button>{% endif %}
-        </div><div class="user-info" id="userInfo"></div></div>
+        <div class="header-right">{% include '_section_navigation.html' %}<div class="user-info" id="userInfo"></div></div>
     </div>
     <main class="faq-container">
         <div class="faq-header"><h2><i class="fas fa-book-open"></i> Руководство пользователя</h2><p>Пошаговые инструкции по работе с системой «Вектор»</p></div>

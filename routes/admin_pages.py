@@ -15,7 +15,7 @@ admin_pages_bp = Blueprint('admin_pages', __name__)
 def admin_panel():
     """Страница управления пользователями (отдельная админка)"""
     # Проверяем права доступа
-    if current_user.role not in ['admin', 'manager']:
+    if not current_user.can_view_admin():
         return render_template('no_access.html'), 403
     
     return render_template('admin_panel.html')

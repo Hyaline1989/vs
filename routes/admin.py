@@ -20,6 +20,16 @@ logger = logging.getLogger(__name__)
 admin_bp = Blueprint('admin', __name__, url_prefix='/api/admin')
 
 
+@admin_bp.before_request
+def protect_department_permissions():
+    # Legacy checkbox forms cannot express inheritance. Never silently overwrite it.
+    if request.method == 'POST' and request.path.startswith('/api/admin/permissions/'):
+        from access_policy import get_effective
+        user_id = (request.view_args or {}).get('user_id')
+        if user_id and get_effective(user_id) is not None:
+            return jsonify(error='Права этого сотрудника настраиваются во вкладке «Отделы и исключения»'), 409
+
+
 # ========== УПРАВЛЕНИЕ ПОЛЬЗОВАТЕЛЯМИ ==========
 
 @admin_bp.route('/users', methods=['GET'])

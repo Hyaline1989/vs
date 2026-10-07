@@ -259,7 +259,7 @@
             let cardsHtml = '';
             
             // Дашборд
-            if (permissions.dashboard !== false) {
+            if (permissions.dashboard === true) {
                 cardsHtml += `
                     <a href="/dashboard" class="welcome-card">
                         <div class="welcome-card-icon">
@@ -275,7 +275,7 @@
             }
             
             // Подбор объектов
-            if (permissions.selection !== false) {
+            if (permissions.selection === true) {
                 cardsHtml += `
                     <a href="/selection" class="welcome-card">
                         <div class="welcome-card-icon">
@@ -291,7 +291,7 @@
             }
             
             // Вахтовики - добавлен новый модуль
-            if (permissions.worker_status !== false) {
+            if (permissions.worker_status === true) {
                 cardsHtml += `
                     <a href="/worker-status" class="welcome-card">
                         <div class="welcome-card-icon">
@@ -306,7 +306,7 @@
                 `;
             }
             
-            if (permissions.reports === true || window.currentUser.role === 'admin') {
+            if (permissions.reports === true) {
                 cardsHtml += `
                     <a href="/reports" class="welcome-card">
                         <div class="welcome-card-icon"><i class="fas fa-file-alt"></i></div>
@@ -317,7 +317,7 @@
             }
 
             // Админ-панель (только для admin и manager)
-            if (window.currentUser.role === 'admin' || window.currentUser.role === 'manager') {
+            if (permissions.admin === true) {
                 cardsHtml += `
                     <a href="/admin" class="welcome-card">
                         <div class="welcome-card-icon">

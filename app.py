@@ -145,6 +145,22 @@ else:
 # ========== РЕГИСТРАЦИЯ BLUEPRINT'ОВ ==========
 app.register_blueprint(auth_bp)
 app.register_blueprint(admin_bp)
+from routes.departments import departments_bp
+app.register_blueprint(departments_bp)
+
+
+@app.before_request
+def department_admin_gate():
+    from flask_login import current_user
+    protected = (request.path == '/admin' or request.blueprint == 'admin'
+                 or (request.method not in ('GET', 'HEAD', 'OPTIONS')
+                     and request.blueprint in ('objects_admin', 'requirements_admin')))
+    # Returning from impersonation must remain possible even without admin access.
+    if request.path in ('/api/admin/impersonate/stop', '/api/admin/impersonate/status'):
+        return None
+    if protected and current_user.is_authenticated and not current_user.can_view_admin():
+        return jsonify(error='Нет доступа к админ-панели'), 403
+
 app.register_blueprint(dashboard_bp)
 app.register_blueprint(selection_bp)
 app.register_blueprint(admin_pages_bp)
@@ -198,7 +214,7 @@ def selection_page():
 @login_required
 def admin_panel():
     try:
-        if current_user.role not in ['admin', 'manager']:
+        if not current_user.can_view_admin():
             return render_template('no_access.html', 
                                  message="У вас нет доступа к админ-панели",
                                  return_url="/welcome"), 403
@@ -234,7 +250,7 @@ def faq_page():
 def worker_status_page():
     """Страница статусов вахтовиков"""
     try:
-        if not current_user.can_view_selection():
+        if not current_user.can_view_worker_status():
             return render_template('no_access.html', 
                                  message="У вас нет доступа к этой странице",
                                  return_url="/welcome"), 403

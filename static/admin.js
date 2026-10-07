@@ -444,6 +444,18 @@ async function deleteUser(userId) {
 
 // ========== РЕДАКТИРОВАНИЕ ПРАВ ==========
 async function editPermissions(userId) {
+    if (window.currentUser?.role === 'admin') {
+        try {
+            const check = await fetch(`/api/departments/users/${userId}`, {credentials: 'same-origin'});
+            if (check.ok && (await check.json()).overrides) {
+                await window.openDepartmentUser(userId);
+                return;
+            }
+        } catch (error) {
+            showNotification('Не удалось проверить настройки отдела. Повторите попытку.', 'error');
+            return;
+        }
+    }
     // Проверка: manager может управлять только viewer
     if (window.currentUser?.role === 'manager') {
         const targetUser = usersList.find(u => u.id === userId);
@@ -835,7 +847,12 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (response.ok) {
             window.currentUser = await response.json();
             console.log('Текущий пользователь:', window.currentUser);
-            loadUsers();
+            if (window.currentUser.role === 'viewer') {
+                document.getElementById('usersTableContainer').textContent = 'Раздел доступен, но ваша роль не разрешает управление пользователями. Обратитесь к администратору.';
+                document.querySelectorAll('.add-user-btn').forEach(el => el.hidden = true);
+            } else {
+                loadUsers();
+            }
         } else {
             window.location.href = '/';
         }

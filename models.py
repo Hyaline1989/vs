@@ -87,6 +87,11 @@ class User(UserMixin):
         """Загружает права доступа из базы данных"""
         if self._module_permissions is None or self._object_permissions is None:
             try:
+                from access_policy import get_effective
+                policy = get_effective(self.id)
+                if policy is not None:
+                    self._module_permissions, self._object_permissions = policy
+                    return
                 from database import DB_NAME
                 conn = sqlite3.connect(DB_NAME)
                 cursor = conn.cursor()
@@ -155,6 +160,13 @@ class User(UserMixin):
     def can_view_reports(self):
         """Проверяет доступ к разделу отчётов."""
         return self.can_view_module('reports')
+
+    def can_view_admin(self):
+        if self.is_admin():
+            return True
+        from access_policy import get_effective
+        policy = get_effective(self.id)
+        return policy[0]['admin'] if policy is not None else self.role == 'manager'
     
     def can_view_object(self, object_id, context='selection'):
         """Проверяет доступ к конкретному объекту"""

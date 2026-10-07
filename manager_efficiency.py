@@ -12,7 +12,7 @@ from PIL import Image, ImageDraw, ImageFont
 SHORT_CALL_SECONDS = 15
 ANALYTICS_EXCLUDED_NAME_PARTS = ['Без менеджера', 'Тарасов Максим']
 EXCLUDED_MANAGER_PREFIXES = ['сервис', 'без менеджера']
-EXCLUDED_MANAGER_NAME_PARTS = ['тройнов максим', 'тарасов максим']
+EXCLUDED_MANAGER_NAME_PARTS = ['тройнов максим', 'тарасов максим', 'грибова надежда']
 
 
 def is_excluded_manager(manager_name):

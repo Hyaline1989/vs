@@ -1,0 +1,47 @@
+/* Scoped to departments: other admin tabs and passports stay unchanged. */
+#tab-departments .admin-page { padding: clamp(16px, 3vw, 32px); }
+#tab-departments .admin-page > p { color: #67717e; line-height: 1.6; max-width: 850px; margin: 12px 0 24px; }
+#departmentsContent { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+#departmentsContent > .permissions-section { min-width: 0; margin: 0; padding: 24px; background: #fff; border: 1px solid #eadedf; border-radius: 18px; box-shadow: 0 4px 16px #30202306; }
+#departmentsContent .department-exceptions { grid-column: 1 / -1; }
+#departmentsContent h3 { font-size: 20px; color: #303b48; margin: 0 0 16px; padding-bottom: 14px; border-bottom: 2px solid #f2e5e6; }
+#departmentsContent h4 { font-size: 15px; color: #303b48; margin: 24px 0 12px; }
+#departmentsContent p { color: #687382; font-size: 14px; line-height: 1.6; margin: 10px 0 16px; }
+#departmentsContent .department-field { display: block; font-size: 13px; font-weight: 600; color: #586270; margin: 18px 0 8px; }
+#departmentsContent input:not([type=checkbox]), #departmentsContent select { display: block; width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; min-height: 44px; padding: 10px 12px; border: 1px solid #d9dee4; border-radius: 9px; background: #fff; color: #303b48; font: inherit; font-size: 14px; }
+#departmentsContent input:focus-visible, #departmentsContent select:focus-visible, #departmentsContent button:focus-visible { outline: 3px solid #a42c3033; outline-offset: 2px; border-color: #a42c30; }
+#departmentsContent input[type=checkbox] { width: 18px; height: 18px; flex: 0 0 18px; margin: 0; accent-color: #a42c30; cursor: pointer; }
+#departmentsContent .department-modules { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+#departmentsContent .perm-checkbox { display: flex; align-items: center; gap: 10px; padding: 12px; margin: 0; border: 1px solid #e5e8ec; border-radius: 9px; font-size: 14px; min-width: 0; cursor: pointer; }
+#departmentsContent .perm-checkbox:has(input:checked) { background: #fbf2f3; border-color: #d9a8ac; }
+#departmentsContent label:has(> #departmentAllObjects) { display: flex; align-items: center; gap: 10px; font-size: 14px; margin: 12px 0; }
+#departmentsContent .department-search { margin: 16px 0 10px; background: #f8f9fb !important; }
+#departmentsContent .objects-perms-list { max-height: 340px; overflow-y: auto; overflow-x: hidden; border: 1px solid #e5e8ec; border-radius: 10px; padding: 0; margin: 0; }
+#departmentsContent .object-perm-item { display: flex; align-items: center; gap: 12px; padding: 12px 14px; margin: 0; min-width: 0; border: 0; border-bottom: 1px solid #edf0f3; border-radius: 0; font-size: 14px; overflow-wrap: anywhere; }
+#departmentsContent .object-perm-item:last-child { border-bottom: 0; }
+#departmentsContent .object-perm-item:nth-child(even) { background: #f7f9fc; }
+#departmentsContent .department-person { min-width: 0; line-height: 1.5; }
+#departmentsContent .department-person small { display: block; color: #79828e; font-size: 12px; margin-top: 2px; }
+#departmentsContent .department-rule { display: grid; grid-template-columns: minmax(0, 1fr) 180px 160px; }
+#departmentsContent .department-status { color: #6c7683; font-size: 12px; }
+#departmentsContent .btn-small { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; margin: 20px 0 0; padding: 11px 20px; border: 0; border-radius: 10px; background: #a42c30; color: #fff; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+#departmentsContent .btn-small:hover { background: #89252a; }
+#departmentsContent [hidden] { display: none !important; }
+#departmentsContent .department-empty { padding: 12px; text-align: center; }
+#departmentsContent .department-roster-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 16px; overflow-wrap: anywhere; }
+#departmentsContent .department-count { border-radius: 20px; padding: 5px 12px; background: #fbf2f3; color: #a42c30; font-size: 13px; white-space: nowrap; }
+#departmentsContent .department-roster-list { list-style: none; }
+#departmentsContent .department-roster-list .object-perm-item { justify-content: space-between; flex-wrap: wrap; }
+#departmentsContent .department-remove { margin-left: auto; padding: 7px 10px; border: 1px solid #e4bfc2; border-radius: 8px; background: #fff; color: #a42c30; font: inherit; font-size: 12px; cursor: pointer; }
+#departmentsContent .department-remove:hover { background: #fbf2f3; }
+#departmentsContent .department-remove:disabled { opacity: .5; cursor: wait; }
+#departmentsContent #departmentAddPanel { margin-top: 20px; padding-top: 4px; border-top: 1px solid #eadedf; }
+@media (max-width: 1050px) {
+    #departmentsContent { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+}
+@media (max-width: 600px) {
+    #departmentsContent > .permissions-section { padding: 16px; }
+    #departmentsContent .department-modules { grid-template-columns: minmax(0, 1fr); }
+    #departmentsContent .department-rule { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+    #departmentsContent .btn-small { width: 100%; }
+}

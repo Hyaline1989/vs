@@ -59,6 +59,7 @@ def auth():
                 set_user_module_permission(user.id, 'selection', True)
                 module_perms = {'dashboard': True, 'selection': True}
             
+            module_perms['admin'] = user.can_view_admin()
             return jsonify({
                 'success': True,
                 'id': user.id,
@@ -93,15 +94,11 @@ def logout():
 def get_current_user():
     """Получение информации о текущем пользователе"""
     if current_user.is_authenticated:
-        module_perms = get_user_module_permissions(current_user.id)
+        # Use the same decisions as server authorization, including admin roles.
+        module_perms = {name: current_user.can_view_module(name)
+                        for name in ('dashboard', 'selection', 'worker_status', 'reports')}
         
-        # Если права не установлены, даём базовые права
-        if not module_perms:
-            from database import set_user_module_permission
-            set_user_module_permission(current_user.id, 'dashboard', True)
-            set_user_module_permission(current_user.id, 'selection', True)
-            module_perms = {'dashboard': True, 'selection': True}
-        
+        module_perms['admin'] = current_user.can_view_admin()
         return jsonify({
             'id': current_user.id,
             'username': current_user.username,

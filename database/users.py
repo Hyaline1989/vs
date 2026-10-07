@@ -200,6 +200,10 @@ def hard_delete_user(user_id):
 
 def get_user_module_permissions(user_id):
     try:
+        from access_policy import get_effective
+        policy = get_effective(user_id)
+        if policy is not None:
+            return policy[0]
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
         cursor.execute('''
@@ -239,6 +243,10 @@ def set_user_module_permission(user_id, module_name, can_view):
 
 def get_user_object_permissions(user_id):
     try:
+        from access_policy import get_effective
+        policy = get_effective(user_id)
+        if policy is not None:
+            return policy[1]
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
         cursor.execute('''
