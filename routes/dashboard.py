@@ -875,12 +875,14 @@ def get_object_stage_report():
     stage = request.args.get('stage')
     from_date = request.args.get('from', '')
     to_date = request.args.get('to', '')
-    if stage not in ('directed', 'checked_in'):
+    if stage not in ('directed', 'in_transit', 'checked_in'):
         return jsonify({'error': 'Неизвестный вид отчёта'}), 400
     try:
-        if not re.fullmatch(r'\d{4}-\d{2}-\d{2}', from_date) or not re.fullmatch(r'\d{4}-\d{2}-\d{2}', to_date):
+        if stage == 'in_transit':
+            from_date = to_date = ''
+        elif not re.fullmatch(r'\d{4}-\d{2}-\d{2}', from_date) or not re.fullmatch(r'\d{4}-\d{2}-\d{2}', to_date):
             raise ValueError()
-        if datetime.strptime(from_date, '%Y-%m-%d') > datetime.strptime(to_date, '%Y-%m-%d'):
+        elif datetime.strptime(from_date, '%Y-%m-%d') > datetime.strptime(to_date, '%Y-%m-%d'):
             raise ValueError()
     except ValueError:
         return jsonify({'error': 'Укажите корректный период'}), 400

@@ -26,6 +26,10 @@
         #fsObjectContent .object-row:nth-child(even), #fsStaffContent .object-row:nth-child(even),
         #directedObjectContent .object-row:nth-child(even), #checkedInObjectContent .object-row:nth-child(even) { background: #f0f6ff; }
         .stage-report-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+        #inTransitObjectContent .office-header, #inTransitObjectSummary .summary-row { width: 100%; max-width: 700px; }
+        #inTransitObjectContent .office-objects { width: calc(100% - 32px); max-width: 668px; }
+        #inTransitObjectContent .object-row { padding: 7px 8px; border-radius: 4px; }
+        #inTransitObjectContent .object-row:nth-child(even) { background: #f0f6ff; }
         .stage-report-toggle { display: inline-flex; padding: 3px; border-radius: 20px; background: rgba(164,44,48,.1); }
         .stage-report-view-btn { border: 0; border-radius: 17px; padding: 6px 12px; background: transparent; color: var(--primary-dark); font-weight: 600; cursor: pointer; }
         .stage-report-view-btn.active { background: var(--primary); color: #fff; }
@@ -55,6 +59,7 @@
 
     <div class="reports-tabs">
         <button class="reports-tab active" type="button" data-report="directed"><i class="fas fa-arrow-right"></i> Направлены</button>
+        <button class="reports-tab" type="button" data-report="in_transit"><i class="fas fa-bus"></i> В пути</button>
         <button class="reports-tab" type="button" data-report="checked_in"><i class="fas fa-house-user"></i> Заселены</button>
         <button class="reports-tab" type="button" data-report="object"><i class="fas fa-building"></i> 1 смена по объектам</button>
         <button class="reports-tab" type="button" data-report="staff"><i class="fas fa-users"></i> 1 смена по сотрудникам</button>
@@ -93,6 +98,18 @@
             <div class="summary-block" id="directedObjectSummary"></div>
             <div id="directedObjectContent" class="stage-report-offices">Выберите даты и нажмите «Показать».</div>
             <div id="directedStaffContent" class="stage-report-staff" hidden>Выберите даты и нажмите «Показать».</div>
+        </div>
+    </div>
+    <div id="inTransitObjectContainer" class="reports-content">
+        <div class="panel-card">
+            <h2 class="panel-title">В пути</h2>
+            <div class="first-shift-filters">
+                <button class="refresh-btn" type="button" onclick="loadObjectStageReport('in_transit')"><i class="fas fa-sync-alt"></i> Обновить</button>
+            </div>
+            <p class="report-date-hint">Все сделки, которые сейчас в статусе «Направлен на объект», независимо от даты направления.</p>
+            <div class="summary-block" id="inTransitObjectSummary"></div>
+            <div id="inTransitObjectContent">Нажмите «Обновить», чтобы загрузить сделки.</div>
+            <div id="inTransitStaffContent" class="stage-report-staff" hidden></div>
         </div>
     </div>
     <div id="checkedInObjectContainer" class="reports-content">
@@ -165,6 +182,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const containers = {
             object: 'firstShiftObjectContainer',
             directed: 'directedObjectContainer',
+            in_transit: 'inTransitObjectContainer',
             checked_in: 'checkedInObjectContainer',
             staff: 'firstShiftStaffContainer',
             manager: 'managerResultsContainer'

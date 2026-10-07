@@ -923,14 +923,15 @@ function renderObjectStageStaff(staff, containerId) {
 }
 
 async function loadObjectStageReport(stage) {
-    const prefix = stage === 'directed' ? 'directedObject' : 'checkedInObject';
-    const fromDate = document.getElementById(`${prefix}From`).value;
-    const toDate = document.getElementById(`${prefix}To`).value;
+    const prefix = {directed: 'directedObject', in_transit: 'inTransitObject', checked_in: 'checkedInObject'}[stage];
+    const withoutDates = stage === 'in_transit';
+    const fromDate = withoutDates ? '' : document.getElementById(`${prefix}From`).value;
+    const toDate = withoutDates ? '' : document.getElementById(`${prefix}To`).value;
     const content = document.getElementById(`${prefix}Content`);
-    const staffContent = document.getElementById(`${stage === 'directed' ? 'directed' : 'checkedIn'}StaffContent`);
+    const staffContent = document.getElementById(`${{directed: 'directed', in_transit: 'inTransit', checked_in: 'checkedIn'}[stage]}StaffContent`);
     const summary = document.getElementById(`${prefix}Summary`);
 
-    if (!fromDate || !toDate || fromDate > toDate) {
+    if (!withoutDates && (!fromDate || !toDate || fromDate > toDate)) {
         content.textContent = 'Укажите корректный период.';
         staffContent.textContent = 'Укажите корректный период.';
         return;
@@ -939,12 +940,12 @@ async function loadObjectStageReport(stage) {
     staffContent.innerHTML = '<div class="loading">Загрузка данных...</div>';
     summary.textContent = '';
     try {
-        const params = new URLSearchParams({ stage, from: fromDate, to: toDate });
+        const params = new URLSearchParams(withoutDates ? { stage } : { stage, from: fromDate, to: toDate });
         const response = await fetch(`/api/object-stage-report?${params}`, { credentials: 'include' });
         const result = await response.json();
         if (!response.ok || result.error) throw new Error(result.error || 'Не удалось загрузить отчёт');
         summary.innerHTML = `
-            <div class="summary-row"><span>Период:</span><span class="summary-value">${formatDateForDisplay(fromDate)} - ${formatDateForDisplay(toDate)}</span></div>
+            ${withoutDates ? '' : `<div class="summary-row"><span>Период:</span><span class="summary-value">${formatDateForDisplay(fromDate)} - ${formatDateForDisplay(toDate)}</span></div>`}
             <div class="summary-row"><span>Всего сделок:</span><span class="summary-value" style="background: #ffd700; color: #2c3e50;">${result.total_all || 0}</span></div>
         `;
         renderFirstShiftByObject(result.data, `${prefix}Content`);

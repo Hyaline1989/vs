@@ -29,6 +29,7 @@ UIS_SYSTEMS = {
 
 # Поля Bitrix24
 FIELD_DATE_DIRECTED = "UF_CRM_1684488775220"  # Дата направлен на объект
+IN_TRANSIT_STAGE_ID = '3'  # DEAL_STAGE: Направлен на объект
 FIELD_COMPANY = "UF_CRM_642A972B79B02"        # Объект (компания)
 
 # Поля для отчётов по 1 смене

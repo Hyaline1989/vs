@@ -881,6 +881,7 @@ class ShiftReportAPI:
         """Направления или заселения по объектам за период события."""
         date_field = {
             'directed': FIELD_DATE_DIRECTED,
+            'in_transit': FIELD_DATE_DIRECTED,
             'checked_in': CHECK_IN_FIELD,
         }.get(stage)
         if not date_field:
@@ -899,11 +900,13 @@ class ShiftReportAPI:
                         f'<={date_field}': end_date_str,
                     },
                     'select': [
-                        'ID', date_field, FIELD_COMPANY, 'SOURCE_ID',
+                        'ID', 'STAGE_ID', date_field, FIELD_COMPANY, 'SOURCE_ID',
                         FIELD_CC_OPERATOR, FIELD_CC_OPERATOR_REPORT, FIELD_AGENT_FIO,
                     ],
                     'start': start,
                 }
+                if stage == 'in_transit':
+                    params['filter'] = {'STAGE_ID': IN_TRANSIT_STAGE_ID}
                 try:
                     response = session.post(
                         f'{self.webhook_url}crm.deal.list', json=params, timeout=(5, 30)
@@ -923,6 +926,8 @@ class ShiftReportAPI:
                 start = next_start
 
         filtered = [deal for deal in deals if deal.get(date_field) and deal.get(date_field) != 'N']
+        if stage == 'in_transit':
+            filtered = [deal for deal in deals if str(deal.get('STAGE_ID')) == IN_TRANSIT_STAGE_ID]
         return self._group_by_companies(filtered, include_staff=True)
 
     def get_manager_result_deals(self, start_date_str, end_date_str):
