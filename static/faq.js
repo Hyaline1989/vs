@@ -2,7 +2,7 @@
 (function () {
     let articles = [];
     let currentCategory = 'all';
-    const icons = { start: '🚀', dashboard: '📊', selection: '🎯', workers: '👥', admin: '⚙️', profile: '👤' };
+    const icons = { start: '🚀', dashboard: '📊', reports: '📋', selection: '🎯', workers: '👥', admin: '⚙️', profile: '👤' };
     const safe = value => String(value || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 
     async function loadFaq() {

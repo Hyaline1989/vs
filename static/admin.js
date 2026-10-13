@@ -161,10 +161,10 @@ function renderUsersTable(users) {
         let html = '<div class="users-cards">';
         
         for (const user of users) {
-            if (isManager && user.role !== 'viewer') continue;
+            if (isManager && !['viewer', 'agent'].includes(user.role)) continue;
             
             const roleClass = user.role === 'admin' ? 'role-admin' : (user.role === 'manager' ? 'role-manager' : 'role-viewer');
-            let roleName = user.role === 'admin' ? 'Администратор' : (user.role === 'manager' ? 'Руководитель' : 'Менеджер');
+            let roleName = user.role === 'admin' ? 'Администратор' : (user.role === 'manager' ? 'Руководитель' : (user.role === 'agent' ? 'Агент' : 'Менеджер'));
             
             if (user.id === 1) {
                 roleName = 'Системный администратор';
@@ -189,7 +189,7 @@ function renderUsersTable(users) {
                     canManagePermissions = true;
                 }
             }
-            else if (isManager && user.role === 'viewer') {
+            else if (isManager && ['viewer', 'agent'].includes(user.role)) {
                 canEdit = true;
                 canDelete = true;
                 canManagePermissions = true;
@@ -262,10 +262,10 @@ function renderUsersTable(users) {
     `;
     
     for (const user of users) {
-        if (isManager && user.role !== 'viewer') continue;
+        if (isManager && !['viewer', 'agent'].includes(user.role)) continue;
         
         const roleClass = user.role === 'admin' ? 'role-admin' : (user.role === 'manager' ? 'role-manager' : 'role-viewer');
-        let roleName = user.role === 'admin' ? 'Администратор' : (user.role === 'manager' ? 'Руководитель' : 'Менеджер');
+        let roleName = user.role === 'admin' ? 'Администратор' : (user.role === 'manager' ? 'Руководитель' : (user.role === 'agent' ? 'Агент' : 'Менеджер'));
         
         if (user.id === 1) {
             roleName = 'Системный администратор';
@@ -290,7 +290,7 @@ function renderUsersTable(users) {
                 canManagePermissions = true;
             }
         }
-        else if (isManager && user.role === 'viewer') {
+        else if (isManager && ['viewer', 'agent'].includes(user.role)) {
             canEdit = true;
             canDelete = true;
             canManagePermissions = true;
@@ -346,6 +346,9 @@ function editUser(userId) {
     document.getElementById('fullName').value = user.full_name || '';
     document.getElementById('email').value = user.email || '';
     document.getElementById('userRole').value = user.role;
+    document.getElementById('userRole').disabled = !window.currentUser?.is_system_admin || userId === window.currentUser?.id || userId === 1;
+    const departmentSettings = document.getElementById('departmentSettingsGroup');
+    if (departmentSettings) departmentSettings.hidden = user.role === 'admin';
     document.getElementById('isActive').checked = user.is_active;
     document.getElementById('password').value = '';
     document.getElementById('confirmPassword').value = '';
@@ -356,20 +359,53 @@ function editUser(userId) {
 }
 
 // ========== ДОБАВЛЕНИЕ ПОЛЬЗОВАТЕЛЯ ==========
-function openAddUserModal() {
+async function checkCreateUserAccess() {
+    try {
+        const response = await fetch('/api/auth/me', { credentials: 'include', cache: 'no-store' });
+        if (!response.ok) throw new Error('Не удалось проверить права');
+        window.currentUser = await response.json();
+        const allowed = window.currentUser.role === 'admin';
+        const button = document.getElementById('addUserButton');
+        if (button) button.style.display = allowed ? '' : 'none';
+        if (!allowed) {
+            closeUserModal();
+            showNotification('Создавать пользователей может только администратор', 'error');
+        }
+        return allowed;
+    } catch (error) {
+        showNotification('Не удалось проверить права. Обновите страницу.', 'error');
+        return false;
+    }
+}
+
+async function openAddUserModal() {
+    if (!await checkCreateUserAccess()) return;
     currentEditUserId = null;
     document.getElementById('modalTitle').textContent = 'Добавить пользователя';
     document.getElementById('userForm').reset();
+    document.getElementById('userRole').disabled = false;
     document.getElementById('userId').value = '';
+    const departmentSettings = document.getElementById('departmentSettingsGroup');
+    if (departmentSettings) departmentSettings.hidden = true;
     document.getElementById('username').disabled = false;
     document.getElementById('passwordField').style.display = 'block';
     document.getElementById('confirmPasswordField').style.display = 'block';
     document.getElementById('userModal').style.display = 'flex';
 }
 
+function openSavedUserDepartment() {
+    const id = Number(document.getElementById('userId').value);
+    if (!id) {
+        showNotification('Сначала сохраните пользователя', 'error');
+        return;
+    }
+    window.openDepartmentUser(id);
+}
+
 // ========== СОХРАНЕНИЕ ПОЛЬЗОВАТЕЛЯ ==========
 async function saveUser() {
     const userId = document.getElementById('userId').value;
+    if (!userId && !await checkCreateUserAccess()) return;
     const username = document.getElementById('username').value;
     const password = document.getElementById('password').value;
     const confirmPassword = document.getElementById('confirmPassword').value;
@@ -394,6 +430,7 @@ async function saveUser() {
             url = `/api/admin/users/${userId}`;
             method = 'PUT';
             body = { full_name: fullName, email: email, is_active: isActive };
+            if (!document.getElementById('userRole').disabled) body.role = role;
             if (password) body.password = password;
         } else {
             url = '/api/admin/users';
@@ -444,23 +481,15 @@ async function deleteUser(userId) {
 
 // ========== РЕДАКТИРОВАНИЕ ПРАВ ==========
 async function editPermissions(userId) {
-    if (window.currentUser?.role === 'admin') {
-        try {
-            const check = await fetch(`/api/departments/users/${userId}`, {credentials: 'same-origin'});
-            if (check.ok && (await check.json()).overrides) {
-                await window.openDepartmentUser(userId);
-                return;
-            }
-        } catch (error) {
-            showNotification('Не удалось проверить настройки отдела. Повторите попытку.', 'error');
-            return;
-        }
+    if (window.currentUser?.role === 'admin' && usersList.find(user => user.id === userId)?.role !== 'admin') {
+        await window.openDepartmentUser(userId);
+        return;
     }
-    // Проверка: manager может управлять только viewer
+    // Руководитель может управлять менеджерами и агентами.
     if (window.currentUser?.role === 'manager') {
         const targetUser = usersList.find(u => u.id === userId);
-        if (targetUser && targetUser.role !== 'viewer') {
-            showNotification('Руководитель может управлять правами только менеджеров', 'error');
+        if (targetUser && !['viewer', 'agent'].includes(targetUser.role)) {
+            showNotification('Руководитель может управлять правами только менеджеров и агентов', 'error');
             return;
         }
     }
@@ -715,7 +744,7 @@ function filterUsers() {
             }
             
             if (roleFilter !== 'all') {
-                const roleMap = { 'admin': 'администратор', 'manager': 'руководитель', 'viewer': 'менеджер' };
+                const roleMap = { 'admin': 'администратор', 'manager': 'руководитель', 'viewer': 'менеджер', 'agent': 'агент' };
                 if (!roleBadge.includes(roleMap[roleFilter])) matches = false;
             }
             
@@ -742,7 +771,7 @@ function filterUsers() {
             }
             
             if (roleFilter !== 'all') {
-                const roleMap = { 'admin': 'администратор', 'manager': 'руководитель', 'viewer': 'менеджер' };
+                const roleMap = { 'admin': 'администратор', 'manager': 'руководитель', 'viewer': 'менеджер', 'agent': 'агент' };
                 if (!role.includes(roleMap[roleFilter])) matches = false;
             }
             
@@ -847,7 +876,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (response.ok) {
             window.currentUser = await response.json();
             console.log('Текущий пользователь:', window.currentUser);
-            if (window.currentUser.role === 'viewer') {
+            if (['viewer', 'agent'].includes(window.currentUser.role)) {
                 document.getElementById('usersTableContainer').textContent = 'Раздел доступен, но ваша роль не разрешает управление пользователями. Обратитесь к администратору.';
                 document.querySelectorAll('.add-user-btn').forEach(el => el.hidden = true);
             } else {
@@ -873,6 +902,7 @@ window.closeUserModal = closeUserModal;
 window.closePermissionsModal = closePermissionsModal;
 window.filterUsers = filterUsers;
 window.openAddUserModal = openAddUserModal;
+window.openSavedUserDepartment = openSavedUserDepartment;
 window.saveUser = saveUser;
 window.loadUsers = loadUsers;
 window.generateSnapshots = generateSnapshots;

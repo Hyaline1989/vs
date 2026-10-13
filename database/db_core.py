@@ -69,7 +69,7 @@ def init_db():
                 password_hash TEXT NOT NULL,
                 full_name TEXT,
                 email TEXT,
-                role TEXT NOT NULL CHECK(role IN ('admin', 'manager', 'viewer')),
+                role TEXT NOT NULL CHECK(role IN ('admin', 'manager', 'viewer', 'agent')),
                 created_by INTEGER,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 is_active INTEGER DEFAULT 1,

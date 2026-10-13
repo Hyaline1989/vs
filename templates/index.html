@@ -130,6 +130,14 @@
             cursor: not-allowed;
             transform: none;
         }
+
+        .login-help {
+            margin-top: 16px;
+            color: var(--gray);
+            font-size: calc(0.85rem * var(--ui-font-scale));
+            line-height: 1.4;
+            text-align: center;
+        }
         
         .error-message {
             background: #fee2e2;
@@ -159,7 +167,7 @@
             </div>
             
             <div class="login-title">Добро пожаловать!</div>
-            <div class="login-subtitle">Войдите в систему, чтобы продолжить</div>
+            <div class="login-subtitle">Введите логин и пароль, чтобы войти в Вектор</div>
             
             <div class="login-form">
                 <div class="input-group">
@@ -185,6 +193,8 @@
                 <div class="error-message" id="errorMessage">
                     <i class="fas fa-exclamation-circle"></i> Неверное имя пользователя или пароль
                 </div>
+
+                <div class="login-help">Нет логина или пароля? Обратитесь к своему руководителю.</div>
             </div>
             
             <div class="login-footer">

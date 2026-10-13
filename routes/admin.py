@@ -43,7 +43,7 @@ def get_users():
     users = get_all_users()
     
     if current_user.role == 'manager':
-        users = [u for u in users if u['role'] == 'viewer']
+        users = [u for u in users if u['role'] in ('viewer', 'agent')]
     elif current_user.role == 'admin' and current_user.id != 1:
         users = [u for u in users if u['id'] != 1]
     
@@ -69,7 +69,7 @@ def create_user_api():
         return jsonify({'error': 'Имя пользователя и пароль обязательны'}), 400
     if len(password) < 4:
         return jsonify({'error': 'Пароль должен быть не менее 4 символов'}), 400
-    if role not in ['admin', 'manager', 'viewer']:
+    if role not in ['admin', 'manager', 'viewer', 'agent']:
         return jsonify({'error': 'Некорректная роль'}), 400
     
     from database import get_user_by_username
@@ -139,6 +139,15 @@ def update_user_api(user_id):
         return jsonify({'error': 'Пользователь не найден'}), 404
     
     updates = {}
+
+    if 'role' in data:
+        if not is_system_admin(current_user.id):
+            return jsonify({'error': 'Роль может менять только системный администратор'}), 403
+        if user_id == current_user.id or user_id == 1:
+            return jsonify({'error': 'Нельзя изменять роль системного администратора или свою роль'}), 403
+        if data['role'] not in ('admin', 'manager', 'viewer', 'agent'):
+            return jsonify({'error': 'Неизвестная роль'}), 400
+        updates['role'] = data['role']
     
     if current_user.id == user_id or current_user.role == 'admin':
         if 'full_name' in data:
@@ -154,7 +163,12 @@ def update_user_api(user_id):
                 return jsonify({'error': 'Пароль должен быть не менее 4 символов'}), 400
     
     if updates:
-        update_user(user_id, updates)
+        if not update_user(user_id, updates):
+            return jsonify({'error': 'Не удалось сохранить пользователя'}), 500
+        if 'role' in updates and updates['role'] != user_data['role']:
+            log_user_action(current_user.id, 'change_user_role',
+                            f"Пользователь ID {user_id}: {user_data['role']} -> {updates['role']}",
+                            request.remote_addr)
         log_user_action(current_user.id, 'update_user', f"Обновлён пользователь ID {user_id}", request.remote_addr)
     
     return jsonify({'success': True})
@@ -202,8 +216,8 @@ def get_user_module_perms(user_id):
         target_user = get_user_by_id(user_id)
         if not target_user:
             return jsonify({'error': 'User not found'}), 404
-        if target_user['role'] != 'viewer':
-            return jsonify({'error': 'Руководитель может управлять правами только менеджеров'}), 403
+        if target_user['role'] not in ('viewer', 'agent'):
+            return jsonify({'error': 'Руководитель может управлять правами только менеджеров и агентов'}), 403
     
     perms = get_user_module_permissions(user_id)
     return jsonify(perms)
@@ -224,8 +238,8 @@ def update_user_module_perms(user_id):
         target_user = get_user_by_id(user_id)
         if not target_user:
             return jsonify({'error': 'User not found'}), 404
-        if target_user['role'] != 'viewer':
-            return jsonify({'error': 'Руководитель может управлять правами только менеджеров'}), 403
+        if target_user['role'] not in ('viewer', 'agent'):
+            return jsonify({'error': 'Руководитель может управлять правами только менеджеров и агентов'}), 403
         my_module_perms = get_user_module_permissions(current_user.id)
     
     data = request.get_json()
@@ -292,8 +306,8 @@ def get_user_object_perms(user_id):
         target_user = get_user_by_id(user_id)
         if not target_user:
             return jsonify({'error': 'User not found'}), 404
-        if target_user['role'] != 'viewer':
-            return jsonify({'error': 'Руководитель может управлять правами только менеджеров'}), 403
+        if target_user['role'] not in ('viewer', 'agent'):
+            return jsonify({'error': 'Руководитель может управлять правами только менеджеров и агентов'}), 403
     
     perms = get_user_object_permissions(user_id)
     
@@ -320,8 +334,8 @@ def update_user_object_perms(user_id):
         target_user = get_user_by_id(user_id)
         if not target_user:
             return jsonify({'error': 'User not found'}), 404
-        if target_user['role'] != 'viewer':
-            return jsonify({'error': 'Руководитель может управлять правами только менеджеров'}), 403
+        if target_user['role'] not in ('viewer', 'agent'):
+            return jsonify({'error': 'Руководитель может управлять правами только менеджеров и агентов'}), 403
         my_perms = get_user_object_permissions(current_user.id)
         visible_objects_for_me = [obj_id for obj_id, perms in my_perms.items() if perms.get('selection', False)]
     

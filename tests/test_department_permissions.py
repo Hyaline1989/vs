@@ -17,11 +17,11 @@ class DepartmentTests(unittest.TestCase):
             CREATE TABLE users(id INTEGER PRIMARY KEY, role TEXT);
             CREATE TABLE objects_settings(id INTEGER PRIMARY KEY, name TEXT);
             CREATE TABLE user_module_permissions(user_id INTEGER,module_name TEXT,can_view INTEGER);
-            CREATE TABLE user_object_permissions(user_id INTEGER,object_id INTEGER,can_view_selection INTEGER);
+            CREATE TABLE user_object_permissions(user_id INTEGER,object_id INTEGER,can_view_dashboard INTEGER,can_view_selection INTEGER);
             INSERT INTO users VALUES(1,'admin'),(2,'viewer'),(3,'manager');
             INSERT INTO objects_settings VALUES(1,'Первый'),(2,'Второй');
             INSERT INTO user_module_permissions VALUES(2,'selection',1);
-            INSERT INTO user_object_permissions VALUES(2,1,1);
+            INSERT INTO user_object_permissions VALUES(2,1,0,1);
         ''')
 
     def department(self, policy='{"modules":{"selection":true},"objects":{"2":true}}'):
@@ -49,6 +49,7 @@ class DepartmentTests(unittest.TestCase):
         assign(self.db, [2,3], 1, 'preserve')
         modules, objects = effective(self.db, 2)
         self.assertTrue(objects[1]['selection'])
+        self.assertFalse(objects[1]['dashboard'])
         self.assertFalse(objects[2]['selection'])
         self.assertTrue(effective(self.db, 3)[0]['admin'])
         self.assertFalse(modules['admin'])

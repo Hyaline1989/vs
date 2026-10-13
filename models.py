@@ -50,7 +50,7 @@ class User(UserMixin):
         return self.role == 'manager'
     
     def is_viewer(self):
-        return self.role == 'viewer'
+        return self.role in ('viewer', 'agent')
     
     def is_system_admin(self):
         """Проверяет, является ли пользователь системным администратором (ID=1)"""
@@ -214,7 +214,8 @@ class User(UserMixin):
         role_names = {
             'admin': 'Администратор',
             'manager': 'Руководитель',
-            'viewer': 'Менеджер'
+            'viewer': 'Менеджер',
+            'agent': 'Агент'
         }
         return role_names.get(self.role, 'Пользователь')
     

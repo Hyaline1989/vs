@@ -55,7 +55,8 @@
                 <label class="department-field" for="departmentSelect">Выберите отдел</label><select id="departmentSelect"><option value="">Создать новый отдел</option>${data.departments.map(d => `<option value="${d.id}">${esc(d.name)}</option>`).join('')}</select>
                 <form id="departmentForm"><div id="departmentFields"></div><button class="btn-small" type="submit">Сохранить отдел</button></form></div>
                 <div class="permissions-section"><h3>Сотрудники отдела</h3><div id="departmentRoster"></div></div>
-                <div class="permissions-section department-exceptions"><h3>Личные исключения</h3><p>Настройки выбранного сотрудника важнее общих прав отдела.</p>
+                <div class="permissions-section"><h3>Без отдела</h3><p>Эти сотрудники сохраняют прежние индивидуальные доступы до назначения отдела.</p><div id="departmentUnassigned"></div></div>
+                <div class="permissions-section department-exceptions"><h3>Доступ сотрудника</h3><p>Сотрудники без отдела сохраняют прежние индивидуальные права.</p>
                 <label class="department-field" for="departmentUser">Сотрудник</label>
                 <select id="departmentUser"><option value="">Выберите сотрудника</option>${data.users.map(u => `<option value="${u.id}">${esc(u.name)}</option>`).join('')}</select>
                 <div id="departmentUserFields"></div></div>`;
@@ -63,6 +64,7 @@
             document.getElementById('departmentForm').addEventListener('submit', saveDepartment);
             document.getElementById('departmentUser').addEventListener('change', renderUser);
             renderDepartment();
+            renderUnassigned();
         } catch (e) { root.textContent = e.message; }
     };
     function renderDepartment() {
@@ -100,7 +102,7 @@
             <div id="departmentAddPanel" hidden>
                 <p>Отметьте сотрудников для отдела «${esc(department.name)}». Если сотрудник уже в другом отделе, он будет переведён.</p>
                 ${candidates.length ? `<div class="objects-perms-list" id="departmentMembersList">${candidates.map(u => `<label class="object-perm-item"><input type="checkbox" name="departmentMember" value="${u.id}"><span class="department-person">${esc(u.name)}<small>${esc(data.departments.find(d => d.id === u.department_id)?.name || 'Без отдела')}</small></span></label>`).join('')}</div>
-                <p>Сотрудники получат права выбранного отдела. Прежние права и личные исключения будут заменены.</p>
+                <p>Сотрудники без отдела получат права этого отдела. При переводе из другого отдела текущие доступы сохранятся. Личные исключения можно настроить позже.</p>
                 <button type="button" class="btn-small" id="departmentAssign">Назначить выбранных</button>` : '<p class="department-empty">Все доступные сотрудники уже в этом отделе.</p>'}
             </div>`;
         addSearch(document.getElementById('departmentCurrentMembers'), 'Поиск в составе отдела');
@@ -115,6 +117,18 @@
             event.currentTarget.setAttribute('aria-expanded', String(!panel.hidden));
             event.currentTarget.textContent = panel.hidden ? 'Добавить сотрудников' : 'Скрыть добавление';
         });
+    }
+    function renderUnassigned() {
+        const root = document.getElementById('departmentUnassigned');
+        const users = data.users.filter(user => user.department_id === null)
+            .sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+        root.innerHTML = `<p>Сотрудников без отдела: ${users.length}</p><ul class="objects-perms-list department-roster-list" id="departmentUnassignedList">${users.map(user => `<li class="object-perm-item"><button type="button" class="department-user-link" data-open-user="${user.id}">${esc(user.name)}</button><small>${user.legacy ? 'Старые индивидуальные права' : 'Личные настройки'}</small></li>`).join('')}</ul>`;
+        addSearch(document.getElementById('departmentUnassignedList'), 'Поиск сотрудника без отдела');
+        root.querySelectorAll('[data-open-user]').forEach(button => button.addEventListener('click', async () => {
+            document.getElementById('departmentUser').value = button.dataset.openUser;
+            await renderUser();
+            document.getElementById('departmentUser').scrollIntoView({behavior:'smooth', block:'center'});
+        }));
     }
     async function saveDepartment(event) {
         event.preventDefault();
@@ -148,14 +162,16 @@
         const id = Number(document.getElementById('departmentSelect').value);
         const ids = [...document.querySelectorAll('[name=departmentMember]:checked')].map(el => Number(el.value));
         if (!id || !ids.length) return fail(new Error('Выберите сохранённый отдел и сотрудников'));
-        if (!confirm(`Назначить отдел ${ids.length} сотрудникам? Они получат только права этого отдела. Прежние личные исключения будут сброшены.`)) return;
+        const inheriting = ids.filter(uid => data.users.find(user => user.id === uid)?.department_id === null).length;
+        const preserving = ids.length - inheriting;
+        const details = [inheriting ? `Без отдела: ${inheriting} — получат права отдела.` : '', preserving ? `Из других отделов: ${preserving} — сохранят текущие права.` : ''].filter(Boolean).join('\n');
+        if (!confirm(`Назначить отдел ${ids.length} сотрудникам?\n\n${details}`)) return;
         try {
-            // Compatibility with a running backend that has not been restarted yet.
-            await api('/assign', 'POST', {department_id:id, user_ids:ids, mode:'inherit'});
+            await api('/assign', 'POST', {department_id:id, user_ids:ids, mode:'preserve'});
             await loadDepartments();
             document.getElementById('departmentSelect').value = id;
             renderDepartment();
-            showNotification('Сотрудники назначены', 'success');
+            showNotification('Сотрудники назначены в отдел', 'success');
         } catch(e) { fail(e); }
     }
     async function renderUser() {
@@ -166,25 +182,17 @@
         try {
             const u = await api('/users/' + id);
             if (document.getElementById('departmentUser').value !== id) return;
-            if (!u.overrides) { root.textContent = 'Пока действуют прежние личные права. Сначала назначьте сотруднику отдел выше.'; return; }
-            root.innerHTML = `<p>Отдел: ${esc(data.departments.find(d => d.id === u.department_id)?.name || 'Без отдела')}</p><p>Запрет раздела важнее разрешения отдельного объекта. Значения «Сейчас» обновляются после сохранения.</p><form id="departmentOverrides">
-                <h4>Доступ к разделам</h4>${Object.entries(labels).map(([k,l]) => `<label class="object-perm-item department-rule"><span>${l}</span><select data-user-module="${k}">${choices(state(u.overrides.modules[k]))}</select><span class="department-status">Сейчас: ${u.effective[0][k] ? 'разрешено' : 'запрещено'}</span></label>`).join('')}
-                <h4>Объекты в подборе</h4><div class="objects-perms-list" id="departmentExceptionObjects">${data.objects.map(o => `<label class="object-perm-item department-rule"><span>${esc(o.name)}</span><select data-user-object="${o.id}">${choices(state(u.overrides.objects[o.id]))}</select><span class="department-status">Сейчас: ${u.effective[0].selection && u.effective[1][o.id]?.selection ? 'разрешено' : 'запрещено'}</span></label>`).join('')}</div>
-                <button type="submit" class="btn-small">Сохранить исключения</button>
-                ${u.department_id !== null ? '<button type="button" class="btn-small" id="departmentResetOverrides">Использовать только права отдела</button>' : ''}</form>`;
-            document.getElementById('departmentResetOverrides')?.addEventListener('click', async () => {
-                if (!confirm('Убрать все личные исключения? Сотрудник получит только права своего отдела.')) return;
-                try {
-                    await api('/users/' + id, 'PUT', {modules:{}, objects:{}});
-                    await renderUser();
-                    showNotification('Применены только права отдела', 'success');
-                } catch(e) { fail(e); }
-            });
+            const legacy = u.legacy;
+            root.innerHTML = `<p>Отдел: ${esc(data.departments.find(d => d.id === u.department_id)?.name || 'Без отдела — индивидуальные доступы')}</p><p>${legacy ? 'Действуют прежние индивидуальные права. Открытие этой карточки их не меняет.' : 'Личные исключения важнее общих прав отдела.'}</p><form id="departmentOverrides">
+                <h4>Доступ к разделам</h4>${Object.entries(labels).map(([k,l]) => `<label class="object-perm-item department-rule"><span>${l}</span><select data-user-module="${k}" ${legacy && k === 'admin' ? 'disabled' : ''}>${legacy ? `<option value="allow" ${u.effective[0][k] ? 'selected' : ''}>Разрешить</option><option value="deny" ${!u.effective[0][k] ? 'selected' : ''}>Запретить</option>` : choices(state(u.overrides.modules[k]))}</select><span class="department-status">Сейчас: ${u.effective[0][k] ? 'разрешено' : 'запрещено'}</span></label>`).join('')}
+                <h4>Объекты в подборе</h4><div class="objects-perms-list" id="departmentExceptionObjects">${data.objects.map(o => `<label class="object-perm-item department-rule"><span>${esc(o.name)}</span><select data-user-object="${o.id}">${legacy ? `<option value="allow" ${u.effective[1][o.id]?.selection ? 'selected' : ''}>Разрешить</option><option value="deny" ${!u.effective[1][o.id]?.selection ? 'selected' : ''}>Запретить</option>` : choices(state(u.overrides.objects[o.id]))}</select><span class="department-status">Сейчас: ${u.effective[0].selection && u.effective[1][o.id]?.selection ? 'разрешено' : 'запрещено'}</span></label>`).join('')}</div>
+                <button type="submit" class="btn-small">${legacy ? 'Сохранить индивидуальные права' : 'Сохранить исключения'}</button></form>`;
             addSearch(document.getElementById('departmentExceptionObjects'), 'Поиск объекта для исключения');
             document.getElementById('departmentOverrides').addEventListener('submit', async event => {
                 event.preventDefault();
                 const body = {modules:{},objects:{}};
                 document.querySelectorAll('[data-user-module]').forEach(el => { if(el.value !== 'inherit') body.modules[el.dataset.userModule] = el.value === 'allow'; });
+                if (legacy) body.modules.admin = u.effective[0].admin;
                 document.querySelectorAll('[data-user-object]').forEach(el => { if(el.value !== 'inherit') body.objects[el.dataset.userObject] = el.value === 'allow'; });
                 try { await api('/users/' + id, 'PUT', body); await renderUser(); showNotification('Исключения сохранены', 'success'); } catch(e) { fail(e); }
             });

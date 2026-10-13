@@ -15,7 +15,7 @@ from comparer import DataComparer
 from config import BITRIX_WEBHOOK_URL
 from manager_efficiency import calculate_efficiency_rating, save_rating_csv, build_rating_png, add_display_colors
 from manager_results import build_manager_results
-from uis_api import UISAPI, validate_report_date
+from uis_api import UISAPI, UISLimitError, validate_report_date
 
 logger = logging.getLogger(__name__)
 
@@ -995,6 +995,22 @@ def get_first_shift_by_staff():
 
 # ========== ОТЧЁТЫ UIS: ЭФФЕКТИВНОСТЬ МЕНЕДЖЕРОВ ==========
 
+@dashboard_bp.route('/reports/manager-results.xlsx', methods=['POST'])
+@login_required
+def export_manager_results_xlsx():
+    if not current_user.can_view_reports():
+        return jsonify({'error': 'Forbidden'}), 403
+    if request.content_length is None or request.content_length > 5 * 1024 * 1024:
+        return jsonify({'error': 'Слишком большой отчёт'}), 413
+    from manager_results_export import build_manager_results_xlsx
+    try:
+        output, filename = build_manager_results_xlsx(request.get_json(silent=True))
+    except (ValueError, TypeError, KeyError, AttributeError):
+        return jsonify({'error': 'Некорректные данные. Загрузите отчёт заново.'}), 400
+    return send_file(output, as_attachment=True, download_name=filename,
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+
 @dashboard_bp.route('/reports/manager-results', methods=['GET'])
 @login_required
 def get_manager_results():
@@ -1017,6 +1033,7 @@ def get_manager_results():
         job = _manager_results_jobs.get(job_key)
         if job and job['future'].done() and (
             (request.args.get('retry') == '1' and job['future'].exception())
+            or (job['future'].exception() and (datetime.now() - job['created']).total_seconds() > 60)
             or (datetime.now() - job['created']).total_seconds() > 900
         ):
             del _manager_results_jobs[job_key]
@@ -1031,6 +1048,8 @@ def get_manager_results():
         return jsonify({'success': True, 'status': 'loading', 'phase': job['state']['phase']}), 202
     try:
         return jsonify(job['future'].result())
+    except UISLimitError as error:
+        return jsonify({'error': str(error)}), 429
     except Exception:
         logger.exception('Ошибка отчёта результативности менеджеров')
         return jsonify({'error': 'Не удалось загрузить отчёт результативности'}), 502

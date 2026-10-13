@@ -27,6 +27,11 @@ def validate_policy(value, override=False):
     if any(not str(k).isdigit() or type(v) is not bool for k, v in objects.items()):
         raise ValueError('Неверные права объектов')
     result = {'modules': dict(modules), 'objects': {str(int(k)): v for k, v in objects.items()}}
+    if override:
+        dashboard_objects = value.get('dashboard_objects', {})
+        if not isinstance(dashboard_objects, dict) or any(not str(k).isdigit() or type(v) is not bool for k, v in dashboard_objects.items()):
+            raise ValueError('Неверные права объектов дашборда')
+        result['dashboard_objects'] = {str(int(k)): v for k, v in dashboard_objects.items()}
     if not override:
         if type(value.get('all_objects', False)) is not bool:
             raise ValueError('Неверный режим объектов')
@@ -49,7 +54,7 @@ def effective(conn, user_id):
         key = str(oid)
         allow = department.get('objects', {}).get(key, department.get('all_objects', False))
         allow = override.get('objects', {}).get(key, allow)
-        objects[oid] = {'selection': bool(allow), 'dashboard': True}
+        objects[oid] = {'selection': bool(allow), 'dashboard': bool(override.get('dashboard_objects', {}).get(key, True))}
     return modules, objects
 
 
@@ -72,7 +77,7 @@ def assign(conn, user_ids, department_id, mode):
         if not row or row[0] == 'admin':
             raise ValueError('Администраторы сохраняют полный доступ; выберите сотрудников других ролей')
     for uid in set(user_ids):
-        overrides = {'modules': {}, 'objects': {}}
+        overrides = {'modules': {}, 'objects': {}, 'dashboard_objects': {}}
         if mode == 'preserve':
             current = effective(conn, uid)
             if current is None:
@@ -80,8 +85,13 @@ def assign(conn, user_ids, department_id, mode):
                 modules = dict(conn.execute('SELECT module_name, can_view FROM user_module_permissions WHERE user_id=?', (uid,)))
                 modules = {m: bool(modules.get(m, False)) for m in MODULES}
                 modules['admin'] = role == 'manager'
-                objects = dict(conn.execute('SELECT object_id, can_view_selection FROM user_object_permissions WHERE user_id=?', (uid,)))
-                overrides = {'modules': modules, 'objects': {str(oid): bool(objects.get(oid, False)) for (oid,) in conn.execute('SELECT id FROM objects_settings')}}
+                objects = {oid: (bool(dashboard), bool(selection)) for oid, dashboard, selection in conn.execute('SELECT object_id, can_view_dashboard, can_view_selection FROM user_object_permissions WHERE user_id=?', (uid,))}
+                known = [oid for (oid,) in conn.execute('SELECT id FROM objects_settings')]
+                overrides = {'modules': modules,
+                             'objects': {str(oid): objects.get(oid, (False, False))[1] for oid in known},
+                             'dashboard_objects': {str(oid): objects.get(oid, (False, False))[0] for oid in known}}
             else:
-                overrides = {'modules': current[0], 'objects': {str(k): v['selection'] for k, v in current[1].items()}}
+                overrides = {'modules': current[0],
+                             'objects': {str(k): v['selection'] for k, v in current[1].items()},
+                             'dashboard_objects': {str(k): v['dashboard'] for k, v in current[1].items()}}
         conn.execute('INSERT INTO access_memberships(user_id,department_id,overrides) VALUES(?,?,?) ON CONFLICT(user_id) DO UPDATE SET department_id=excluded.department_id,overrides=excluded.overrides', (uid, department_id, json.dumps(overrides)))

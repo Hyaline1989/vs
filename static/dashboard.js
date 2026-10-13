@@ -871,6 +871,40 @@ function renderFirstShiftByObject(data, containerId = 'fsObjectContent') {
     }).join('');
 }
 
+function renderInTransitTable(data) {
+    renderGroupedReportTable(data, 'inTransitObjectContent', 'Объект', [
+        ['Основной', 'Подбор'],
+        ['Агенты', 'Агенты'],
+        ['Опер и Спутник', 'Операции']
+    ], 'Нет сделок в статусе «Направлен на объект».');
+}
+
+function renderGroupedReportTable(data, containerId, rowLabel, groups, emptyMessage) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    const names = [...new Set(groups.flatMap(([key]) => Object.keys(data?.[key] || {})))].sort((a, b) => {
+        if (a === 'Без сотрудника') return 1;
+        if (b === 'Без сотрудника') return -1;
+        return a.localeCompare(b, 'ru');
+    });
+    const totals = groups.map(() => 0);
+    const rows = names.map(name => {
+        const counts = groups.map(([key], index) => {
+            const count = Number(data?.[key]?.[name]) || 0;
+            totals[index] += count;
+            return count;
+        });
+        return `<tr><th scope="row">${escapeHtml(name)}</th><td>${counts.reduce((sum, n) => sum + n, 0)}</td>${counts.map(n => `<td>${n}</td>`).join('')}</tr>`;
+    }).join('');
+    const columnCount = groups.length + 2;
+    container.innerHTML = `<table class="in-transit-table${columnCount === 6 ? ' six-column-report-table' : ''}">
+        <thead><tr><th scope="col">${rowLabel}</th><th scope="col">Итого</th>${groups.map(([, title]) => `<th scope="col">${title}</th>`).join('')}</tr></thead>
+        <tbody>${rows || `<tr><td colspan="${columnCount}">${emptyMessage}</td></tr>`}</tbody>
+        <tfoot><tr><th scope="row">Всего</th><td>${totals.reduce((sum, n) => sum + n, 0)}</td>${totals.map(n => `<td>${n}</td>`).join('')}</tr></tfoot>
+    </table>`;
+}
+
 function switchObjectStageView(stage, view) {
     const prefix = stage === 'directed' ? 'directed' : 'checkedIn';
     const container = document.getElementById(`${prefix}ObjectContainer`);
@@ -887,39 +921,11 @@ function switchObjectStageView(stage, view) {
 }
 
 function renderObjectStageStaff(staff, containerId) {
-    const container = document.getElementById(containerId);
-    if (!container) return;
-
-    const blocks = [
+    renderGroupedReportTable(staff, containerId, 'Сотрудник', [
         ['Основной', 'Подбор'],
         ['Агенты', 'Агенты'],
         ['Опер и Спутник', 'Операции']
-    ];
-    container.innerHTML = blocks.map(([key, title]) => {
-        const items = Object.entries(staff?.[key] || {}).sort(([nameA], [nameB]) => {
-            if (nameA === 'Без сотрудника') return 1;
-            if (nameB === 'Без сотрудника') return -1;
-            return nameA.localeCompare(nameB, 'ru');
-        });
-        const total = items.reduce((sum, [, count]) => sum + Number(count), 0);
-        const rows = items.length
-            ? items.map(([name, count]) => `
-                <div class="object-row">
-                    <span class="object-name">${escapeHtml(name)}</span>
-                    <span class="object-value">${count}</span>
-                </div>
-            `).join('')
-            : '<div class="empty-objects">Нет сделок</div>';
-        return `
-            <div class="office-item" style="margin-bottom: 20px;">
-                <div class="office-header">
-                    <span class="office-name">${title}</span>
-                    <span class="office-count">${total}</span>
-                </div>
-                <div class="office-objects">${rows}</div>
-            </div>
-        `;
-    }).join('');
+    ], 'Нет сделок за выбранный период.');
 }
 
 async function loadObjectStageReport(stage) {
@@ -948,7 +954,12 @@ async function loadObjectStageReport(stage) {
             ${withoutDates ? '' : `<div class="summary-row"><span>Период:</span><span class="summary-value">${formatDateForDisplay(fromDate)} - ${formatDateForDisplay(toDate)}</span></div>`}
             <div class="summary-row"><span>Всего сделок:</span><span class="summary-value" style="background: #ffd700; color: #2c3e50;">${result.total_all || 0}</span></div>
         `;
-        renderFirstShiftByObject(result.data, `${prefix}Content`);
+        if (withoutDates) renderInTransitTable(result.data);
+        else renderGroupedReportTable(result.data, `${prefix}Content`, 'Объект', [
+            ['Основной', 'Подбор'],
+            ['Агенты', 'Агенты'],
+            ['Опер и Спутник', 'Операции']
+        ], 'Нет сделок за выбранный период.');
         renderObjectStageStaff(result.staff, staffContent.id);
     } catch (error) {
         console.error('Ошибка отчёта по объектам:', error);
@@ -1011,15 +1022,15 @@ async function loadFirstShiftByStaff() {
 function renderFirstShiftByStaff(data, totals) {
     const container = document.getElementById('fsStaffContent');
     if (!container) return;
-    
+
     const categories = ['Поток', 'Комплект', 'Сервис', 'Бишкек'];
     let html = '';
-    
+
     for (const cat of categories) {
         const catData = data[cat] || {};
         const catTotal = totals[cat] || 0;
         const items = Object.entries(catData).sort((a, b) => b[1] - a[1]);
-        
+
         html += `
             <div class="office-item" style="margin-bottom: 20px;">
                 <div class="office-header">
@@ -1029,7 +1040,7 @@ function renderFirstShiftByStaff(data, totals) {
                 </div>
                 <div class="office-objects">
         `;
-        
+
         if (items.length === 0) {
             html += `<div class="empty-objects">✘ Нет сделок</div>`;
         } else {
@@ -1042,12 +1053,12 @@ function renderFirstShiftByStaff(data, totals) {
                 `;
             }
         }
-        
+
         html += `</div></div>`;
     }
-    
+
     container.innerHTML = html;
-    
+
     // Добавляем обработчики для сворачивания/разворачивания
     document.querySelectorAll('#fsStaffContent .office-header').forEach(header => {
         header.addEventListener('click', function() {

@@ -3,7 +3,8 @@
 import logging
 from collections import defaultdict
 from datetime import datetime, timedelta
-from threading import local
+from threading import local, Lock
+from time import monotonic, sleep
 
 import requests
 from requests.adapters import HTTPAdapter
@@ -12,6 +13,30 @@ from urllib3.util import Retry
 from config import UIS_BASE_URL, UIS_SYSTEMS
 
 logger = logging.getLogger(__name__)
+
+
+class UISLimitError(RuntimeError):
+    """Безопасное для отображения сообщение о лимите UIS."""
+
+
+# Общий ограничитель для всех клиентов и потоков одного процесса.
+_request_lock = Lock()
+_next_request_at = 0.0
+
+
+def _wait_for_uis_slot():
+    global _next_request_at
+    with _request_lock:
+        delay = _next_request_at - monotonic()
+        if delay > 0:
+            sleep(delay)
+        _next_request_at = monotonic() + 1.1
+
+
+def _pause_uis_requests():
+    global _next_request_at
+    with _request_lock:
+        _next_request_at = max(_next_request_at, monotonic() + 61)
 
 UIS_CALL_FIELDS = [
     'id',
@@ -98,7 +123,8 @@ class UISAPI:
                 if cache_key not in self._daily_call_counts or day == datetime.now().date():
                     calls = self._fetch_calls(
                         system_name, access_token,
-                        f'{day.isoformat()} 00:00:00', f'{day.isoformat()} 23:59:59'
+                        f'{day.isoformat()} 00:00:00', f'{day.isoformat()} 23:59:59',
+                        on_wait=(lambda: progress(system_name, 'пауза UIS около минуты', index + 1, days)) if progress else None,
                     )
                     day_counts = defaultdict(int)
                     for row in self._normalize_calls(system_name, calls):
@@ -131,7 +157,7 @@ class UISAPI:
                 + self._fetch_calls_split_on_timeout(system_name, access_token, middle + timedelta(days=1), last)
             )
 
-    def _fetch_calls(self, system_name, access_token, date_from, date_till):
+    def _fetch_calls(self, system_name, access_token, date_from, date_till, on_wait=None):
         result = []
         limit = 1000
         offset = 0
@@ -152,12 +178,31 @@ class UISAPI:
                 }
             }
 
-            response = self._get_session().post(self.base_url, json=payload, timeout=(5, 40))
-            response.raise_for_status()
-            data = response.json()
-
-            if data.get('error'):
-                raise RuntimeError(data['error'].get('message') or str(data['error']))
+            for attempt in range(3):
+                _wait_for_uis_slot()
+                response = self._get_session().post(self.base_url, json=payload, timeout=(5, 40))
+                # UIS может вернуть лимит в JSON даже при HTTP 200.
+                if response.status_code == 429:
+                    message = 'Limit per minute has been exceeded'
+                    data = {}
+                else:
+                    response.raise_for_status()
+                    data = response.json()
+                    error = data.get('error') or {}
+                    message = error.get('message', '') if isinstance(error, dict) else str(error)
+                if 'limit per day' in message.lower():
+                    raise UISLimitError('Исчерпан суточный лимит запросов UIS. Повторите после восстановления лимита.')
+                if 'limit per minute' in message.lower():
+                    _pause_uis_requests()
+                    if attempt == 2:
+                        raise UISLimitError('UIS ограничивает число запросов в минуту. Подождите немного и нажмите «Показать» ещё раз.')
+                    logger.warning('Минутный лимит UIS: пауза перед повтором страницы (%s)', system_name)
+                    if on_wait:
+                        on_wait()
+                    continue
+                if data.get('error'):
+                    raise RuntimeError(message or 'Ошибка UIS API')
+                break
 
             batch = data.get('result', {}).get('data') or []
             result.extend(batch)

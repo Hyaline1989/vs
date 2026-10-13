@@ -386,6 +386,7 @@ function getRoleColor(role) {
         case 'admin': return '#e74c3c';
         case 'manager': return '#f39c12';
         case 'viewer': return '#3498db';
+        case 'agent': return '#3498db';
         default: return '#95a5a6';
     }
 }

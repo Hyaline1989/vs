@@ -1,5 +1,8 @@
 security.log
 *.db
+*.db-shm
+*.db-wal
+*.db.*.bak
 *.db.departments-*.bak
 *.db.departments-*.bak-shm
 *.db.departments-*.bak-wal

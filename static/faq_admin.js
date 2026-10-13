@@ -6,6 +6,7 @@ let faqEditingBlocks = [];
 const FAQ_CATEGORIES = {
     start: 'Начало работы',
     dashboard: 'Дашборд',
+    reports: 'Отчёты',
     selection: 'Подбор объектов',
     workers: 'Вахтовики',
     admin: 'Администрирование',
@@ -109,7 +110,14 @@ function openFaqArticleEditor(articleId = null) {
 function syncFaqCategoryTitle() {
     const slug = document.getElementById('faqCategorySlug').value;
     document.getElementById('faqCategoryTitle').value = FAQ_CATEGORIES[slug] || slug;
-    document.getElementById('faqCategoryOrder').value = Math.max(1, FAQ_CATEGORY_ORDER.indexOf(slug) + 1);
+    const orders = faqAdminArticles
+        .filter(article => article.category_slug === slug)
+        .map(article => Number(article.category_order))
+        .filter(Number.isFinite);
+    const counts = new Map();
+    orders.forEach(order => counts.set(order, (counts.get(order) || 0) + 1));
+    const existingOrder = [...counts.keys()].sort((a, b) => counts.get(b) - counts.get(a) || a - b)[0];
+    document.getElementById('faqCategoryOrder').value = existingOrder || Math.max(1, FAQ_CATEGORY_ORDER.indexOf(slug) + 1);
 }
 
 function renderFaqBlocksEditor() {
@@ -169,7 +177,6 @@ async function uploadFaqImage(index, input) {
 
 async function saveFaqArticle() {
     collectFaqBlocks();
-    syncFaqCategoryTitle();
     const payload = {
         category_slug: document.getElementById('faqCategorySlug').value,
         category_title: document.getElementById('faqCategoryTitle').value,

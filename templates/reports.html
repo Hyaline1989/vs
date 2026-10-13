@@ -26,10 +26,18 @@
         #fsObjectContent .object-row:nth-child(even), #fsStaffContent .object-row:nth-child(even),
         #directedObjectContent .object-row:nth-child(even), #checkedInObjectContent .object-row:nth-child(even) { background: #f0f6ff; }
         .stage-report-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
-        #inTransitObjectContent .office-header, #inTransitObjectSummary .summary-row { width: 100%; max-width: 700px; }
-        #inTransitObjectContent .office-objects { width: calc(100% - 32px); max-width: 668px; }
-        #inTransitObjectContent .object-row { padding: 7px 8px; border-radius: 4px; }
-        #inTransitObjectContent .object-row:nth-child(even) { background: #f0f6ff; }
+        #inTransitObjectSummary .summary-row { width: 100%; max-width: 700px; }
+        .in-transit-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        .in-transit-table th, .in-transit-table td { padding: 12px 8px; border-bottom: 1px solid #e5d8da; text-align: center; overflow-wrap: anywhere; }
+        .in-transit-table th:first-child { width: 40%; text-align: left; }
+        .in-transit-table tbody th { font-weight: normal; }
+        .in-transit-table thead, .in-transit-table tfoot { background: #f4e9ec; font-weight: bold; }
+        .in-transit-table tbody tr:nth-child(even) { background: #f0f6ff; }
+        .in-transit-table caption { text-align: left; padding-bottom: 10px; }
+        @media (max-width: 600px) {
+            .in-transit-table th, .in-transit-table td { padding: 8px 3px; font-size: 12px; }
+            .in-transit-table th:first-child { width: 32%; }
+        }
         .stage-report-toggle { display: inline-flex; padding: 3px; border-radius: 20px; background: rgba(164,44,48,.1); }
         .stage-report-view-btn { border: 0; border-radius: 17px; padding: 6px 12px; background: transparent; color: var(--primary-dark); font-weight: 600; cursor: pointer; }
         .stage-report-view-btn.active { background: var(--primary); color: #fff; }
@@ -154,6 +162,7 @@
                 <div class="export-date-field"><label for="managerResultsTo">По:</label><input type="date" id="managerResultsTo" class="date-picker small"></div>
                 <label><input type="checkbox" id="managerResultsCompare"> Сравнить с предыдущим периодом</label>
                 <button class="refresh-btn" type="button" onclick="loadManagerResults(true)">Показать</button>
+                <button id="managerResultsExport" class="export-btn" type="button" onclick="exportManagerResults()" disabled>Скачать Excel</button>
             </div>
             <p class="report-date-hint">Фильтр отбора выбирает даты по календарю.</p>
             <p>Заселения и смены относятся к выбранному периоду направления, даже если произошли позже. Все проценты считаются от звонков.</p>
@@ -193,14 +202,45 @@ document.addEventListener('DOMContentLoaded', () => {
         if (report === 'staff' && document.getElementById('fsStaffContent').textContent.includes('Загрузка...')) loadFirstShiftByStaff();
     }));
 });
+let managerResultsSnapshot = null;
+async function exportManagerResults() {
+    if (!managerResultsSnapshot) return;
+    const snapshot = managerResultsSnapshot;
+    const button = document.getElementById('managerResultsExport');
+    button.disabled = true;
+    try {
+        const response = await fetch('/api/reports/manager-results.xlsx', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(snapshot)
+        });
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.error || 'Не удалось скачать Excel');
+        }
+        const url = URL.createObjectURL(await response.blob());
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `manager_results_${snapshot.from}_${snapshot.to}.xlsx`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+        alert(error.message);
+    } finally {
+        button.disabled = !managerResultsSnapshot;
+    }
+}
 async function loadManagerResults(retry = false) {
     const from = document.getElementById('managerResultsFrom').value;
     const to = document.getElementById('managerResultsTo').value;
     const compare = document.getElementById('managerResultsCompare').checked;
     const periodKey = `${from}_${to}_${compare}`;
     const target = document.getElementById('managerResultsContent');
+    if (target.dataset.loading) return;
+    managerResultsSnapshot = null;
+    document.getElementById('managerResultsExport').disabled = true;
     if (!from || !to || from > to) { target.textContent = 'Укажите корректный период.'; return; }
-    if (target.dataset.loading === periodKey) return;
     target.dataset.loading = periodKey;
     target.textContent = 'Загрузка отчёта...';
     try {
@@ -238,6 +278,8 @@ async function loadManagerResults(retry = false) {
         };
         target.innerHTML = `<div class="manager-results-wrap"><table class="manager-results-table"><thead><tr><th>Менеджер</th>${metrics.map(([,label]) => `<th>${label}</th>`).join('')}<th>Рейтинг</th></tr></thead><tbody>${data.rows.map(row => `<tr><td>${escape(row.manager)} <small>${escape(row.system)}</small></td>${metrics.map(([metric]) => cell(row, metric)).join('')}<td style="background-color: ${ratingColor(row.rating)}">${row.rating}</td></tr>`).join('')}</tbody><tfoot><tr><td>Итого</td>${metrics.map(([metric]) => cell(data.totals, metric, true)).join('')}<td>—</td></tr></tfoot></table></div>`;
         target.dataset.loaded = periodKey;
+        managerResultsSnapshot = data;
+        document.getElementById('managerResultsExport').disabled = false;
     } catch (error) {
         target.textContent = `Ошибка загрузки: ${error.message}`;
     } finally {

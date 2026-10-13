@@ -35,6 +35,8 @@
 #departmentsContent .department-remove { margin-left: auto; padding: 7px 10px; border: 1px solid #e4bfc2; border-radius: 8px; background: #fff; color: #a42c30; font: inherit; font-size: 12px; cursor: pointer; }
 #departmentsContent .department-remove:hover { background: #fbf2f3; }
 #departmentsContent .department-remove:disabled { opacity: .5; cursor: wait; }
+#departmentsContent .department-user-link { border: 0; background: transparent; color: #a42c30; font: inherit; text-align: left; cursor: pointer; }
+#departmentsContent .department-user-link:hover { text-decoration: underline; }
 #departmentsContent #departmentAddPanel { margin-top: 20px; padding-top: 4px; border-top: 1px solid #eadedf; }
 @media (max-width: 1050px) {
     #departmentsContent { grid-template-columns: minmax(0, 1fr); gap: 16px; }

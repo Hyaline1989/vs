@@ -3,6 +3,7 @@
 
 import json
 from database.db_core import get_db_connection
+from faq_reports_content import REPORT_FAQ_ARTICLES
 
 
 DEFAULT_FAQ = [
@@ -38,10 +39,6 @@ DEFAULT_FAQ = [
     ('dashboard', 'Дашборд', 'Переключение «Офисы / Сотрудники»', [
         {'type': 'text', 'content': 'В режиме «Офисы» направления сгруппированы по офисам, а внутри показаны объекты. В режиме «Сотрудники» сначала показан направивший сотрудник, а под ним — объекты.'},
         {'type': 'note', 'content': 'В обоих режимах используются данные за дату, выбранную в верхней части дашборда.'},
-    ]),
-    ('dashboard', 'Дашборд', 'Как скачать отчёт План/Факт', [
-        {'type': 'steps', 'content': 'В блоке «Выгрузка отчёта» выберите начальную дату.\nВыберите конечную дату.\nНажмите «Скачать отчёт».'},
-        {'type': 'text', 'content': 'Вектор сформирует CSV-файл, который можно открыть в Excel.'},
     ]),
     ('dashboard', 'Дашборд', 'Как зафиксировать день', [
         {'type': 'note', 'content': 'Функция доступна администратору.'},
@@ -133,6 +130,10 @@ DEFAULT_FAQ = [
         {'type': 'text', 'content': 'Фотографию можно удалить и заменить другой.'},
     ]),
 ]
+
+DEFAULT_FAQ.extend(
+    ('reports', 'Отчёты', title, blocks) for title, blocks in REPORT_FAQ_ARTICLES
+)
 
 
 def ensure_default_faq():

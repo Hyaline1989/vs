@@ -6,6 +6,7 @@ import uuid
 
 from flask import Blueprint, current_app, jsonify, request, url_for
 from flask_login import current_user, login_required
+from faq_visibility import visible_faq_articles
 from database import (
     create_faq_article,
     delete_faq_article,
@@ -49,7 +50,7 @@ def _validate_article(data):
 @login_required
 def public_faq():
     ensure_default_faq()
-    return jsonify({'articles': get_faq_articles(False)})
+    return jsonify({'articles': visible_faq_articles(get_faq_articles(False), current_user.role)})
 
 
 @faq_bp.route('/admin/faq', methods=['GET'])
