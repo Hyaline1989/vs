@@ -12,6 +12,24 @@ function plannedDepartureReason(code) {
     return plannedDepartureReasonLabels[code] || 'Причина не указана в сохранённой сводке';
 }
 
+function appendDepartureMonthTotal(row, counts) {
+    const known = counts.filter(count => count !== null);
+    const incomplete = known.length !== counts.length;
+    const cell = row.insertCell();
+    const sum = known.reduce((total, count) => total + count, 0);
+    cell.textContent = known.length ? `${sum}${incomplete ? ' ⚠' : ''}` : '—';
+    cell.style.fontWeight = '700';
+    if (incomplete || !known.length) {
+        cell.className = 'no-data';
+        cell.title = known.length
+            ? 'Неполный итог за месяц: сумма только по ячейкам с известными данными.'
+            : 'Нет данных для расчёта итога за месяц.';
+    } else {
+        cell.title = 'Итого за месяц';
+    }
+    cell.setAttribute('aria-label', `${cell.title} ${cell.textContent}`);
+}
+
 function renderPlannedDepartures(data, target) {
     const year = Number(data.month.slice(0, 4));
     const month = Number(data.month.slice(5, 7));
@@ -33,6 +51,10 @@ function renderPlannedDepartures(data, target) {
         cell.title = `${String(day).padStart(2, '0')}.${String(month).padStart(2, '0')}.${year}`;
         heading.appendChild(cell);
     }
+    const monthHeading = document.createElement('th');
+    monthHeading.scope = 'col';
+    monthHeading.textContent = 'Итого';
+    heading.appendChild(monthHeading);
     const tbody = table.createTBody();
     for (const object of data.objects) {
         const row = tbody.insertRow();
@@ -55,6 +77,7 @@ function renderPlannedDepartures(data, target) {
                 cell.className = 'zero';
             }
         });
+        appendDepartureMonthTotal(row, object.counts);
     }
     const tfoot = table.createTFoot();
     const totalRow = tfoot.insertRow();
@@ -75,11 +98,12 @@ function renderPlannedDepartures(data, target) {
             cell.setAttribute('aria-label', `${dayIndex + 1}-е число, итог неизвестен: ${details.join('; ')}`);
         }
     });
+    appendDepartureMonthTotal(totalRow, data.objects.flatMap(object => object.counts));
     wrapper.appendChild(table);
     target.replaceChildren(wrapper);
     const note = document.createElement('p');
     note.className = 'departures-note';
-    note.textContent = '— означает, что точное число неизвестно; наведите на «—», чтобы узнать причину. Это не ноль.';
+    note.textContent = '— означает, что точное число неизвестно; наведите на «—», чтобы узнать причину. Это не ноль. Итого справа — сумма за месяц. ⚠ рядом с суммой означает неполный итог: учтены только ячейки с известными данными.';
     if (data.updated_at) {
         const updated = new Date(data.updated_at);
         if (!Number.isNaN(updated.getTime())) note.textContent += ` Обновлено: ${updated.toLocaleString('ru-RU')}.`;
