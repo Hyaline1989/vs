@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from werkzeug.security import generate_password_hash
 import logging
 
-from database import get_user_by_username, update_user, log_user_action, get_user_module_permissions
+from database import get_user_by_username, update_user, log_user_action, get_user_module_permissions, is_system_admin
 from models import User
 from config import SESSION_DURATION_HOURS
 
@@ -68,7 +68,8 @@ def auth():
                 'email': user.email,
                 'role': user.role,
                 'role_display': user.get_role_display_name(),
-                'is_system_admin': (user.id == 1),
+                'is_system_admin': is_system_admin(user.id),
+                'can_view_vip': user.can_view_vip(),
                 'module_permissions': module_perms
             })
     
@@ -106,7 +107,8 @@ def get_current_user():
             'email': current_user.email,
             'role': current_user.role,
             'role_display': current_user.get_role_display_name(),
-            'is_system_admin': (current_user.id == 1),
+            'is_system_admin': is_system_admin(current_user.id),
+            'can_view_vip': current_user.can_view_vip(),
             'module_permissions': module_perms,
             'is_active': current_user.is_active
         })

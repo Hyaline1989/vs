@@ -29,7 +29,8 @@ from models import User
 # Импортируем blueprint'ы
 from routes import (
     auth_bp, admin_bp, dashboard_bp, selection_bp, admin_pages_bp, objects_admin_bp,
-    init_dashboard_apis, worker_status_bp, faq_bp
+    init_dashboard_apis, worker_status_bp, faq_bp, planned_departures_bp,
+    service_reports_bp, report_refresh_bp
 )
 from routes.requirements_admin import requirements_admin_bp
 from routes.profile import profile_bp
@@ -162,6 +163,11 @@ def department_admin_gate():
         return jsonify(error='Нет доступа к админ-панели'), 403
 
 app.register_blueprint(dashboard_bp)
+from routes.candidate_rates import candidate_rates_bp
+app.register_blueprint(candidate_rates_bp)
+app.register_blueprint(planned_departures_bp)
+app.register_blueprint(service_reports_bp)
+app.register_blueprint(report_refresh_bp)
 app.register_blueprint(selection_bp)
 app.register_blueprint(admin_pages_bp)
 app.register_blueprint(objects_admin_bp)
@@ -238,6 +244,17 @@ def reports_page():
                                message='У вас нет доступа к отчётам',
                                return_url='/welcome'), 403
     return render_template('reports.html')
+
+
+@app.route('/service')
+@login_required
+def service_page():
+    if not current_user.can_view_vip():
+        return render_template('no_access.html',
+                               message='У вас нет доступа к разделу VIP',
+                               return_url='/welcome'), 403
+    today = get_moscow_date()
+    return render_template('service.html', today=today, month_start=today[:8] + '01')
 
 @app.route('/faq')
 @login_required

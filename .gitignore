@@ -3,6 +3,8 @@ security.log
 *.db-shm
 *.db-wal
 *.db.*.bak
+*.db.*.bak-shm
+*.db.*.bak-wal
 *.db.departments-*.bak
 *.db.departments-*.bak-shm
 *.db.departments-*.bak-wal
@@ -13,3 +15,6 @@ __pycache__/
 venv/
 static/uploads/help_cards/
 static/uploads/faq/
+data/planned_departures/
+data/shift_attendance/
+data/report_refresh/

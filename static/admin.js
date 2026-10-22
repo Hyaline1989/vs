@@ -334,6 +334,15 @@ function renderUsersTable(users) {
 }
 
 // ========== РЕДАКТИРОВАНИЕ ПОЛЬЗОВАТЕЛЯ ==========
+function syncVipAccessGroup() {
+    const group = document.getElementById('vipAccessGroup');
+    if (!group) return;
+    const userId = Number(document.getElementById('userId').value);
+    const role = document.getElementById('userRole').value;
+    group.hidden = !window.currentUser?.is_system_admin || !userId || userId === 1 || role !== 'admin';
+    if (role !== 'admin') document.getElementById('vipAccess').checked = false;
+}
+
 function editUser(userId) {
     const user = usersList.find(u => u.id === userId);
     if (!user) return;
@@ -347,6 +356,9 @@ function editUser(userId) {
     document.getElementById('email').value = user.email || '';
     document.getElementById('userRole').value = user.role;
     document.getElementById('userRole').disabled = !window.currentUser?.is_system_admin || userId === window.currentUser?.id || userId === 1;
+    const vipAccess = document.getElementById('vipAccess');
+    if (vipAccess) vipAccess.checked = user.vip_access === true;
+    syncVipAccessGroup();
     const departmentSettings = document.getElementById('departmentSettingsGroup');
     if (departmentSettings) departmentSettings.hidden = user.role === 'admin';
     document.getElementById('isActive').checked = user.is_active;
@@ -385,6 +397,9 @@ async function openAddUserModal() {
     document.getElementById('userForm').reset();
     document.getElementById('userRole').disabled = false;
     document.getElementById('userId').value = '';
+    const vipAccess = document.getElementById('vipAccess');
+    if (vipAccess) vipAccess.checked = false;
+    syncVipAccessGroup();
     const departmentSettings = document.getElementById('departmentSettingsGroup');
     if (departmentSettings) departmentSettings.hidden = true;
     document.getElementById('username').disabled = false;
@@ -431,6 +446,8 @@ async function saveUser() {
             method = 'PUT';
             body = { full_name: fullName, email: email, is_active: isActive };
             if (!document.getElementById('userRole').disabled) body.role = role;
+            const vipGroup = document.getElementById('vipAccessGroup');
+            if (vipGroup && !vipGroup.hidden) body.vip_access = document.getElementById('vipAccess').checked;
             if (password) body.password = password;
         } else {
             url = '/api/admin/users';
@@ -871,6 +888,7 @@ window.addEventListener('resize', function() {
 
 // ========== ИНИЦИАЛИЗАЦИЯ ==========
 document.addEventListener('DOMContentLoaded', async function() {
+    document.getElementById('userRole')?.addEventListener('change', syncVipAccessGroup);
     try {
         const response = await fetch('/api/auth/me', { credentials: 'include' });
         if (response.ok) {

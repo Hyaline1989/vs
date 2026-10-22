@@ -5,6 +5,7 @@ from flask_login import current_user, login_user
 from werkzeug.security import generate_password_hash
 import logging
 import sqlite3
+from urllib.parse import urlsplit
 
 from database import (
     get_all_users, get_user_by_id, create_user, update_user, hard_delete_user,
@@ -13,6 +14,7 @@ from database import (
     log_user_action, DB_NAME, is_system_admin
 )
 from models import User
+from database.vip import has_vip_access, vip_access_ready
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +48,8 @@ def get_users():
         users = [u for u in users if u['role'] in ('viewer', 'agent')]
     elif current_user.role == 'admin' and current_user.id != 1:
         users = [u for u in users if u['id'] != 1]
+    for user in users:
+        user['vip_access'] = has_vip_access(user['id']) if user['role'] == 'admin' else False
     
     return jsonify(users)
 
@@ -119,6 +123,7 @@ def get_user(user_id):
         'full_name': user_data['full_name'],
         'email': user_data['email'],
         'role': user_data['role'],
+        'vip_access': has_vip_access(user_id) if user_data['role'] == 'admin' else False,
         'is_active': user_data['is_active'],
         'created_at': user_data['created_at'],
         'last_login': user_data['last_login'],
@@ -139,6 +144,7 @@ def update_user_api(user_id):
         return jsonify({'error': 'Пользователь не найден'}), 404
     
     updates = {}
+    previous_vip_access = has_vip_access(user_id) if user_data['role'] == 'admin' else False
 
     if 'role' in data:
         if not is_system_admin(current_user.id):
@@ -148,6 +154,20 @@ def update_user_api(user_id):
         if data['role'] not in ('admin', 'manager', 'viewer', 'agent'):
             return jsonify({'error': 'Неизвестная роль'}), 400
         updates['role'] = data['role']
+
+    if 'vip_access' in data:
+        origin = request.headers.get('Origin')
+        if origin and urlsplit(origin).netloc != request.host:
+            return jsonify({'error': 'Запрос с другого сайта запрещён'}), 403
+        if not is_system_admin(current_user.id) or user_id == 1:
+            return jsonify({'error': 'Доступ VIP может менять только системный администратор'}), 403
+        if type(data['vip_access']) is not bool:
+            return jsonify({'error': 'Некорректное право VIP'}), 400
+        if data.get('role', user_data['role']) != 'admin':
+            return jsonify({'error': 'VIP доступен только администраторам'}), 400
+        if not vip_access_ready():
+            return jsonify({'error': 'Право VIP ещё не подготовлено в базе'}), 503
+        updates['vip_access'] = data['vip_access']
     
     if current_user.id == user_id or current_user.role == 'admin':
         if 'full_name' in data:
@@ -168,6 +188,10 @@ def update_user_api(user_id):
         if 'role' in updates and updates['role'] != user_data['role']:
             log_user_action(current_user.id, 'change_user_role',
                             f"Пользователь ID {user_id}: {user_data['role']} -> {updates['role']}",
+                            request.remote_addr)
+        if 'vip_access' in updates and updates['vip_access'] != previous_vip_access:
+            log_user_action(current_user.id, 'change_vip_access',
+                            f"Пользователь ID {user_id}: VIP {'включён' if updates['vip_access'] else 'выключен'}",
                             request.remote_addr)
         log_user_action(current_user.id, 'update_user', f"Обновлён пользователь ID {user_id}", request.remote_addr)
     

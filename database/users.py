@@ -132,38 +132,36 @@ def create_user(username, password_hash, full_name, email, role, created_by):
 
 def update_user(user_id, data):
     try:
-        conn = sqlite3.connect(DB_NAME)
-        cursor = conn.cursor()
-        
-        updates = []
-        params = []
-        
-        if 'password_hash' in data:
-            updates.append('password_hash = ?')
-            params.append(data['password_hash'])
-        if 'full_name' in data:
-            updates.append('full_name = ?')
-            params.append(data['full_name'])
-        if 'email' in data:
-            updates.append('email = ?')
-            params.append(data['email'])
-        if 'role' in data:
-            updates.append('role = ?')
-            params.append(data['role'])
-        if 'is_active' in data:
-            updates.append('is_active = ?')
-            params.append(1 if data['is_active'] else 0)
-        if 'last_login' in data:
-            updates.append('last_login = ?')
-            params.append(data['last_login'])
-        
-        if updates:
-            params.append(user_id)
-            cursor.execute(f'UPDATE users SET {", ".join(updates)} WHERE id = ?', params)
-            conn.commit()
-            logger.info(f"Обновлен пользователь {user_id}")
-        
-        conn.close()
+        from contextlib import closing
+        with closing(sqlite3.connect(DB_NAME)) as conn, conn:
+            cursor = conn.cursor()
+            updates = []
+            params = []
+            for field in ('password_hash', 'full_name', 'email', 'role', 'last_login'):
+                if field in data:
+                    updates.append(f'{field} = ?')
+                    params.append(data[field])
+            if 'is_active' in data:
+                updates.append('is_active = ?')
+                params.append(1 if data['is_active'] else 0)
+            if updates:
+                cursor.execute(f'UPDATE users SET {", ".join(updates)} WHERE id = ?',
+                               [*params, user_id])
+            if 'vip_access' in data or ('role' in data and data['role'] != 'admin'):
+                table_exists = cursor.execute(
+                    "SELECT 1 FROM sqlite_master WHERE type='table' AND name='user_vip_access'"
+                ).fetchone() is not None
+                if not table_exists and data.get('vip_access'):
+                    raise sqlite3.OperationalError('Право VIP ещё не подготовлено')
+                if table_exists:
+                    if data.get('vip_access') and data.get('role', 'admin') == 'admin':
+                        role = cursor.execute('SELECT role FROM users WHERE id=?', (user_id,)).fetchone()
+                        if user_id == 1 or not role or role[0] != 'admin':
+                            raise ValueError('VIP доступен только администраторам, кроме системного')
+                        cursor.execute('INSERT OR IGNORE INTO user_vip_access(user_id) VALUES(?)', (user_id,))
+                    else:
+                        cursor.execute('DELETE FROM user_vip_access WHERE user_id=?', (user_id,))
+        logger.info('Обновлен пользователь %s', user_id)
         return True
     except Exception as e:
         logger.error(f"Ошибка при обновлении пользователя: {e}")
@@ -188,6 +186,8 @@ def hard_delete_user(user_id):
     try:
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
+        if cursor.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='user_vip_access'").fetchone():
+            cursor.execute('DELETE FROM user_vip_access WHERE user_id=?', (user_id,))
         cursor.execute('DELETE FROM users WHERE id = ?', (user_id,))
         conn.commit()
         conn.close()

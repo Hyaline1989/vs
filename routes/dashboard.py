@@ -21,6 +21,30 @@ logger = logging.getLogger(__name__)
 
 dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/api')
 
+
+@dashboard_bp.route('/reports/priority-history', methods=['GET'])
+def priority_history_report():
+    if not current_user.is_authenticated:
+        return jsonify(error='Unauthorized'), 401
+    if not current_user.can_view_reports():
+        return jsonify(error='Forbidden'), 403
+    start, end = request.args.get('from', ''), request.args.get('to', '')
+    try:
+        if not all(re.fullmatch(r'\d{4}-\d{2}-\d{2}', value) for value in (start, end)):
+            raise ValueError()
+        first = datetime.strptime(start, '%Y-%m-%d')
+        last = datetime.strptime(end, '%Y-%m-%d')
+        if not 0 <= (last - first).days <= 365:
+            raise ValueError()
+    except ValueError:
+        return jsonify(error='Выберите период не более 366 дней: дата «С» не позже даты «По».'), 400
+    try:
+        from database.snapshots import get_priority_history
+        return jsonify(rows=get_priority_history(start, end))
+    except sqlite3.Error:
+        logger.exception('Ошибка чтения истории приоритетов')
+        return jsonify(error='Не удалось прочитать историю приоритетов'), 500
+
 bitrix_api = None
 comparer = None
 uis_api = UISAPI()
@@ -583,7 +607,8 @@ def fix_day():
         
         # 7. Сохраняем снапшоты
         if snapshots:
-            save_daily_snapshots_batch(date_key, snapshots)
+            if not save_daily_snapshots_batch(date_key, snapshots):
+                raise RuntimeError('Не удалось сохранить приоритеты и ставки')
             logger.info(f"✅ Снапшот за {date_key} сохранён ({len(snapshots)} записей)")
             
             # Логируем действие

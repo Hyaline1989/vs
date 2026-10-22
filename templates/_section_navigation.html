@@ -4,9 +4,10 @@
         ('selection', '/selection', 'Подбор объектов', 'fa-user-check'),
         ('worker_status', '/worker-status', 'Вахтовики', 'fa-users'),
         ('reports', '/reports', 'Отчёты', 'fa-file-alt'),
+        ('service', '/service', 'VIP', 'fa-lock'),
         ('admin', '/admin', 'Админ-панель', 'fa-users-cog')
     ] %}
-        {% if current_user.is_authenticated and (current_user.can_view_admin() if key == 'admin' else current_user.can_view_module(key)) %}
+        {% if current_user.is_authenticated and (current_user.can_view_vip() if key == 'service' else (current_user.can_view_admin() if key == 'admin' else current_user.can_view_module(key))) %}
         <button class="system-btn{% if request.path == path %} active{% endif %}" onclick="window.location.href='{{ path }}'">
             <i class="fas {{ icon }}"></i><span>{{ title }}</span>
         </button>

@@ -145,7 +145,7 @@ function renderRouteSheetsList() {
     if (routeSheetsList.length === 0) {
         html += `
             <div style="padding: 15px; background: #f8f9fa; border-radius: 8px; text-align: center; color: var(--gray);">
-                <i class="fas fa-file-pdf" style="font-size: 24px; display: block; margin-bottom: 8px;"></i>
+                <i class="fas fa-file-alt" style="font-size: 24px; display: block; margin-bottom: 8px;"></i>
                 Маршрутные листы не загружены
             </div>
         `;
@@ -159,7 +159,7 @@ function renderRouteSheetsList() {
             html += `
                 <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: #f8f9fa; border-radius: 8px; border-left: 3px solid var(--primary);">
                     <div style="display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0;">
-                        <i class="fas fa-file-pdf" style="color: #e74c3c; font-size: 20px;"></i>
+                        <i class="fas fa-file-alt" style="color: #e74c3c; font-size: 20px;"></i>
                         <div style="flex: 1; min-width: 0;">
                             <div style="font-weight: 500; font-size: 0.9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(sheet.original_name)}">
                                 ${escapeHtml(sheet.original_name)}
@@ -190,12 +190,12 @@ function renderRouteSheetsList() {
     if (canUpload) {
         html += `
             <div style="margin-top: 12px;">
-                <input type="file" id="routeSheetInput" accept=".pdf" style="display: none;" onchange="uploadRouteSheet(this)">
+                <input type="file" id="routeSheetInput" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" style="display: none;" onchange="uploadRouteSheet(this)">
                 <button type="button" class="btn-small" onclick="document.getElementById('routeSheetInput').click()" style="background: #27ae60; padding: 8px 16px;">
-                    <i class="fas fa-upload"></i> Загрузить PDF (${currentCount}/${maxFiles})
+                    <i class="fas fa-upload"></i> Загрузить файл (${currentCount}/${maxFiles})
                 </button>
                 <span style="font-size: 0.7rem; color: var(--gray); margin-left: 10px;">
-                    Только PDF, максимум 30 MB
+                    PDF, JPG, PNG, Word (DOC, DOCX), максимум 30 MB
                 </span>
             </div>
         `;
@@ -215,8 +215,8 @@ async function uploadRouteSheet(input) {
     if (!input.files || input.files.length === 0) return;
     
     const file = input.files[0];
-    if (!file.name.toLowerCase().endsWith('.pdf')) {
-        showNotification('❌ Можно загружать только PDF файлы', 'error');
+    if (!/\.(pdf|jpe?g|png|docx?)$/i.test(file.name)) {
+        showNotification('❌ Разрешены PDF, JPG, PNG и Word (DOC, DOCX)', 'error');
         return;
     }
     
@@ -264,7 +264,7 @@ async function uploadRouteSheet(input) {
     } finally {
         if (uploadBtn) {
             uploadBtn.disabled = false;
-            uploadBtn.innerHTML = '<i class="fas fa-upload"></i> Загрузить PDF';
+            uploadBtn.innerHTML = '<i class="fas fa-upload"></i> Загрузить файл';
         }
     }
     
@@ -454,7 +454,7 @@ function openPassportEditor(objectId, objectName) {
                     
                     <!-- Маршрутные листы -->
                     <div class="form-section">
-                        <h4><i class="fas fa-map"></i> Маршрутные листы (PDF, максимум 5)</h4>
+                        <h4><i class="fas fa-map"></i> Маршрутные листы (максимум 5 файлов)</h4>
                         <div id="routeSheetsContainer"></div>
                     </div>
                     

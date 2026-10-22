@@ -34,6 +34,17 @@
         .in-transit-table thead, .in-transit-table tfoot { background: #f4e9ec; font-weight: bold; }
         .in-transit-table tbody tr:nth-child(even) { background: #f0f6ff; }
         .in-transit-table caption { text-align: left; padding-bottom: 10px; }
+        .departures-grid { max-width: 100%; overflow-x: auto; border: 1px solid #e5d8da; border-radius: 12px; }
+        .departures-table { border-collapse: separate; border-spacing: 0; min-width: max-content; width: 100%; }
+        .departures-table th, .departures-table td { min-width: 42px; padding: 10px 5px; border-right: 1px solid #e5d8da; border-bottom: 1px solid #e5d8da; text-align: center; }
+        .departures-table th:first-child { position: sticky; left: 0; z-index: 2; min-width: 210px; max-width: 210px; text-align: left; background: #fff; }
+        .departures-table thead th, .departures-table tfoot th, .departures-table tfoot td { background: #f4e9ec; font-weight: 700; }
+        .departures-table thead th:first-child, .departures-table tfoot th:first-child { z-index: 3; background: #f4e9ec; }
+        .departures-table tbody tr:nth-child(even) td, .departures-table tbody tr:nth-child(even) th:first-child { background: #f0f6ff; }
+        .departures-table td:not(.no-data):not(.zero) { font-weight: 700; color: var(--primary-dark); }
+        .departures-table .no-data { background: #fff4d9; color: #775700; }
+        .departures-table tfoot .no-data { background: #fff4d9; }
+        .departures-note { margin: 10px 0 0; color: #666; }
         @media (max-width: 600px) {
             .in-transit-table th, .in-transit-table td { padding: 8px 3px; font-size: 12px; }
             .in-transit-table th:first-child { width: 32%; }
@@ -42,6 +53,7 @@
         .stage-report-view-btn { border: 0; border-radius: 17px; padding: 6px 12px; background: transparent; color: var(--primary-dark); font-weight: 600; cursor: pointer; }
         .stage-report-view-btn.active { background: var(--primary); color: #fff; }
         .stage-report-staff[hidden], .stage-report-offices[hidden] { display: none; }
+        #ratesSave[hidden] { display: none !important; }
         .stage-report-staff .office-header { width: 100%; max-width: 700px; }
         .stage-report-staff .office-item { max-width: 700px; }
         .stage-report-staff .object-row { padding: 7px 8px; border-radius: 4px; }
@@ -71,7 +83,9 @@
         <button class="reports-tab" type="button" data-report="checked_in"><i class="fas fa-house-user"></i> Заселены</button>
         <button class="reports-tab" type="button" data-report="object"><i class="fas fa-building"></i> 1 смена по объектам</button>
         <button class="reports-tab" type="button" data-report="staff"><i class="fas fa-users"></i> 1 смена по сотрудникам</button>
+        <button class="reports-tab" type="button" data-report="departures"><i class="fas fa-calendar-alt"></i> Плановое убытие</button>
         <button class="reports-tab" type="button" data-report="manager"><i class="fas fa-chart-bar"></i> Результативность менеджеров</button>
+        <button class="reports-tab" type="button" data-report="priorities"><i class="fas fa-history"></i> История приоритетов</button>
     </div>
 
     <div id="firstShiftObjectContainer" class="reports-content">
@@ -140,6 +154,19 @@
             <div id="checkedInStaffContent" class="stage-report-staff" hidden>Выберите даты и нажмите «Показать».</div>
         </div>
     </div>
+    <div id="plannedDeparturesContainer" class="reports-content">
+        <div class="panel-card">
+            <h2 class="panel-title"><i class="fas fa-calendar-alt"></i> Плановое убытие</h2>
+            <div class="first-shift-filters">
+                <div class="export-date-field"><label for="plannedDeparturesMonth">Месяц:</label><input type="month" id="plannedDeparturesMonth" class="date-picker small"></div>
+                <button class="refresh-btn" type="button" onclick="loadPlannedDepartures()"><i class="fas fa-search"></i> Показать</button>
+                <button class="refresh-btn" id="plannedDeparturesRefresh" type="button" onclick="refreshPlannedDepartures()"><i class="fas fa-sync-alt"></i> Обновить данные</button>
+            </div>
+            <p class="report-date-hint" id="plannedDeparturesRefreshStatus" role="status" aria-live="polite"></p>
+            <p class="report-date-hint">Строки — объекты, столбцы — дни месяца. «ПУ» и «ОВ» учитываются один раз по первой дате серии.</p>
+            <div id="plannedDeparturesContent" aria-live="polite">Выберите месяц и нажмите «Показать».</div>
+        </div>
+    </div>
     <div id="firstShiftStaffContainer" class="reports-content">
         <div class="panel-card">
             <h2 class="panel-title"><i class="fas fa-users"></i> 1 смена по сотрудникам</h2>
@@ -152,6 +179,47 @@
             <p class="report-date-hint">Фильтр по датам строится по полю «Дата направлен».</p>
             <div class="summary-block" id="fsStaffSummary"><div class="loading">Загрузка...</div></div>
             <div id="fsStaffContent"><div class="loading">Загрузка...</div></div>
+        </div>
+    </div>
+    <div id="priorityHistoryContainer" class="reports-content">
+        <div class="panel-card">
+            <h2 class="panel-title">История приоритетов</h2>
+            <div class="first-shift-filters" role="group" aria-label="Вид истории">
+                <button type="button" class="refresh-btn" id="showPriorities" aria-pressed="true">Приоритеты</button>
+                <button type="button" class="refresh-btn" id="showCandidateRates" aria-pressed="false">Ставки за кандидата</button>
+            </div>
+            <div id="prioritiesPane">
+            <div class="first-shift-filters">
+                <div class="export-date-field"><label for="priorityHistoryFrom">С:</label><input type="date" id="priorityHistoryFrom" class="date-picker small"></div>
+                <div class="export-date-field"><label for="priorityHistoryTo">По:</label><input type="date" id="priorityHistoryTo" class="date-picker small"></div>
+                <button class="refresh-btn" type="button" id="priorityHistoryShow">Показать</button>
+            </div>
+            <p>Последняя сохранённая фиксация за каждую дату. Повторная фиксация дня заменяет предыдущую.</p>
+            <div id="priorityHistoryContent" aria-live="polite">Выберите даты и нажмите «Показать».</div>
+            </div>
+            <div id="candidateRatesPane" hidden>
+                <p>Ставка на дату направления. Выплата полагается после первой смены. Расчёт зарплаты пока не подключён.</p>
+                <label>Месяц <input type="month" id="ratesMonth" class="date-picker small"></label>
+                <button type="button" class="refresh-btn" id="ratesLoad">Показать</button>
+                <p>Ставки сохраняются автоматически при фиксации приоритетов: 2 500 ₽ — обычный объект, 4 000 ₽ — приоритетный. «—» — нет сохранённой ставки. Нажмите на ячейку для выбора дня.</p>
+                <div id="ratesCalendar" style="overflow-x:auto; width:100%; max-width:100%"></div>
+                <h3>Установить ставку на день или период</h3>
+                <div class="first-shift-filters">
+                    <label>Объект <select id="ratesObject"></select></label>
+                    <label>С <input type="date" id="ratesFrom" class="date-picker small"></label>
+                    <label>По <input type="date" id="ratesTo" class="date-picker small"></label>
+                    <label>Действие <select id="ratesMode"><option value="manual">Ручная ставка / акция</option></select></label>
+                    <label>Сумма, ₽ <input type="number" id="ratesAmount" min="0" max="1000000" step="1"></label>
+                    <label>Причина / акция <input type="text" id="ratesComment" maxlength="500"></label>
+                    <button type="button" class="refresh-btn" id="ratesPreview">Посмотреть изменения</button>
+                    <button type="button" class="refresh-btn" id="ratesHistory">История правок</button>
+                </div>
+                <p>Повторная фиксация приоритетов обновляет только автоматические ставки. Ручные ставки акций не перезаписываются. Все изменения сохраняются в истории.</p>
+                <div id="ratesStatus" role="status" aria-live="polite"></div>
+                <div id="ratesChanges"></div>
+                <button type="button" class="refresh-btn" id="ratesSave" hidden>Подтвердить и сохранить</button>
+                <div id="ratesAudit"></div>
+            </div>
         </div>
     </div>
     <div id="managerResultsContainer" class="reports-content">
@@ -173,6 +241,10 @@
 <footer class="app-footer"><div class="footer-links"><a href="/faq"><i class="fas fa-question-circle"></i> FAQ</a></div><div class="footer-copyright"><p>© 2026 Вектор — Управление вахтовым персоналом.</p></div></footer>
 <script src="{{ url_for('static', filename='common.js') }}"></script>
 <script src="{{ url_for('static', filename='dashboard.js') }}"></script>
+<script src="{{ url_for('static', filename='report_refresh.js') }}"></script>
+<script src="{{ url_for('static', filename='planned_departures.js') }}"></script>
+<script src="{{ url_for('static', filename='priority_history.js') }}"></script>
+<script src="{{ url_for('static', filename='candidate_rates.js') }}"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     const today = getTodayDate();
@@ -185,6 +257,7 @@ document.addEventListener('DOMContentLoaded', () => {
     weekAgo.setDate(weekAgo.getDate() - 6);
     document.getElementById('managerResultsFrom').value = weekAgo.toISOString().slice(0, 10);
     document.getElementById('managerResultsTo').value = today;
+    document.getElementById('plannedDeparturesMonth').value = today.slice(0, 7);
     document.querySelectorAll('.reports-tab').forEach(button => button.addEventListener('click', () => {
         document.querySelectorAll('.reports-tab').forEach(item => item.classList.toggle('active', item === button));
         const report = button.dataset.report;
@@ -193,13 +266,16 @@ document.addEventListener('DOMContentLoaded', () => {
             directed: 'directedObjectContainer',
             in_transit: 'inTransitObjectContainer',
             checked_in: 'checkedInObjectContainer',
+            departures: 'plannedDeparturesContainer',
             staff: 'firstShiftStaffContainer',
-            manager: 'managerResultsContainer'
+            manager: 'managerResultsContainer',
+            priorities: 'priorityHistoryContainer'
         };
         Object.entries(containers).forEach(([key, id]) => {
             document.getElementById(id).classList.toggle('active', key === report);
         });
         if (report === 'staff' && document.getElementById('fsStaffContent').textContent.includes('Загрузка...')) loadFirstShiftByStaff();
+        if (report === 'departures' && !document.getElementById('plannedDeparturesContent').dataset.loaded) loadPlannedDepartures();
     }));
 });
 let managerResultsSnapshot = null;

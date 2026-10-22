@@ -161,6 +161,13 @@ class User(UserMixin):
         """Проверяет доступ к разделу отчётов."""
         return self.can_view_module('reports')
 
+    def can_view_vip(self):
+        """Отдельное право VIP только для администраторов."""
+        if self.role != 'admin':
+            return False
+        from database.vip import has_vip_access
+        return has_vip_access(self.id)
+
     def can_view_admin(self):
         if self.is_admin():
             return True

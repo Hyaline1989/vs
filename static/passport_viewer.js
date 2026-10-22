@@ -155,7 +155,7 @@ function renderPassportContent(passportData, routeSheets, objectId) {
             html += `
                 <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: #f8f9fa; border-radius: 8px; border-left: 3px solid #A42C30;">
                     <div style="display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0;">
-                        <i class="fas fa-file-pdf" style="color: #e74c3c; font-size: 18px;"></i>
+                        <i class="fas fa-file-alt" style="color: #e74c3c; font-size: 18px;"></i>
                         <div style="flex: 1; min-width: 0;">
                             <div style="font-weight: 500; font-size: 0.9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(sheet.original_name)}">
                                 ${escapeHtml(sheet.original_name)}

@@ -25,6 +25,11 @@ def manager_key(value):
             return name
 
 
+def is_potok_manager(value):
+    name = re.sub(r'^\([^)]*\)\s*', '', (value or '').strip()).casefold()
+    return name.startswith('поток ')
+
+
 def eligible_name(value):
     name = (value or '').strip()
     key = manager_key(name)
@@ -49,7 +54,9 @@ def build_manager_results(calls, deals, previous=None):
         name = call.get('employee_name') or ''
         if not eligible_name(name):
             continue
-        system = call.get('system') or ''
+        # После объединения UIS звонки обоих подразделений приходят под
+        # системой «Комплект», но имя сотрудника сохраняет префикс «Поток».
+        system = 'Поток' if is_potok_manager(name) else (call.get('system') or '')
         key = (system, manager_key(name))
         names.setdefault(key, name)
         systems[key] = system
@@ -75,7 +82,7 @@ def build_manager_results(calls, deals, previous=None):
             directed_date = date.fromisoformat(str(directed_raw)[:10])
         except ValueError:
             continue
-        system = 'Поток' if source == SOURCE_POTOK else 'Комплект'
+        system = 'Поток' if is_potok_manager(name) or source == SOURCE_POTOK else 'Комплект'
         key = (system, manager_key(name))
         names.setdefault(key, name)
         systems[key] = system

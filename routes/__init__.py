@@ -10,6 +10,9 @@ from routes.objects_admin import objects_admin_bp
 from routes.requirements_admin import requirements_admin_bp
 from routes.worker_status import worker_status_bp
 from routes.faq import faq_bp
+from routes.planned_departures import planned_departures_bp
+from routes.service_reports import service_reports_bp
+from routes.report_refresh import report_refresh_bp
 
 __all__ = [
     'auth_bp',
@@ -21,6 +24,9 @@ __all__ = [
     'requirements_admin_bp',
     'worker_status_bp',
     'faq_bp',
+    'planned_departures_bp',
+    'service_reports_bp',
+    'report_refresh_bp',
     'init_dashboard_apis',
     'init_selection_apis'
 ]

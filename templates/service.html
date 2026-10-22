@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Вектор | VIP</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/favicon4.png') }}">
+    <style>
+        .service-card { width: 100%; }
+        .service-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; margin: 18px 0; }
+        .service-filters label { display: grid; gap: 5px; }
+        .service-filters input { padding: 9px 12px; border: 1px solid #b43c41; border-radius: 8px; }
+        .service-filters button { padding: 10px 18px; border: 0; border-radius: 20px; background: var(--primary); color: white; cursor: pointer; }
+        .service-table-wrap { max-width: 100%; overflow-x: auto; margin-top: 18px; border: 1px solid #e5d8da; border-radius: 10px; }
+        .service-table { width: 100%; border-collapse: separate; border-spacing: 0; }
+        .service-table th, .service-table td { min-width: 70px; padding: 10px 12px; border-right: 1px solid #e5d8da; border-bottom: 1px solid #e5d8da; text-align: center; white-space: nowrap; }
+        .service-table th:first-child { position: sticky; left: 0; z-index: 1; min-width: 190px; text-align: left; background: white; }
+        .service-table tbody tr:nth-child(even) { background: #f0f6ff; }
+        .service-table tbody tr:nth-child(even) th:first-child { background: #f0f6ff; }
+        .service-table thead, .service-table tfoot { background: #f4e9ec; font-weight: 700; }
+        .service-table thead th:first-child, .service-table tfoot th:first-child { z-index: 2; background: #f4e9ec; }
+        .service-table .no-data { background: #fff4d9; color: #775700; }
+        .service-warning { margin-top: 14px; color: #775700; }
+    </style>
+</head>
+<body>
+<div class="app-container">
+    <div class="app-header">
+        <div class="logo-container"><img src="{{ url_for('static', filename='images/logo2.png') }}" alt="Вектор" class="app-logo-img"></div>
+        <div class="header-right">{% include '_section_navigation.html' %}<div class="user-info" id="userInfo"></div></div>
+    </div>
+    <main class="panel-card service-card">
+        <h1>VIP</h1>
+        <h2>Смены по табелям</h2>
+        <form class="service-filters" id="serviceShiftForm">
+            <label for="serviceShiftFrom">С
+                <input id="serviceShiftFrom" type="date" value="{{ month_start }}" required>
+            </label>
+            <label for="serviceShiftTo">По
+                <input id="serviceShiftTo" type="date" value="{{ today }}" required>
+            </label>
+            <button type="submit">Показать</button>
+            <button id="serviceShiftRefresh" type="button">Обновить данные</button>
+            <button id="serviceShiftExport" type="button">Скачать Excel</button>
+        </form>
+        <p id="serviceShiftRefreshStatus" role="status" aria-live="polite"></p>
+        <p id="serviceShiftExportStatus" role="status" aria-live="polite"></p>
+        <div id="serviceShiftResult" role="status" aria-live="polite">Загрузка данных…</div>
+    </main>
+</div>
+<script src="{{ url_for('static', filename='common.js') }}"></script>
+<script src="{{ url_for('static', filename='report_refresh.js') }}"></script>
+<script src="{{ url_for('static', filename='service.js') }}"></script>
+</body>
+</html>

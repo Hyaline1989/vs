@@ -540,6 +540,7 @@
         }
         
         #departmentSettingsGroup[hidden] { display: none !important; }
+        #vipAccessGroup[hidden] { display: none !important; }
         .form-group {
             margin-bottom: 20px;
         }
@@ -1147,6 +1148,16 @@
                         </select>
                         <small>Менять роль существующего пользователя может только системный администратор. Отдел и личные доступы сохраняются; у администратора доступ полный.</small>
                     </div>
+
+                    {% if current_user.is_system_admin() %}
+                    <div class="form-group checkbox" id="vipAccessGroup" hidden>
+                        <label>
+                            <input type="checkbox" id="vipAccess">
+                            <span>Доступ к разделу VIP</span>
+                        </label>
+                        <small>Только для администраторов. По умолчанию выключен.</small>
+                    </div>
+                    {% endif %}
                     
                     {% if current_user.role == 'admin' %}
                     <div class="form-group" id="departmentSettingsGroup" hidden>

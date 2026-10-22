@@ -99,48 +99,26 @@ class BitrixAPI:
             date_str = target_date
         else:
             date_str = target_date.strftime('%Y-%m-%d')
-        
-        result = {}
-        
-        agent_deals = self.get_deals_by_office(target_date, SOURCE_AGENT)
-        result['agent'] = {
-            'count': sum(agent_deals.values()) if agent_deals else 0,
-            'objects': agent_deals if agent_deals else {}
+        # Дневные снимки должны использовать ту же классификацию, что и
+        # текущий дашборд: после объединения CRM одного SOURCE_ID недостаточно.
+        facts = self.get_report_facts_range(date_str, date_str).get(date_str, {})
+        result = {
+            office: {'count': 0, 'objects': {}}
+            for office in ('agent', 'potok', 'gorkiy52', 'bishkek', 'complect')
         }
-        
-        potok_deals = self.get_deals_by_office(target_date, SOURCE_POTOK)
-        result['potok'] = {
-            'count': sum(potok_deals.values()) if potok_deals else 0,
-            'objects': potok_deals if potok_deals else {}
+        office_mapping = {
+            'agent': 'agent',
+            'potok': 'potok',
+            'gorkiy': 'gorkiy52',
+            'bishkek': 'bishkek',
+            'complect': 'complect',
         }
-        
-        gorkiy_deals = self.get_deals_by_office(target_date, SOURCE_GORKIY52)
-        result['gorkiy52'] = {
-            'count': sum(gorkiy_deals.values()) if gorkiy_deals else 0,
-            'objects': gorkiy_deals if gorkiy_deals else {}
-        }
-        
-        bishkek_deals = self.get_deals_by_office(target_date, SOURCE_BISHKEK)
-        result['bishkek'] = {
-            'count': sum(bishkek_deals.values()) if bishkek_deals else 0,
-            'objects': bishkek_deals if bishkek_deals else {}
-        }
-        
-        all_raw = self._get_all_deals_raw({FIELD_DATE_DIRECTED: date_str})
-        complect_deals_raw = []
-        known_sources = [SOURCE_AGENT, SOURCE_POTOK, SOURCE_GORKIY52, SOURCE_BISHKEK]
-        
-        for deal in all_raw:
-            source_id = deal.get('SOURCE_ID')
-            if source_id not in known_sources and source_id not in EXCLUDED_SOURCES:
-                complect_deals_raw.append(deal)
-        
-        complect_deals = self._process_deals_data(complect_deals_raw)
-        result['complect'] = {
-            'count': sum(complect_deals.values()) if complect_deals else 0,
-            'objects': complect_deals if complect_deals else {}
-        }
-        
+        for object_name, office_counts in facts.items():
+            for report_key, office_name in office_mapping.items():
+                count = office_counts.get(report_key, 0)
+                if count:
+                    result[office_name]['objects'][object_name] = count
+                    result[office_name]['count'] += count
         return result
     
     def get_report_facts_range(self, start_date, end_date, include_staff=False):
@@ -207,7 +185,8 @@ class BitrixAPI:
             if not object_name:
                 object_name = 'Неизвестная компания'
 
-            office_key = self._get_report_office_key(deal.get('SOURCE_ID'))
+            staff_name = (deal.get(FIELD_CC_OPERATOR_REPORT) or '').strip()
+            office_key = self._get_report_office_key(deal.get('SOURCE_ID'), staff_name)
 
             if date_key not in facts_by_date:
                 facts_by_date[date_key] = {}
@@ -223,7 +202,6 @@ class BitrixAPI:
 
             facts_by_date[date_key][object_name][office_key] += 1
 
-            staff_name = (deal.get(FIELD_CC_OPERATOR_REPORT) or '').strip()
             if staff_name.casefold().startswith('сервис'):
                 service_counts = service_by_date.setdefault(date_key, {}).setdefault(object_name, {})
                 service_counts[office_key] = service_counts.get(office_key, 0) + 1
@@ -262,16 +240,20 @@ class BitrixAPI:
             return value_str[:10]
         return value_str
 
-    def _get_report_office_key(self, source_id):
+    def _get_report_office_key(self, source_id, staff_name=''):
         """Преобразует SOURCE_ID Bitrix в ключ офиса отчёта."""
         if source_id == SOURCE_AGENT:
             return 'agent'
+        if source_id == SOURCE_BISHKEK:
+            return 'bishkek'
+        # После объединения CRM у сотрудников Потока бывает общий SOURCE_ID
+        # Комплекта; в этом случае ориентируемся на префикс сотрудника.
+        if staff_name.casefold().startswith('поток'):
+            return 'potok'
         if source_id == SOURCE_POTOK:
             return 'potok'
         if source_id == SOURCE_GORKIY52:
             return 'gorkiy'
-        if source_id == SOURCE_BISHKEK:
-            return 'bishkek'
         return 'complect'
     
     def _get_all_deals_raw(self, filter_params):
@@ -1122,10 +1104,10 @@ class ShiftReportAPI:
             staff = (d.get(FIELD_CC_OPERATOR_REPORT) or '').strip()
             if staff.casefold().startswith('сервис'):
                 categories['Сервис'].append(d)
-            elif src == SOURCE_POTOK:
-                categories['Поток'].append(d)
             elif src == SOURCE_BISHKEK:
                 categories['Бишкек'].append(d)
+            elif staff.casefold().startswith('поток') or src == SOURCE_POTOK:
+                categories['Поток'].append(d)
             else:
                 categories['Комплект'].append(d)
         

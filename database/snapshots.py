@@ -8,6 +8,31 @@ from database.db_core import DB_NAME
 logger = logging.getLogger(__name__)
 
 
+def get_priority_history(from_date, to_date):
+    """Читает сохранённые дни, включая дни без приоритетов; не скрывает ошибки."""
+    from contextlib import closing
+    from datetime import date, timedelta
+    with closing(sqlite3.connect(DB_NAME)) as conn:
+        rows = conn.execute('''
+            SELECT date, object_name, MAX(is_high)
+            FROM daily_snapshots WHERE date BETWEEN ? AND ?
+            GROUP BY date, object_name
+        ''', (from_date, to_date)).fetchall()
+    saved = {}
+    for day, name, is_high in rows:
+        saved.setdefault(day, set())
+        if is_high:
+            saved[day].add(name)
+    result = []
+    day, end = date.fromisoformat(from_date), date.fromisoformat(to_date)
+    while day <= end:
+        key = day.isoformat()
+        result.append({'date': key, 'saved': key in saved,
+                       'objects': sorted(saved.get(key, ()), key=str.casefold)})
+        day += timedelta(days=1)
+    return result
+
+
 def save_daily_snapshot(date, object_name, office_name, count, plan=0, is_high=False):
     """Сохраняет или обновляет снапшот за день"""
     try:
@@ -49,12 +74,17 @@ def save_daily_snapshots_batch(date, data):
                     created_at = CURRENT_TIMESTAMP
             ''', (date, item['object_name'], item['office_name'], item['count'], item['plan'], 1 if item.get('is_high', False) else 0))
         
+        from candidate_rates import sync_priority_rates
+        sync_priority_rates(conn, date)
         conn.commit()
         conn.close()
         logger.info(f"✅ Сохранено {len(data)} снапшотов за {date}")
         return True
     except Exception as e:
         logger.error(f"Ошибка при пакетном сохранении снапшотов: {e}")
+        if 'conn' in locals():
+            conn.rollback()
+            conn.close()
         return False
 
 

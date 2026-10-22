@@ -430,8 +430,8 @@ def upload_route_sheet(object_id):
         return jsonify({'error': 'Файл не выбран'}), 400
     
     # Проверяем расширение
-    if not file.filename.lower().endswith('.pdf'):
-        return jsonify({'error': 'Можно загружать только PDF файлы'}), 400
+    if not file.filename.lower().endswith(('.pdf', '.jpg', '.jpeg', '.png', '.doc', '.docx')):
+        return jsonify({'error': 'Разрешены PDF, JPG, PNG и Word (DOC, DOCX)'}), 400
     
     # Проверяем размер файла (30 MB)
     file.seek(0, os.SEEK_END)
@@ -575,8 +575,8 @@ def upload_route_sheet_api(object_id):
         return jsonify({'error': 'Файл не выбран'}), 400
     
     # Проверяем расширение
-    if not file.filename.lower().endswith('.pdf'):
-        return jsonify({'error': 'Можно загружать только PDF файлы'}), 400
+    if not file.filename.lower().endswith(('.pdf', '.jpg', '.jpeg', '.png', '.doc', '.docx')):
+        return jsonify({'error': 'Разрешены PDF, JPG, PNG и Word (DOC, DOCX)'}), 400
     
     # Проверяем размер файла (30 MB)
     file.seek(0, os.SEEK_END)

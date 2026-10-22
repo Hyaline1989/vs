@@ -316,6 +316,16 @@
                 `;
             }
 
+            if (window.currentUser.can_view_vip === true) {
+                cardsHtml += `
+                    <a href="/service" class="welcome-card">
+                        <div class="welcome-card-icon"><i class="fas fa-lock"></i></div>
+                        <div class="welcome-card-title">VIP</div>
+                        <div class="welcome-card-desc">Смены по табелям за выбранную дату</div>
+                    </a>
+                `;
+            }
+
             // Админ-панель (только для admin и manager)
             if (permissions.admin === true) {
                 cardsHtml += `
