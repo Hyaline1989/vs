@@ -12,8 +12,8 @@ candidate_rates_bp = Blueprint('candidate_rates', __name__, url_prefix='/api/rep
 def access():
     if not current_user.is_authenticated:
         return jsonify(error='Требуется вход'), 401
-    if not current_user.can_view_reports():
-        return jsonify(error='Нет доступа к отчётам'), 403
+    if not current_user.can_view_module('payroll'):
+        return jsonify(error='Нет доступа к расчёту зарплаты'), 403
     if request.method == 'POST':
         origin = request.headers.get('Origin')
         if not request.is_json or (origin and urlsplit(origin).netloc != request.host):

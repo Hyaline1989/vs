@@ -59,6 +59,7 @@ def auth():
                 set_user_module_permission(user.id, 'selection', True)
                 module_perms = {'dashboard': True, 'selection': True}
             
+            module_perms['payroll'] = user.can_view_module('payroll')
             module_perms['admin'] = user.can_view_admin()
             return jsonify({
                 'success': True,
@@ -97,7 +98,7 @@ def get_current_user():
     if current_user.is_authenticated:
         # Use the same decisions as server authorization, including admin roles.
         module_perms = {name: current_user.can_view_module(name)
-                        for name in ('dashboard', 'selection', 'worker_status', 'reports')}
+                        for name in ('dashboard', 'selection', 'worker_status', 'reports', 'payroll')}
         
         module_perms['admin'] = current_user.can_view_admin()
         return jsonify({

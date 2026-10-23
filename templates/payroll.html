@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Вектор | Расчёт зп</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='payroll.css') }}">
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/favicon4.png') }}">
+</head>
+<body>
+<div class="app-container">
+    <div class="app-header">
+        <div class="logo-container"><img src="{{ url_for('static', filename='images/logo2.png') }}" alt="Вектор" class="app-logo-img"></div>
+        <div class="header-right">{% include '_section_navigation.html' %}<div class="user-info" id="userInfo"></div></div>
+    </div>
+    <main><h1>Расчёт зп</h1>{% include '_payroll_history.html' %}</main>
+</div>
+<script src="{{ url_for('static', filename='common.js') }}"></script>
+<script src="{{ url_for('static', filename='priority_history.js') }}"></script>
+<script src="{{ url_for('static', filename='candidate_rates.js') }}"></script>
+</body>
+</html>

@@ -26,7 +26,7 @@ dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/api')
 def priority_history_report():
     if not current_user.is_authenticated:
         return jsonify(error='Unauthorized'), 401
-    if not current_user.can_view_reports():
+    if not current_user.can_view_module('payroll'):
         return jsonify(error='Forbidden'), 403
     start, end = request.args.get('from', ''), request.args.get('to', '')
     try:

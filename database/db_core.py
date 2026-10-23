@@ -82,7 +82,7 @@ def init_db():
             CREATE TABLE IF NOT EXISTS user_module_permissions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL,
-                module_name TEXT NOT NULL CHECK(module_name IN ('dashboard', 'selection', 'worker_status', 'reports')),
+                module_name TEXT NOT NULL CHECK(module_name IN ('dashboard', 'selection', 'worker_status', 'reports', 'payroll')),
                 can_view INTEGER DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -228,12 +228,12 @@ def init_db():
         # Новый раздел по умолчанию закрыт для существующих пользователей.
         cursor.execute("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'user_module_permissions'")
         permissions_schema = cursor.fetchone()[0]
-        if "'reports'" not in permissions_schema:
+        if 'CHECK' in permissions_schema.upper() and "'reports'" not in permissions_schema:
             cursor.execute('''
                 CREATE TABLE user_module_permissions_new (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     user_id INTEGER NOT NULL,
-                    module_name TEXT NOT NULL CHECK(module_name IN ('dashboard', 'selection', 'worker_status', 'reports')),
+                    module_name TEXT NOT NULL CHECK(module_name IN ('dashboard', 'selection', 'worker_status', 'reports', 'payroll')),
                     can_view INTEGER DEFAULT 0,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,

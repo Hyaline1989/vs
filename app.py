@@ -246,6 +246,14 @@ def reports_page():
     return render_template('reports.html')
 
 
+@app.route('/payroll')
+@login_required
+def payroll_page():
+    if not current_user.can_view_module('payroll'):
+        return render_template('no_access.html', message='У вас нет доступа к разделу «Расчёт зп»', return_url='/welcome'), 403
+    return render_template('payroll.html')
+
+
 @app.route('/service')
 @login_required
 def service_page():

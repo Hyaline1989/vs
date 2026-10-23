@@ -136,6 +136,12 @@ class User(UserMixin):
     def can_view_module(self, module_name):
         """Проверяет доступ к модулю (dashboard, selection, worker_status)"""
         try:
+            if module_name == 'payroll':
+                if self.is_system_admin():
+                    return True
+                if self._module_permissions is None:
+                    self._load_permissions()
+                return self._module_permissions.get('payroll', False)
             if self.is_admin():
                 return True
             if self._module_permissions is None:

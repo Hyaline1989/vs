@@ -1,6 +1,6 @@
 /* Shared department permissions; no changes are saved until explicitly submitted. */
 (() => {
-    const labels = {dashboard: 'Дашборд', selection: 'Подбор объектов', worker_status: 'Вахтовики', reports: 'Отчёты', admin: 'Админ-панель'};
+    const labels = {dashboard: 'Дашборд', selection: 'Подбор объектов', worker_status: 'Вахтовики', reports: 'Отчёты', payroll: 'Расчёт зп', admin: 'Админ-панель'};
     let data;
     const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     async function api(path = '', method = 'GET', body) {

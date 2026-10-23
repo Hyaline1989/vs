@@ -3,7 +3,7 @@ import json
 import sqlite3
 from contextlib import closing
 
-MODULES = ('dashboard', 'selection', 'worker_status', 'reports', 'admin')
+MODULES = ('dashboard', 'selection', 'worker_status', 'reports', 'payroll', 'admin')
 
 
 def ready(conn):

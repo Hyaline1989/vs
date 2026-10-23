@@ -50,6 +50,7 @@ def get_users():
         users = [u for u in users if u['id'] != 1]
     for user in users:
         user['vip_access'] = has_vip_access(user['id']) if user['role'] == 'admin' else False
+        user['payroll_access'] = bool(get_user_module_permissions(user['id']).get('payroll', False))
     
     return jsonify(users)
 
@@ -154,6 +155,13 @@ def update_user_api(user_id):
         if data['role'] not in ('admin', 'manager', 'viewer', 'agent'):
             return jsonify({'error': 'Неизвестная роль'}), 400
         updates['role'] = data['role']
+
+    if 'payroll_access' in data:
+        if not is_system_admin(current_user.id) or user_id == 1:
+            return jsonify(error='Право администратора может менять только системный администратор'), 403
+        if type(data['payroll_access']) is not bool or data.get('role', user_data['role']) != 'admin':
+            return jsonify(error='Некорректное право расчёта зарплаты'), 400
+        updates['payroll_access'] = data['payroll_access']
 
     if 'vip_access' in data:
         origin = request.headers.get('Origin')
@@ -279,13 +287,13 @@ def update_user_module_perms(user_id):
         # Проверяем constraint
         cursor.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='user_module_permissions'")
         create_sql = cursor.fetchone()
-        if create_sql and "reports" not in create_sql[0]:
+        if create_sql and 'CHECK' in create_sql[0].upper() and "reports" not in create_sql[0]:
             logger.warning("Таблица user_module_permissions не имеет reports в CHECK, обновляем...")
             # Пересоздаём таблицу с правильным CHECK
             cursor.execute("CREATE TABLE user_module_permissions_new (" +
                 "id INTEGER PRIMARY KEY AUTOINCREMENT," +
                 "user_id INTEGER NOT NULL," +
-                "module_name TEXT NOT NULL CHECK(module_name IN ('dashboard', 'selection', 'worker_status', 'reports'))," +
+                "module_name TEXT NOT NULL CHECK(module_name IN ('dashboard', 'selection', 'worker_status', 'reports', 'payroll'))," +
                 "can_view INTEGER DEFAULT 0," +
                 "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP," +
                 "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE," +
@@ -302,7 +310,7 @@ def update_user_module_perms(user_id):
         logger.error(f"Ошибка при проверке структуры таблицы: {e}")
     
     for module, can_view in data.items():
-        if module in ['dashboard', 'selection', 'worker_status', 'reports']:
+        if module in ['dashboard', 'selection', 'worker_status', 'reports', 'payroll']:
             if current_user.role == 'manager':
                 if not my_module_perms.get(module, False):
                     logger.warning(f"Manager {current_user.id} пытается выдать доступ к модулю {module}")

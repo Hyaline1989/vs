@@ -85,7 +85,6 @@
         <button class="reports-tab" type="button" data-report="staff"><i class="fas fa-users"></i> 1 смена по сотрудникам</button>
         <button class="reports-tab" type="button" data-report="departures"><i class="fas fa-calendar-alt"></i> Плановое убытие</button>
         <button class="reports-tab" type="button" data-report="manager"><i class="fas fa-chart-bar"></i> Результативность менеджеров</button>
-        <button class="reports-tab" type="button" data-report="priorities"><i class="fas fa-history"></i> История приоритетов</button>
     </div>
 
     <div id="firstShiftObjectContainer" class="reports-content">
@@ -181,47 +180,6 @@
             <div id="fsStaffContent"><div class="loading">Загрузка...</div></div>
         </div>
     </div>
-    <div id="priorityHistoryContainer" class="reports-content">
-        <div class="panel-card">
-            <h2 class="panel-title">История приоритетов</h2>
-            <div class="first-shift-filters" role="group" aria-label="Вид истории">
-                <button type="button" class="refresh-btn" id="showPriorities" aria-pressed="true">Приоритеты</button>
-                <button type="button" class="refresh-btn" id="showCandidateRates" aria-pressed="false">Ставки за кандидата</button>
-            </div>
-            <div id="prioritiesPane">
-            <div class="first-shift-filters">
-                <div class="export-date-field"><label for="priorityHistoryFrom">С:</label><input type="date" id="priorityHistoryFrom" class="date-picker small"></div>
-                <div class="export-date-field"><label for="priorityHistoryTo">По:</label><input type="date" id="priorityHistoryTo" class="date-picker small"></div>
-                <button class="refresh-btn" type="button" id="priorityHistoryShow">Показать</button>
-            </div>
-            <p>Последняя сохранённая фиксация за каждую дату. Повторная фиксация дня заменяет предыдущую.</p>
-            <div id="priorityHistoryContent" aria-live="polite">Выберите даты и нажмите «Показать».</div>
-            </div>
-            <div id="candidateRatesPane" hidden>
-                <p>Ставка на дату направления. Выплата полагается после первой смены. Расчёт зарплаты пока не подключён.</p>
-                <label>Месяц <input type="month" id="ratesMonth" class="date-picker small"></label>
-                <button type="button" class="refresh-btn" id="ratesLoad">Показать</button>
-                <p>Ставки сохраняются автоматически при фиксации приоритетов: 2 500 ₽ — обычный объект, 4 000 ₽ — приоритетный. «—» — нет сохранённой ставки. Нажмите на ячейку для выбора дня.</p>
-                <div id="ratesCalendar" style="overflow-x:auto; width:100%; max-width:100%"></div>
-                <h3>Установить ставку на день или период</h3>
-                <div class="first-shift-filters">
-                    <label>Объект <select id="ratesObject"></select></label>
-                    <label>С <input type="date" id="ratesFrom" class="date-picker small"></label>
-                    <label>По <input type="date" id="ratesTo" class="date-picker small"></label>
-                    <label>Действие <select id="ratesMode"><option value="manual">Ручная ставка / акция</option></select></label>
-                    <label>Сумма, ₽ <input type="number" id="ratesAmount" min="0" max="1000000" step="1"></label>
-                    <label>Причина / акция <input type="text" id="ratesComment" maxlength="500"></label>
-                    <button type="button" class="refresh-btn" id="ratesPreview">Посмотреть изменения</button>
-                    <button type="button" class="refresh-btn" id="ratesHistory">История правок</button>
-                </div>
-                <p>Повторная фиксация приоритетов обновляет только автоматические ставки. Ручные ставки акций не перезаписываются. Все изменения сохраняются в истории.</p>
-                <div id="ratesStatus" role="status" aria-live="polite"></div>
-                <div id="ratesChanges"></div>
-                <button type="button" class="refresh-btn" id="ratesSave" hidden>Подтвердить и сохранить</button>
-                <div id="ratesAudit"></div>
-            </div>
-        </div>
-    </div>
     <div id="managerResultsContainer" class="reports-content">
         <div class="panel-card">
             <h2 class="panel-title">Результативность менеджеров</h2>
@@ -243,8 +201,6 @@
 <script src="{{ url_for('static', filename='dashboard.js') }}"></script>
 <script src="{{ url_for('static', filename='report_refresh.js') }}"></script>
 <script src="{{ url_for('static', filename='planned_departures.js') }}"></script>
-<script src="{{ url_for('static', filename='priority_history.js') }}"></script>
-<script src="{{ url_for('static', filename='candidate_rates.js') }}"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     const today = getTodayDate();
@@ -269,7 +225,6 @@ document.addEventListener('DOMContentLoaded', () => {
             departures: 'plannedDeparturesContainer',
             staff: 'firstShiftStaffContainer',
             manager: 'managerResultsContainer',
-            priorities: 'priorityHistoryContainer'
         };
         Object.entries(containers).forEach(([key, id]) => {
             document.getElementById(id).classList.toggle('active', key === report);

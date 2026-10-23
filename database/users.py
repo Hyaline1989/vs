@@ -147,6 +147,8 @@ def update_user(user_id, data):
             if updates:
                 cursor.execute(f'UPDATE users SET {", ".join(updates)} WHERE id = ?',
                                [*params, user_id])
+            if 'payroll_access' in data:
+                cursor.execute('INSERT INTO user_module_permissions(user_id,module_name,can_view) VALUES(?,?,?) ON CONFLICT(user_id,module_name) DO UPDATE SET can_view=excluded.can_view', (user_id, 'payroll', int(data['payroll_access'])))
             if 'vip_access' in data or ('role' in data and data['role'] != 'admin'):
                 table_exists = cursor.execute(
                     "SELECT 1 FROM sqlite_master WHERE type='table' AND name='user_vip_access'"

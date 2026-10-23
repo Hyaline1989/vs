@@ -358,6 +358,8 @@ function editUser(userId) {
     document.getElementById('userRole').disabled = !window.currentUser?.is_system_admin || userId === window.currentUser?.id || userId === 1;
     const vipAccess = document.getElementById('vipAccess');
     if (vipAccess) vipAccess.checked = user.vip_access === true;
+    const payrollAccess = document.getElementById('payrollAccess');
+    if (payrollAccess) payrollAccess.checked = user.payroll_access === true;
     syncVipAccessGroup();
     const departmentSettings = document.getElementById('departmentSettingsGroup');
     if (departmentSettings) departmentSettings.hidden = user.role === 'admin';
@@ -448,6 +450,7 @@ async function saveUser() {
             if (!document.getElementById('userRole').disabled) body.role = role;
             const vipGroup = document.getElementById('vipAccessGroup');
             if (vipGroup && !vipGroup.hidden) body.vip_access = document.getElementById('vipAccess').checked;
+            if (vipGroup && !vipGroup.hidden) body.payroll_access = document.getElementById('payrollAccess').checked;
             if (password) body.password = password;
         } else {
             url = '/api/admin/users';
@@ -559,12 +562,13 @@ async function editPermissions(userId) {
         console.log('Загруженные права на модули:', modulePerms);
         
         // Получаем модули, доступные текущему пользователю (для manager)
-        let availableModules = ['dashboard', 'selection', 'worker_status', 'reports'];
+        let availableModules = ['dashboard', 'selection', 'worker_status', 'reports', 'payroll'];
         let moduleLabels = {
             'dashboard': '📊 Дашборд План/Факт',
             'selection': '🎯 Подбор объектов',
             'worker_status': '👥 Вахтовики',
-            'reports': '📋 Отчёты'
+            'reports': '📋 Отчёты',
+            'payroll': 'Расчёт зп'
         };
         
         if (window.currentUser?.role === 'manager') {
@@ -661,6 +665,8 @@ async function savePermissions() {
     if (permSelection) modulePerms.selection = permSelection.checked;
     if (permWorkerStatus) modulePerms.worker_status = permWorkerStatus.checked;
     if (permReports) modulePerms.reports = permReports.checked;
+    const permPayroll = document.getElementById('perm_payroll');
+    if (permPayroll) modulePerms.payroll = permPayroll.checked;
     
     console.log('Сохраняемые права на модули:', modulePerms);
     

@@ -1,0 +1,22 @@
+        .in-transit-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        .in-transit-table th, .in-transit-table td { padding: 12px 8px; border-bottom: 1px solid #e5d8da; text-align: center; overflow-wrap: anywhere; }
+        .in-transit-table th:first-child { width: 40%; text-align: left; }
+        .in-transit-table tbody th { font-weight: normal; }
+        .in-transit-table thead, .in-transit-table tfoot { background: #f4e9ec; font-weight: bold; }
+        .in-transit-table tbody tr:nth-child(even) { background: #f0f6ff; }
+        .in-transit-table caption { text-align: left; padding-bottom: 10px; }
+        .departures-table { border-collapse: separate; border-spacing: 0; min-width: max-content; width: 100%; }
+        .departures-table th, .departures-table td { min-width: 42px; padding: 10px 5px; border-right: 1px solid #e5d8da; border-bottom: 1px solid #e5d8da; text-align: center; }
+        .departures-table th:first-child { position: sticky; left: 0; z-index: 2; min-width: 210px; max-width: 210px; text-align: left; background: #fff; }
+        .departures-table thead th, .departures-table tfoot th, .departures-table tfoot td { background: #f4e9ec; font-weight: 700; }
+        .departures-table thead th:first-child, .departures-table tfoot th:first-child { z-index: 3; background: #f4e9ec; }
+        .departures-table tbody tr:nth-child(even) td, .departures-table tbody tr:nth-child(even) th:first-child { background: #f0f6ff; }
+        .departures-table td:not(.no-data):not(.zero) { font-weight: 700; color: var(--primary-dark); }
+        .departures-table .no-data { background: #fff4d9; color: #775700; }
+        .departures-table tfoot .no-data { background: #fff4d9; }
+        @media (max-width: 600px) {
+            .in-transit-table th, .in-transit-table td { padding: 8px 3px; font-size: 12px; }
+            .in-transit-table th:first-child { width: 32%; }
+        }
+        #ratesSave[hidden] { display: none !important; }
+.first-shift-filters { display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin:16px 0; }
