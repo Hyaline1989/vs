@@ -168,10 +168,15 @@ def save_current_requirements(objects_data):
                     is_high
                 ))
         
+        from demand_history import record_current
+        record_current(conn, extra_names=objects_data.keys())
         conn.commit()
         conn.close()
         logger.info(f"✅ Сохранены текущие потребности для {len(objects_data)} объектов")
         return True
     except Exception as e:
         logger.error(f"Ошибка при сохранении текущих потребностей: {e}")
+        if 'conn' in locals():
+            conn.rollback()
+            conn.close()
         return False

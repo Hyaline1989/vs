@@ -11,10 +11,79 @@ from flask_login import current_user
 
 from report_refresh_store import finish_refresh
 from shift_attendance_store import report_for_period, validate_snapshot, write_snapshot
+import rotation_duration
+from report_refresh_store import get_refresh, advance_rotation_refresh
 
 
 service_reports_bp = Blueprint('service_reports', __name__, url_prefix='/api/service')
 logger = logging.getLogger(__name__)
+
+
+def _load_rotations():
+    try:
+        start = date.fromisoformat(request.args.get('from', ''))
+        end = date.fromisoformat(request.args.get('to', ''))
+    except ValueError:
+        raise ValueError('Выберите даты периода') from None
+    if not 2020 <= start.year <= end.year <= 2099:
+        raise ValueError('Некорректный год')
+    return rotation_duration.build_report(start, end, request.args.get('cohort', ''),
+                                          request.args.get('mode', 'objects'))
+
+
+@service_reports_bp.get('/rotations')
+@service_reports_bp.get('/rotations.xlsx')
+def get_rotations():
+    denied = _can_view_shifts()
+    if denied is not None:
+        return denied
+    try:
+        report = _load_rotations()
+        if request.path.endswith('.xlsx'):
+            if report['status'] == 'not_loaded':
+                return jsonify(error='Сводки продолжительности ещё не загружены'), 404
+            output = rotation_duration.export_workbook(report)
+            return send_file(output, as_attachment=True,
+                             download_name=f"rotation_duration_{report['mode']}_{report['from']}_{report['to']}.xlsx",
+                             mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        return jsonify(report)
+    except ValueError as error:
+        return jsonify(error=str(error)), 400
+    except (OSError, KeyError, TypeError):
+        logger.exception('Не удалось прочитать отчёт продолжительности')
+        return jsonify(error='Не удалось прочитать сохранённый отчёт'), 500
+
+
+@service_reports_bp.post('/rotations/import')
+def import_rotations():
+    expected = os.environ.get('PLANNED_DEPARTURES_IMPORT_KEY', '')
+    provided = request.headers.get('X-Vector-Import-Key', '')
+    if len(expected) < 32 or not hmac.compare_digest(provided.encode(), expected.encode()):
+        return jsonify(error='Unauthorized'), 401
+    if request.content_length is None or request.content_length > 8 * 1024 * 1024:
+        return jsonify(error='Слишком большой отчёт'), 413
+    try:
+        payload = request.get_json(silent=True)
+        part = rotation_duration.validate_part(payload)
+        cursor = payload.get('cursor')
+        if type(cursor) is not int or not 0 <= cursor < len(part['expected_objects']):
+            raise ValueError('Некорректный номер табеля')
+        if part['object']['name'] != part['expected_objects'][cursor]:
+            raise ValueError('Порядок табелей изменился')
+        task = get_refresh('rotations', part['month'], part['batch_id'])
+        if not task or task['status'] != 'pending' or task.get('cursor', 0) != cursor:
+            return jsonify(error='Запрос устарел'), 409
+        completed = rotation_duration.save_part(part)
+        if completed:
+            finish_refresh('rotations', part['month'], part['batch_id'], 'completed')
+        else:
+            advance_rotation_refresh(part['month'], part['batch_id'], cursor)
+        return jsonify(status='completed' if completed else 'saved')
+    except ValueError as error:
+        return jsonify(error=str(error)), 400
+    except OSError:
+        logger.exception('Не удалось сохранить продолжительность вахт')
+        return jsonify(error='Не удалось сохранить отчёт'), 500
 
 
 class InvalidPeriod(ValueError):
@@ -62,6 +131,27 @@ def get_shifts():
                      request.args.get('from'), request.args.get('to'), error)
         return jsonify(error='Не удалось прочитать сохранённый отчёт'), 500
     return jsonify(report)
+
+
+@service_reports_bp.get('/demand-history')
+def get_demand_history():
+    denied = _can_view_shifts()
+    if denied is not None:
+        return denied
+    import sqlite3
+    from database.db_core import DB_NAME
+    from demand_history import report_for_period as demand_report
+    try:
+        start = date.fromisoformat(request.args.get('from', ''))
+        end = date.fromisoformat(request.args.get('to', ''))
+        if not 2020 <= start.year <= end.year <= 2099:
+            raise ValueError('Некорректный год')
+        return jsonify(demand_report(DB_NAME, start, end))
+    except ValueError:
+        return jsonify(error='Выберите корректный период не более 366 дней'), 400
+    except sqlite3.OperationalError:
+        logger.exception('Архив потребности недоступен')
+        return jsonify(error='Архив потребности недоступен. Проверьте выполнение миграции.'), 503
 
 
 @service_reports_bp.get('/shifts.xlsx')

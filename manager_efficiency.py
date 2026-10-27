@@ -88,6 +88,12 @@ def calculate_efficiency_rating(rows):
         if is_excluded_manager(manager_name):
             continue
 
+        # Защита также для ранее закэшированных строк нормализованных звонков.
+        if (row.get('direction') == 'out'
+                and int(row.get('clean_talk_duration') or 0) > 0
+                and not row.get('is_talked')):
+            continue
+
         key = (row.get('system') or '', manager_name)
         item = stats[key]
         direction = row.get('direction')

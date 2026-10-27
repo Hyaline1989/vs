@@ -12,7 +12,7 @@ from planned_departures_store import days_in_month
 
 
 STORE_DIR = Path(__file__).resolve().parent / 'data' / 'report_refresh'
-REPORTS = {'departures', 'shifts'}
+REPORTS = {'departures', 'shifts', 'rotations'}
 
 
 def _path(report, month, store_dir):
@@ -79,8 +79,8 @@ def request_refresh(report, month, store_dir=STORE_DIR):
         existing = _read(path)
         now = datetime.now(timezone.utc)
         if existing and existing.get('status') == 'pending':
-            created = datetime.fromisoformat(existing['requested_at'])
-            if now - created < timedelta(minutes=20):
+            created = datetime.fromisoformat(existing['updated_at'] if report == 'rotations' else existing['requested_at'])
+            if now - created < timedelta(minutes=180 if report == 'rotations' else 20):
                 return existing
         payload = {
             'id': uuid.uuid4().hex, 'report': report, 'month': month,
@@ -106,8 +106,8 @@ def claim_pending(store_dir=STORE_DIR):
             for path in (Path(store_dir) / report).glob('*.json'):
                 payload = _read(path)
                 if payload and payload.get('status') == 'pending':
-                    candidates.append((payload['requested_at'], path, payload))
-        for _, path, payload in sorted(candidates):
+                    candidates.append((payload['report'] == 'rotations', payload['requested_at'], path, payload))
+        for _, _, path, payload in sorted(candidates):
             if datetime.fromisoformat(payload['next_attempt_at']) > now:
                 continue
             if payload['attempts'] >= 5:
@@ -119,8 +119,28 @@ def claim_pending(store_dir=STORE_DIR):
             payload['next_attempt_at'] = (now + timedelta(minutes=2)).isoformat(timespec='seconds')
             payload['updated_at'] = now.isoformat(timespec='seconds')
             _write(path, payload)
-            return {key: payload[key] for key in ('id', 'report', 'month')}
+            result = {key: payload[key] for key in ('id', 'report', 'month')}
+            if payload['report'] == 'rotations':
+                result['cursor'] = payload.get('cursor', 0)
+            return result
     return None
+
+
+def advance_rotation_refresh(month, request_id, cursor, store_dir=STORE_DIR):
+    """После одного табеля освобождаем очередь для следующей минутной итерации."""
+    path = _path('rotations', month, store_dir)
+    with _locked(store_dir):
+        payload = _read(path)
+        if not payload or payload['id'] != request_id or payload['status'] != 'pending':
+            return False
+        if payload.get('cursor', 0) != cursor:
+            return False
+        payload['cursor'] = cursor + 1
+        payload['attempts'] = 0
+        payload['next_attempt_at'] = datetime.now(timezone.utc).isoformat(timespec='seconds')
+        payload['updated_at'] = payload['next_attempt_at']
+        _write(path, payload)
+        return True
 
 
 def finish_refresh(report, month, request_id, status, store_dir=STORE_DIR):

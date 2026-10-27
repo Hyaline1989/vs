@@ -1,10 +1,10 @@
     <div id="priorityHistoryContainer" class="payroll-history">
+            <div class="payroll-tabs" role="group" aria-label="Вид истории">
+                <button type="button" class="payroll-tab" id="showPriorities" aria-pressed="true">Приоритеты</button>
+                <button type="button" class="payroll-tab" id="showCandidateRates" aria-pressed="false">Ставки за кандидата</button>
+            </div>
         <div class="panel-card">
             <h2 class="panel-title">История приоритетов</h2>
-            <div class="first-shift-filters" role="group" aria-label="Вид истории">
-                <button type="button" class="refresh-btn" id="showPriorities" aria-pressed="true">Приоритеты</button>
-                <button type="button" class="refresh-btn" id="showCandidateRates" aria-pressed="false">Ставки за кандидата</button>
-            </div>
             <div id="prioritiesPane">
             <div class="first-shift-filters">
                 <div class="export-date-field"><label for="priorityHistoryFrom">С:</label><input type="date" id="priorityHistoryFrom" class="date-picker small"></div>

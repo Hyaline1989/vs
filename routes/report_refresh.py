@@ -19,7 +19,7 @@ def _user_can_refresh(report):
         return False
     if report == 'departures':
         return current_user.can_view_reports()
-    if report == 'shifts':
+    if report in {'shifts', 'rotations'}:
         return current_user.can_view_vip()
     return False
 

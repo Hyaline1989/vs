@@ -435,6 +435,9 @@ def reset_object_requirements():
         
         current_updated = cursor.rowcount
         logger.info(f"Обнулено {current_updated} записей в current_requirements для объекта {object_name}")
+
+        from demand_history import record_current
+        record_current(conn, object_name=object_name, extra_names=[object_name])
         
         conn.commit()
         conn.close()
@@ -455,4 +458,7 @@ def reset_object_requirements():
         
     except Exception as e:
         logger.error(f"Ошибка при обнулении потребностей объекта {object_name}: {e}", exc_info=True)
+        if 'conn' in locals():
+            conn.rollback()
+            conn.close()
         return jsonify({'error': str(e)}), 500

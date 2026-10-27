@@ -222,7 +222,14 @@ class UISAPI:
                 continue
 
             for employee in employees:
-                rows.append(self._normalize_call_row(system_name, call, employee))
+                row = self._normalize_call_row(system_name, call, employee)
+                # direction и длительность принадлежат сессии, а не каждому
+                # участнику. Не начисляем чужой успешный исходящий и не
+                # превращаем его в неуспешную попытку этого сотрудника.
+                if (row['direction'] == 'out' and row['clean_talk_duration'] > 0
+                        and not row['is_talked']):
+                    continue
+                rows.append(row)
 
         return rows
 

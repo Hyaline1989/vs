@@ -1,5 +1,6 @@
 // Проверяет очередь Вектора раз в минуту. Без запроса табели не открываются.
 function processReportRefreshRequests() {
+  const startedAt = Date.now();
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(1000)) return;
   try {
@@ -12,6 +13,9 @@ function processReportRefreshRequests() {
     }
     const base = importUrl.slice(0, -suffix.length);
     const headers = {'X-Vector-Import-Key': key};
+    // Не начинаем новый табель после трёх минут. Каждый импорт сохраняет
+    // курсор на сервере, а следующий запрос получает именно оставшуюся работу.
+    while (Date.now() - startedAt < 180000) {
     const pending = UrlFetchApp.fetch(base + '/api/report-refresh/pending', {
       method: 'get', headers, muteHttpExceptions: true,
     });
@@ -21,13 +25,17 @@ function processReportRefreshRequests() {
     const task = JSON.parse(pending.getContentText()).request;
     if (!task) return;
     try {
-      if (!['departures', 'shifts'].includes(task.report) ||
+      if (!['departures', 'shifts', 'rotations'].includes(task.report) ||
           !/^20\d{2}-(0[1-9]|1[0-2])$/.test(task.month) ||
           !/^[0-9a-f]{32}$/.test(task.id)) {
         throw new Error('Некорректный запрос на пересчёт');
       }
       const year = Number(task.month.slice(0, 4));
       const month = Number(task.month.slice(5, 7));
+      if (task.report === 'rotations') {
+        sendRotationPart_(task, base, key);
+        continue;
+      }
       const payload = task.report === 'departures' ?
         buildPlannedDepartures_(year, month) : buildShiftAttendance_(year, month);
       const endpoint = task.report === 'departures' ?
@@ -41,6 +49,7 @@ function processReportRefreshRequests() {
         throw new Error('Импорт вернул HTTP ' + response.getResponseCode());
       }
       console.log('Обновлён отчёт ' + task.report + ' за ' + task.month);
+      return;
     } catch (error) {
       console.error('Ошибка пересчёта ' + task.report + ' за ' + task.month + ': ' + error);
       const failed = UrlFetchApp.fetch(base + '/api/report-refresh/failed', {
@@ -50,7 +59,10 @@ function processReportRefreshRequests() {
       if (failed.getResponseCode() !== 200) {
         console.error('Не удалось отметить ошибку пересчёта: HTTP ' + failed.getResponseCode());
       }
+      return;
     }
+    }
+    console.log('Пакет продолжительности завершён по времени; продолжим со следующего табеля.');
   } finally {
     lock.releaseLock();
   }

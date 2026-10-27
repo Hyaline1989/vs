@@ -15,7 +15,7 @@
         <div class="logo-container"><img src="{{ url_for('static', filename='images/logo2.png') }}" alt="Вектор" class="app-logo-img"></div>
         <div class="header-right">{% include '_section_navigation.html' %}<div class="user-info" id="userInfo"></div></div>
     </div>
-    <main><h1>Расчёт зп</h1>{% include '_payroll_history.html' %}</main>
+    <main aria-label="Расчёт зп">{% include '_payroll_history.html' %}</main>
 </div>
 <script src="{{ url_for('static', filename='common.js') }}"></script>
 <script src="{{ url_for('static', filename='priority_history.js') }}"></script>
