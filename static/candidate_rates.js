@@ -39,9 +39,9 @@ document.addEventListener('DOMContentLoaded', () => {
             for (const cell of row.cells) {
                 const td = tr.insertCell();
                 const button = document.createElement('button'); button.type = 'button';
-                button.textContent = cell.amount !== null ? money(cell.amount) : '—';
+                button.textContent = money(cell.amount ?? cell.suggestion);
                 button.style.cssText = 'font:inherit;color:inherit;background:transparent;border:0;cursor:pointer;white-space:nowrap';
-                button.title = row.name + ', ' + dateLabel(cell.day) + ': ' + (cell.comment || 'Ставка ещё не сохранена');
+                button.title = row.name + ', ' + dateLabel(cell.day) + ': ' + (cell.comment || 'Ставка по умолчанию');
                 button.addEventListener('click', () => {
                     if (busy) return;
                     el('ratesObject').value = row.object_id;
@@ -97,12 +97,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const today = getTodayDate();
     el('ratesMonth').value = today.slice(0,7);
     el('ratesFrom').value = el('ratesTo').value = today;
-    function pane(rates) {
-        el('prioritiesPane').hidden = rates; el('candidateRatesPane').hidden = !rates;
-        el('showPriorities').setAttribute('aria-pressed', String(!rates));
+    function pane(name) {
+        const rates = name === 'rates';
+        el('prioritiesPane').hidden = name !== 'priorities';
+        el('candidateRatesPane').hidden = !rates;
+        el('payrollCalculationPane').hidden = name !== 'calculation';
+        el('showPriorities').setAttribute('aria-pressed', String(name === 'priorities'));
         el('showCandidateRates').setAttribute('aria-pressed', String(rates));
+        el('showPayrollCalculation').setAttribute('aria-pressed', String(name === 'calculation'));
         if (rates && !el('ratesObject').options.length) el('ratesLoad').click();
     }
-    el('showPriorities').addEventListener('click', () => pane(false));
-    el('showCandidateRates').addEventListener('click', () => pane(true));
+    el('showPriorities').addEventListener('click', () => pane('priorities'));
+    el('showCandidateRates').addEventListener('click', () => pane('rates'));
+    el('showPayrollCalculation').addEventListener('click', () => pane('calculation'));
 });

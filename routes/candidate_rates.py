@@ -4,6 +4,9 @@ from flask import Blueprint, request, jsonify
 from flask_login import current_user
 from database.db_core import DB_NAME
 import candidate_rates as store
+import payroll_calculation
+from bitrix_api import ShiftReportAPI
+from config import BITRIX_WEBHOOK_URL
 
 candidate_rates_bp = Blueprint('candidate_rates', __name__, url_prefix='/api/reports/candidate-rates')
 
@@ -32,6 +35,11 @@ def database_error(error):
     return jsonify(error='Не удалось прочитать или сохранить ставки. Проверьте подготовку базы ставок.'), 503
 
 
+@candidate_rates_bp.errorhandler(RuntimeError)
+def bitrix_error(error):
+    return jsonify(error=str(error)), 502
+
+
 @candidate_rates_bp.get('')
 def calendar():
     return jsonify(store.read_calendar(DB_NAME, request.args.get('month')))
@@ -53,6 +61,22 @@ def preview():
 @candidate_rates_bp.get('/history')
 def history():
     return jsonify(rows=store.read_history(DB_NAME, *selection()))
+
+
+@candidate_rates_bp.get('/calculation')
+def calculation():
+    month = request.args.get('month', '')
+    import calendar
+    from datetime import date
+    try:
+        first = date.fromisoformat(month + '-01')
+    except ValueError:
+        raise ValueError('Выберите месяц расчёта')
+    last = date(first.year, first.month, calendar.monthrange(first.year, first.month)[1])
+    deals = ShiftReportAPI(BITRIX_WEBHOOK_URL).get_payroll_deals(first.isoformat(), last.isoformat())
+    result = payroll_calculation.calculate(DB_NAME, deals)
+    result['month'] = month
+    return jsonify(result)
 
 
 @candidate_rates_bp.post('')

@@ -29,18 +29,18 @@ class CandidateRatesTests(unittest.TestCase):
 
     def test_suggestions_and_missing_are_not_saved_by_read(self):
         cells = rates.read_calendar(self.path,'2026-10')['rows'][0]['cells']
-        self.assertEqual([c['suggestion'] for c in cells[:3]], [4000,2500,None])
+        self.assertEqual([c['suggestion'] for c in cells[:3]], [4000,2500,2500])
         self.assertTrue(all(c['amount'] is None for c in cells))
         self.assertEqual(rates.read_history(self.path,1,'2026-10-01','2026-10-31'), [])
 
     def test_confirm_manual_history_and_no_overwrite(self):
         result = rates.save_rates(self.path,self.payload(),7,'Катя')
-        self.assertEqual(result['changed'],2)
+        self.assertEqual(result['changed'],3)
         rates.save_rates(self.path,self.payload('manual',amount=5000,comment='Акция'),8,'Менеджер')
         result = rates.save_rates(self.path,self.payload(),7,'Катя')
         self.assertEqual(result['changed'],0)
         history = rates.read_history(self.path,1,'2026-10-01','2026-10-03')
-        self.assertEqual(len(history),5)
+        self.assertEqual(len(history),6)
         self.assertEqual(history[0]['actor_name'],'Менеджер')
         self.assertEqual(history[-1]['new_amount'],4000)
 

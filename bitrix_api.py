@@ -1085,6 +1085,40 @@ class ShiftReportAPI:
         result = self._group_by_staff(deals)
         logger.info(f"📊 [1 смена] Итоговый отчёт по сотрудникам: {sum(sum(v.values()) for v in result.values()) if result else 0} записей")
         return result
+
+    def get_payroll_deals(self, start_date_str, end_date_str):
+        """Зарплата Комплекта: тот же состав подразделения, что в отчёте по сотрудникам."""
+        deals = self._get_filtered_deals(start_date_str, end_date_str)
+        deals = [d for d in deals
+                 if d.get('SOURCE_ID') not in (SOURCE_AGENT, SOURCE_BISHKEK, SOURCE_POTOK)
+                 and not (d.get(FIELD_CC_OPERATOR_REPORT) or '').strip().casefold().startswith(('сервис', 'поток'))]
+        company_ids = list({d.get(FIELD_COMPANY) for d in deals if d.get(FIELD_COMPANY)})
+        companies = self._get_companies_info(company_ids)
+        result = []
+        for deal in deals:
+            directed = self._extract_date(deal.get(FIELD_DATE_DIRECTED))
+            shifted = self._extract_date(deal.get(FIELD_WORKED_1_SHIFT))
+            result.append({
+                'deal_id': deal.get('ID'),
+                'candidate': deal.get('TITLE') or 'Без имени',
+                'staff': (deal.get(FIELD_CC_OPERATOR_REPORT) or '').strip() or 'Без сотрудника',
+                'object_name': companies.get(deal.get(FIELD_COMPANY), 'Объект не указан'),
+                'directed_date': directed,
+                'shift_date': shifted,
+            })
+        return result
+
+    @staticmethod
+    def _extract_date(value):
+        if not value or value == 'N':
+            return ''
+        text = str(value)
+        if re.fullmatch(r'\d{2}\.\d{2}\.\d{4}', text[:10]):
+            try:
+                return datetime.strptime(text[:10], '%d.%m.%Y').strftime('%Y-%m-%d')
+            except ValueError:
+                return ''
+        return text[:10] if re.fullmatch(r'\d{4}-\d{2}-\d{2}', text[:10]) else ''
     
     def _group_by_staff(self, deals):
         """Группировка по полю Сотрудник Колл-центра (ОТЧЕТ)."""

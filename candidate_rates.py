@@ -54,7 +54,7 @@ def _cells(conn, object_id, days):
     cells = []
     for day in days:
         saved = stored.get(day)
-        suggestion = (4000 if priorities[day] else 2500) if day in priorities else None
+        suggestion = 4000 if priorities.get(day, False) else 2500
         cells.append(dict(day=day, amount=saved[0] if saved else None,
                           source=saved[1] if saved else None, comment=saved[2] if saved else '',
                           updated_at=saved[3] if saved else None, suggestion=suggestion))

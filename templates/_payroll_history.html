@@ -2,6 +2,7 @@
             <div class="payroll-tabs" role="group" aria-label="Вид истории">
                 <button type="button" class="payroll-tab" id="showPriorities" aria-pressed="true">Приоритеты</button>
                 <button type="button" class="payroll-tab" id="showCandidateRates" aria-pressed="false">Ставки за кандидата</button>
+                <button type="button" class="payroll-tab" id="showPayrollCalculation" aria-pressed="false">Начисления сотрудникам</button>
             </div>
         <div class="panel-card">
             <h2 class="panel-title">История приоритетов</h2>
@@ -15,10 +16,10 @@
             <div id="priorityHistoryContent" aria-live="polite">Выберите даты и нажмите «Показать».</div>
             </div>
             <div id="candidateRatesPane" hidden>
-                <p>Ставка на дату направления. Выплата полагается после первой смены. Расчёт зарплаты пока не подключён.</p>
+                <p>Ставка на дату направления. Выплата полагается после первой смены. Расчёт для Комплекта доступен во вкладке «Начисления сотрудникам».</p>
                 <label>Месяц <input type="month" id="ratesMonth" class="date-picker small"></label>
                 <button type="button" class="refresh-btn" id="ratesLoad">Показать</button>
-                <p>Ставки сохраняются автоматически при фиксации приоритетов: 2 500 ₽ — обычный объект, 4 000 ₽ — приоритетный. «—» — нет сохранённой ставки. Нажмите на ячейку для выбора дня.</p>
+                <p>По умолчанию ставка составляет 2 500 ₽. Для зафиксированного приоритетного объекта — 4 000 ₽. Ручная ставка или акция имеет приоритет над автоматической. Нажмите на ячейку для выбора дня.</p>
                 <div id="ratesCalendar" style="overflow-x:auto; width:100%; max-width:100%"></div>
                 <h3>Установить ставку на день или период</h3>
                 <div class="first-shift-filters">
@@ -36,6 +37,19 @@
                 <div id="ratesChanges"></div>
                 <button type="button" class="refresh-btn" id="ratesSave" hidden>Подтвердить и сохранить</button>
                 <div id="ratesAudit"></div>
+            </div>
+            <div id="payrollCalculationPane" hidden>
+                <h2 class="panel-title">Начисления сотрудникам — Комплект</h2>
+                <p>Только Комплект, без Потока, Сервиса, Бишкека, агентов, операторов и Спутника. Это пересчитываемый отчёт: изменение ставок за прошлые даты изменит результат следующего расчёта.</p>
+                <p>Учитываются кандидаты, направленные в выбранном месяце и впоследствии отработавшие первую смену. Ставка берётся на дату направления.</p>
+                <div class="first-shift-filters">
+                    <label>Месяц направления <input type="month" id="payrollMonth" class="date-picker small"></label>
+                    <button type="button" class="refresh-btn" id="payrollLoad">Рассчитать</button>
+                </div>
+                <div id="payrollStatus" role="status" aria-live="polite">Выберите месяц и нажмите «Рассчитать».</div>
+                <div id="payrollSummary"></div>
+                <h3 id="payrollDetailsTitle" hidden>Расшифровка по кандидатам</h3>
+                <div id="payrollDetails"></div>
             </div>
         </div>
     </div>

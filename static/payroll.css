@@ -19,6 +19,10 @@
             .in-transit-table th:first-child { width: 32%; }
         }
         #ratesSave[hidden] { display: none !important; }
+.payroll-result-table { margin-top:16px; table-layout:auto; }
+.payroll-result-table th:first-child { width:auto; }
+.payroll-result-table .money-cell { font-weight:700; white-space:nowrap; }
+#payrollStatus { margin:12px 0; font-weight:600; }
 .first-shift-filters { display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin:16px 0; }
 .payroll-tabs { display:flex; flex-wrap:wrap; gap:0; margin:0 0 25px; border-bottom:2px solid var(--primary); }
 .payroll-tab { padding:11px 24px; border:1px solid rgba(164,44,48,.25); border-bottom:0; border-radius:0; background:rgba(164,44,48,.08); cursor:pointer; }
