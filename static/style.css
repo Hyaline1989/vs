@@ -2244,8 +2244,19 @@ button, input, select, textarea {
     overflow-x: auto;
 }
 
+#managerEfficiencySummary .summary-row {
+    width: 100%;
+    max-width: 700px;
+}
+
+.manager-efficiency-table tfoot td {
+    background: #dde7f2 !important;
+    font-weight: 700;
+}
+
 .manager-efficiency-table {
     width: 100%;
+    table-layout: fixed;
     border-collapse: collapse;
     font-size: calc(0.9rem * var(--ui-font-scale));
     background: #fff;
@@ -2253,13 +2264,15 @@ button, input, select, textarea {
 
 .manager-efficiency-table th,
 .manager-efficiency-table td {
-    padding: 10px 8px;
+    padding: 8px 3px;
     border: 1px solid #ddd;
     text-align: right;
     white-space: nowrap;
 }
 
 .manager-efficiency-table th {
+    white-space: normal;
+    overflow-wrap: anywhere;
     position: sticky;
     top: 0;
     z-index: 1;
@@ -2273,6 +2286,29 @@ button, input, select, textarea {
 .manager-efficiency-table td:nth-child(1),
 .manager-efficiency-table td:nth-child(2) {
     text-align: left;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+/* Остаток ширины делится поровну между 13 колонками показателей. */
+.manager-efficiency-table th:nth-child(1) {
+    width: 7%;
+}
+
+.manager-efficiency-table th:nth-child(2) {
+    width: 20%;
+}
+
+@media (min-width: 1100px) and (max-width: 1450px) {
+    .manager-efficiency-table {
+        font-size: 0.75rem;
+    }
+}
+
+@media (max-width: 1099px) {
+    .manager-efficiency-table {
+        min-width: 1100px;
+    }
 }
 
 .manager-efficiency-table tbody tr:nth-child(even) td {
@@ -2285,6 +2321,20 @@ button, input, select, textarea {
 
 .manager-efficiency-table tbody tr:nth-child(even) .metric-in {
     background: #fff3b0;
+}
+
+.manager-efficiency-table .metric-duration-subset {
+    border-left: 2px solid #000;
+    border-right: 2px solid #000;
+}
+
+.manager-efficiency-table th.metric-duration-subset {
+    border-top: 2px solid #000;
+    border-bottom: 2px solid #000;
+}
+
+.manager-efficiency-table tfoot .metric-duration-subset {
+    border-bottom: 2px solid #000;
 }
 
 .manager-efficiency-table .metric-out-success {

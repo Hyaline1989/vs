@@ -13,7 +13,8 @@ from database import get_user_module_permissions, get_plan_requirements_for_date
 from bitrix_api import BitrixAPI, ShiftReportAPI
 from comparer import DataComparer
 from config import BITRIX_WEBHOOK_URL
-from manager_efficiency import calculate_efficiency_rating, save_rating_csv, build_rating_png, add_display_colors
+from manager_efficiency import calculate_efficiency_rating, save_rating_csv, build_rating_png, add_display_colors, rating_totals
+from incoming_calls import incoming_summary
 from manager_results import build_manager_results
 from uis_api import UISAPI, UISLimitError, validate_report_date
 
@@ -91,7 +92,7 @@ def _check_dashboard_access():
 
 def _get_manager_efficiency_for_date(date_str):
     validate_report_date(date_str)
-    cache_key = f'manager_efficiency_{date_str}'
+    cache_key = f'manager_efficiency_incoming_v2_{date_str}'
     rows = get_cached_data(cache_key, uis_api.get_calls_for_date, date_str)
     rating = add_display_colors(calculate_efficiency_rating(rows))
     return rows, rating
@@ -1142,8 +1143,10 @@ def get_manager_efficiency_report():
             'success': True,
             'date': date_str,
             'date_ru': date_ru,
-            'total_calls': len({(row.get('system'), row.get('id')) for row in rows}),
-            'rows': rating
+            'total_calls': rating_totals(rating)['total_calls'],
+            'incoming': incoming_summary(rows),
+            'rows': rating,
+            'totals': rating_totals(rating)
         })
     except Exception as e:
         logger.error(f"Ошибка в get_manager_efficiency_report: {e}", exc_info=True)

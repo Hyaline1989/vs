@@ -47,6 +47,9 @@ UIS_CALL_FIELDS = [
     'clean_talk_duration',
     'total_duration',
     'finish_reason',
+    'is_lost',
+    'scenario_operations',
+    'first_talked_employee_id',
     'source'
 ]
 
@@ -87,7 +90,8 @@ class UISAPI:
                 continue
 
             calls = self._fetch_calls(system_name, access_token, start, finish)
-            rows.extend(self._normalize_calls(system_name, calls))
+            from incoming_calls import report_calls
+            rows.extend(report_calls(self, system_name, calls))
 
         return rows
 

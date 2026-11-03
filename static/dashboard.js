@@ -705,13 +705,14 @@ function renderManagerEfficiencyReport(data) {
                 <span class="summary-value">${escapeHtml(data.date_ru || data.date)}</span>
             </div>
             <div class="summary-row">
-                <span>Звонков UIS:</span>
+                <span>UIS без блокировки и сервиса:</span>
                 <span class="summary-value">${data.total_calls || 0}</span>
             </div>
             <div class="summary-row">
                 <span>Менеджеров:</span>
-                <span class="summary-value">${rows.length}</span>
+                <span class="summary-value">${rows.filter(row => !row.company_unassigned).length}</span>
             </div>
+            <div class="summary-row"><span>Технические входящие (вне итогов таблицы):</span><span class="summary-value">${data.incoming?.technical || 0}</span></div>
         `;
     }
 
@@ -727,6 +728,9 @@ function renderManagerEfficiencyReport(data) {
                     <tr>
                         <th>Система</th>
                         <th>Менеджер</th>
+                        <th class="metric-duration-subset">Исх неусп &gt;15 сек</th>
+                        <th class="metric-duration-subset">Исх усп &gt;30 сек</th>
+                        <th>Вх неприн</th>
                         <th>Вх прин</th>
                         <th>Исх усп</th>
                         <th>Исх неусп</th>
@@ -742,8 +746,10 @@ function renderManagerEfficiencyReport(data) {
                 <tbody>
                     ${rows.map(renderManagerEfficiencyRow).join('')}
                 </tbody>
+                <tfoot>${data.totals ? renderManagerEfficiencyRow(data.totals) : ''}</tfoot>
             </table>
         </div>
+        <p>Непринятые входящие собраны в строке «Потерянные звонки» без распределения по менеджерам. Блокировки, исключённые сотрудники и технические звонки не входят в общий счётчик и итог. «Исх усп &gt;30 сек» — часть успешных исходящих, повторно в итог не прибавляется.</p>
     `;
 }
 
@@ -753,6 +759,9 @@ function renderManagerEfficiencyRow(item) {
         <tr>
             <td>${escapeHtml(item.system)}</td>
             <td>${escapeHtml(item.manager)}</td>
+            <td class="metric-duration-subset">${item.out_failed_over_15 || 0}</td>
+            <td class="metric-duration-subset">${item.out_over_30 || 0}</td>
+            <td class="metric-out-failed">${item.lost_row || item.manager === 'Итого' ? (item.in_missed || 0) : ''}</td>
             <td class="metric-in">${item.in_accepted}</td>
             <td class="metric-out-success">${item.out_success}</td>
             <td class="metric-out-failed">${item.out_failed}</td>

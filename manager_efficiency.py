@@ -74,7 +74,11 @@ def calculate_efficiency_rating(rows):
     stats = defaultdict(
         lambda: {
             'in_accepted': 0,
+            'in_missed': 0,
+            'company_unassigned': False,
             'out_success': 0,
+            'out_over_30': 0,
+            'out_failed_over_15': 0,
             'out_failed': 0,
             'line_seconds': 0,
             'short_calls': 0,
@@ -84,8 +88,16 @@ def calculate_efficiency_rating(rows):
     )
 
     for row in rows:
+        category = row.get('incoming_category')
+        if category in ('blocked_old', 'blocked_new', 'technical'):
+            continue
         manager_name = row.get('employee_name') or 'Без менеджера'
         if is_excluded_manager(manager_name):
+            continue
+        if category == 'missed':
+            item = stats[('', 'Потерянные звонки')]
+            item['company_unassigned'] = True
+            item['in_missed'] += 1
             continue
 
         # Защита также для ранее закэшированных строк нормализованных звонков.
@@ -96,12 +108,16 @@ def calculate_efficiency_rating(rows):
 
         key = (row.get('system') or '', manager_name)
         item = stats[key]
+        item['company_unassigned'] = item['company_unassigned'] or row.get('company_unassigned', False)
         direction = row.get('direction')
         duration = int(row.get('clean_talk_duration') or 0)
         is_talked = bool(row.get('is_talked'))
 
         if direction == 'in':
-            if is_talked and duration > 0:
+            if category == 'missed':
+                item['in_missed'] += 1
+                continue
+            if (is_talked and duration > 0) or category == 'accepted':
                 item['in_accepted'] += 1
                 item['contacts'] += 1
                 item['line_seconds'] += duration
@@ -115,22 +131,26 @@ def calculate_efficiency_rating(rows):
             item['call_windows'].append((row.get('start_time'), row.get('finish_time'), row.get('id')))
             if duration > 0:
                 item['out_success'] += 1
+                if duration > 30:
+                    item['out_over_30'] += 1
                 item['contacts'] += 1
                 if duration < SHORT_CALL_SECONDS:
                     item['short_calls'] += 1
             else:
                 item['out_failed'] += 1
+                if int(row.get('total_duration') or 0) > 15:
+                    item['out_failed_over_15'] += 1
 
-    max_contacts = max((v['contacts'] for v in stats.values()), default=0) or 1
-    max_line_seconds = max((v['line_seconds'] for v in stats.values()), default=0) or 1
+    max_contacts = max((v['contacts'] for v in stats.values() if not v['company_unassigned']), default=0) or 1
+    max_line_seconds = max((v['line_seconds'] for v in stats.values() if not v['company_unassigned']), default=0) or 1
 
     result = []
     for (system, manager), item in stats.items():
         out_total = item['out_success'] + item['out_failed']
-        if item['contacts'] == 0 and out_total == 0:
+        if item['contacts'] == 0 and out_total == 0 and not item['in_missed']:
             continue
 
-        total_calls = item['in_accepted'] + item['out_success'] + item['out_failed']
+        total_calls = item['in_missed'] + item['in_accepted'] + item['out_success'] + item['out_failed']
         out_success_rate = item['out_success'] / out_total if out_total else 0
         short_share = item['short_calls'] / item['contacts'] if item['contacts'] else 0
         avg_seconds = item['line_seconds'] / item['contacts'] if item['contacts'] else 0
@@ -146,7 +166,12 @@ def calculate_efficiency_rating(rows):
             'system': system,
             'manager': manager,
             'in_accepted': item['in_accepted'],
+            'in_missed': item['in_missed'],
+            'company_unassigned': item['company_unassigned'],
             'out_success': item['out_success'],
+            'out_over_30': item['out_over_30'],
+            'out_failed_over_15': item['out_failed_over_15'],
+            'lost_row': manager == 'Потерянные звонки',
             'out_failed': item['out_failed'],
             'total_calls': total_calls,
             'line_seconds': item['line_seconds'],
@@ -160,10 +185,26 @@ def calculate_efficiency_rating(rows):
             'break_time': secfmt(break_seconds),
             'out_success_rate_text': pct(out_success_rate),
             'short_share_text': pct(short_share),
-            'index_text': f'{index:.1f}'
+            'index_text': '' if item['company_unassigned'] else f'{index:.1f}'
         })
 
     result.sort(key=lambda item: item['index'], reverse=True)
+    return result
+
+
+def rating_totals(rating):
+    """Итоги отображаемых строк; средние — среднее показателей менеджеров."""
+    result = {'system': '', 'manager': 'Итого', 'short_share_text': '', 'index_text': ''}
+    for key in ('in_missed', 'in_accepted', 'out_success', 'out_over_30', 'out_failed_over_15', 'out_failed', 'total_calls', 'line_seconds'):
+        result[key] = sum(item.get(key, 0) for item in rating)
+    managers = [item for item in rating if not item.get('company_unassigned')]
+    for key in ('avg_seconds', 'break_seconds'):
+        result[key] = sum(item[key] for item in managers) / len(managers) if managers else 0
+    outgoing = result['out_success'] + result['out_failed']
+    result['out_success_rate'] = result['out_success'] / outgoing if outgoing else 0
+    result['out_success_rate_text'] = pct(result['out_success_rate'])
+    for label, key in (('line_time','line_seconds'), ('avg_time','avg_seconds'), ('break_time','break_seconds')):
+        result[label] = secfmt(result[key])
     return result
 
 
@@ -171,14 +212,14 @@ def save_rating_csv(rating):
     output = io.StringIO()
     writer = csv.writer(output, delimiter=';')
     writer.writerow([
-        'Система', 'Менеджер', 'Вх прин', 'Исх усп', 'Исх неусп', 'Итого',
+        'Система', 'Менеджер', 'Исх неусп >15 сек', 'Исх усп >30 сек', 'Вх неприн', 'Вх прин', 'Исх усп', 'Исх неусп', 'Итого',
         'Время', 'Средн', 'Перерыв', '% дозв', '% кор', 'Индекс'
     ])
-    for item in rating:
+    for item in [*rating, rating_totals(rating)]:
         writer.writerow([
-            item['system'], item['manager'], item['in_accepted'], item['out_success'],
+            item['system'], item['manager'], item.get('out_failed_over_15', 0), item.get('out_over_30', 0), item.get('in_missed', 0) if item.get('lost_row') or 'index' not in item else '', item['in_accepted'], item['out_success'],
             item['out_failed'], item['total_calls'], item['line_time'], item['avg_time'], item['break_time'],
-            item['out_success_rate_text'], item['short_share_text'], decimal_comma(item['index'])
+            item['out_success_rate_text'], item['short_share_text'], decimal_comma(item['index']) if 'index' in item and not item.get('company_unassigned') else ''
         ])
     return '\ufeff' + output.getvalue()
 
@@ -253,7 +294,7 @@ def rgb_to_hex(rgb):
 
 
 def is_excluded_from_break_scale(item):
-    return any(part in item['manager'] for part in ANALYTICS_EXCLUDED_NAME_PARTS)
+    return item.get('company_unassigned', False) or any(part in item['manager'] for part in ANALYTICS_EXCLUDED_NAME_PARTS)
 
 
 def break_scale_bounds(rating):
@@ -292,13 +333,13 @@ def add_display_colors(rating):
 
 def build_rating_png(rating, date_ru):
     f = fonts()
-    headers = ['Система', 'Менеджер', 'Вх прин', 'Исх усп', 'Исх неусп', 'Итого', 'Время', 'Средн', 'Перерыв', '% дозв', '% кор', 'Индекс']
-    widths = [86, 300, 70, 70, 80, 70, 90, 75, 80, 70, 65, 70]
+    headers = ['Система', 'Менеджер', 'Исх неусп >15 сек', 'Исх усп >30 сек', 'Вх неприн', 'Вх прин', 'Исх усп', 'Исх неусп', 'Итого', 'Время', 'Средн', 'Перерыв', '% дозв', '% кор', 'Индекс']
+    widths = [86, 300] + [135] * 13
     row_h = 28
     top = 44
     note_h = 88
     width = sum(widths) + 2
-    height = top + row_h * (len(rating) + 1) + note_h
+    height = top + row_h * (len(rating) + 2) + note_h
 
     colors = {
         'header': (221, 231, 242),
@@ -324,47 +365,54 @@ def build_rating_png(rating, date_ru):
     x = 1
     for index, header in enumerate(headers):
         fill = colors['header']
-        if index == 2:
+        if header == 'Вх прин':
             fill = colors['yellow']
-        if index == 3:
+        if header == 'Исх усп':
             fill = colors['green']
-        if index == 4:
+        if header in ('Вх неприн', 'Исх неусп'):
             fill = colors['red']
-        if index in (5, 6, 7, 8, 9, 10, 11):
+        if index >= 8:
             fill = colors['neutral']
         draw.rectangle([x, y, x + widths[index], y + row_h], fill=fill, outline=colors['grid'])
         draw.text((x + 5, y + 7), header, fill=colors['text'], font=f['bold'])
         x += widths[index]
 
-    for item in rating:
+    for row_index, item in enumerate([*rating, rating_totals(rating)]):
         y += row_h
         row = [
-            item['system'], item['manager'], item['in_accepted'], item['out_success'],
+            item['system'], item['manager'], item.get('out_failed_over_15', 0), item.get('out_over_30', 0), item.get('in_missed', 0) if item.get('lost_row') or 'index' not in item else '', item['in_accepted'], item['out_success'],
             item['out_failed'], item['total_calls'], item['line_time'], item['avg_time'], item['break_time'],
             item['out_success_rate_text'], item['short_share_text'], item['index_text']
         ]
         x = 1
         for index, value in enumerate(row):
-            fill = colors['white']
-            if index == 2:
+            fill = (240, 246, 255) if row_index % 2 else colors['white']
+            if headers[index] == 'Вх прин':
                 fill = colors['yellow']
-            if index == 3:
+            if headers[index] == 'Исх усп':
                 fill = colors['green']
-            if index == 4:
+            if headers[index] in ('Вх неприн', 'Исх неусп'):
                 fill = colors['red']
-            if index == 7:
+            if headers[index] == 'Средн':
                 fill = red_green_scale(item['avg_seconds'], min_avg, max_avg)
-            if index == 8:
+            if headers[index] == 'Перерыв':
                 fill = break_fill(item, min_break, max_break, colors)
-            if index in (5, 6, 9, 10, 11):
+            if headers[index] in ('Итого', 'Время', '% дозв', '% кор', 'Индекс'):
                 fill = colors['neutral']
+            if 'index' not in item:
+                fill = colors['header']
             draw.rectangle([x, y, x + widths[index], y + row_h], fill=fill, outline=colors['grid'])
             text = str(value)
-            font = f['bold'] if index == 11 else f['regular']
+            font = f['bold'] if headers[index] == 'Индекс' or 'index' not in item else f['regular']
             tx = x + 5 if index in (0, 1) else x + widths[index] - draw.textlength(text, font=font) - 6
             draw.text((tx, y + 7), text, fill=colors['text'], font=font)
             x += widths[index]
 
+    # Outline the two additional metrics without colouring their cells.
+    x = 1 + sum(widths[:2])
+    for column in (2, 3):
+        draw.rectangle([x, top, x + widths[column], y + row_h], outline=(0, 0, 0), width=2)
+        x += widths[column]
     y += row_h + 8
     notes = [
         'Индекс: контакты 45%, время на линии 25%, успешность исходящих 25%, понижение за короткие разговоры',
