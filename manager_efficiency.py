@@ -78,7 +78,7 @@ def calculate_efficiency_rating(rows):
             'company_unassigned': False,
             'out_success': 0,
             'out_over_30': 0,
-            'out_failed_over_15': 0,
+            'out_over_15': 0,
             'out_failed': 0,
             'line_seconds': 0,
             'short_calls': 0,
@@ -131,6 +131,8 @@ def calculate_efficiency_rating(rows):
             item['call_windows'].append((row.get('start_time'), row.get('finish_time'), row.get('id')))
             if duration > 0:
                 item['out_success'] += 1
+                if duration > 15:
+                    item['out_over_15'] += 1
                 if duration > 30:
                     item['out_over_30'] += 1
                 item['contacts'] += 1
@@ -138,8 +140,6 @@ def calculate_efficiency_rating(rows):
                     item['short_calls'] += 1
             else:
                 item['out_failed'] += 1
-                if int(row.get('total_duration') or 0) > 15:
-                    item['out_failed_over_15'] += 1
 
     max_contacts = max((v['contacts'] for v in stats.values() if not v['company_unassigned']), default=0) or 1
     max_line_seconds = max((v['line_seconds'] for v in stats.values() if not v['company_unassigned']), default=0) or 1
@@ -170,7 +170,7 @@ def calculate_efficiency_rating(rows):
             'company_unassigned': item['company_unassigned'],
             'out_success': item['out_success'],
             'out_over_30': item['out_over_30'],
-            'out_failed_over_15': item['out_failed_over_15'],
+            'out_over_15': item['out_over_15'],
             'lost_row': manager == 'Потерянные звонки',
             'out_failed': item['out_failed'],
             'total_calls': total_calls,
@@ -195,7 +195,7 @@ def calculate_efficiency_rating(rows):
 def rating_totals(rating):
     """Итоги отображаемых строк; средние — среднее показателей менеджеров."""
     result = {'system': '', 'manager': 'Итого', 'short_share_text': '', 'index_text': ''}
-    for key in ('in_missed', 'in_accepted', 'out_success', 'out_over_30', 'out_failed_over_15', 'out_failed', 'total_calls', 'line_seconds'):
+    for key in ('in_missed', 'in_accepted', 'out_success', 'out_over_30', 'out_over_15', 'out_failed', 'total_calls', 'line_seconds'):
         result[key] = sum(item.get(key, 0) for item in rating)
     managers = [item for item in rating if not item.get('company_unassigned')]
     for key in ('avg_seconds', 'break_seconds'):
@@ -212,12 +212,12 @@ def save_rating_csv(rating):
     output = io.StringIO()
     writer = csv.writer(output, delimiter=';')
     writer.writerow([
-        'Система', 'Менеджер', 'Исх неусп >15 сек', 'Исх усп >30 сек', 'Вх неприн', 'Вх прин', 'Исх усп', 'Исх неусп', 'Итого',
+        'Система', 'Менеджер', 'Исх усп >15 сек', 'Исх усп >30 сек', 'Вх неприн', 'Вх прин', 'Исх усп', 'Исх неусп', 'Итого',
         'Время', 'Средн', 'Перерыв', '% дозв', '% кор', 'Индекс'
     ])
     for item in [*rating, rating_totals(rating)]:
         writer.writerow([
-            item['system'], item['manager'], item.get('out_failed_over_15', 0), item.get('out_over_30', 0), item.get('in_missed', 0) if item.get('lost_row') or 'index' not in item else '', item['in_accepted'], item['out_success'],
+            item['system'], item['manager'], item.get('out_over_15', 0), item.get('out_over_30', 0), item.get('in_missed', 0) if item.get('lost_row') or 'index' not in item else '', item['in_accepted'], item['out_success'],
             item['out_failed'], item['total_calls'], item['line_time'], item['avg_time'], item['break_time'],
             item['out_success_rate_text'], item['short_share_text'], decimal_comma(item['index']) if 'index' in item and not item.get('company_unassigned') else ''
         ])
@@ -333,7 +333,7 @@ def add_display_colors(rating):
 
 def build_rating_png(rating, date_ru):
     f = fonts()
-    headers = ['Система', 'Менеджер', 'Исх неусп >15 сек', 'Исх усп >30 сек', 'Вх неприн', 'Вх прин', 'Исх усп', 'Исх неусп', 'Итого', 'Время', 'Средн', 'Перерыв', '% дозв', '% кор', 'Индекс']
+    headers = ['Система', 'Менеджер', 'Исх усп >15 сек', 'Исх усп >30 сек', 'Вх неприн', 'Вх прин', 'Исх усп', 'Исх неусп', 'Итого', 'Время', 'Средн', 'Перерыв', '% дозв', '% кор', 'Индекс']
     widths = [86, 300] + [135] * 13
     row_h = 28
     top = 44
@@ -380,7 +380,7 @@ def build_rating_png(rating, date_ru):
     for row_index, item in enumerate([*rating, rating_totals(rating)]):
         y += row_h
         row = [
-            item['system'], item['manager'], item.get('out_failed_over_15', 0), item.get('out_over_30', 0), item.get('in_missed', 0) if item.get('lost_row') or 'index' not in item else '', item['in_accepted'], item['out_success'],
+            item['system'], item['manager'], item.get('out_over_15', 0), item.get('out_over_30', 0), item.get('in_missed', 0) if item.get('lost_row') or 'index' not in item else '', item['in_accepted'], item['out_success'],
             item['out_failed'], item['total_calls'], item['line_time'], item['avg_time'], item['break_time'],
             item['out_success_rate_text'], item['short_share_text'], item['index_text']
         ]

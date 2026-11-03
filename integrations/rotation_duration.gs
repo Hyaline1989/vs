@@ -32,7 +32,7 @@ function rotationSource_(source, year, month, key) {
   const days = monthDays_(year, month);
   const empty = reason => ({name, reason, available: Array(days).fill(false), people: []});
   let book;
-  try { book = SpreadsheetApp.openById(id); }
+  try { book = SpreadsheetApp.openById(sourceIdForMonth_(source, year, month)); }
   catch (_) { return empty('source_unavailable'); }
   let selected;
   try { selected = chooseMonthSheet_(book, year, month, override); }

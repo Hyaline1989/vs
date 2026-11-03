@@ -2266,7 +2266,7 @@ button, input, select, textarea {
 .manager-efficiency-table td {
     padding: 8px 3px;
     border: 1px solid #ddd;
-    text-align: right;
+    text-align: center;
     white-space: nowrap;
 }
 
@@ -2324,8 +2324,13 @@ button, input, select, textarea {
 }
 
 .manager-efficiency-table .metric-duration-subset {
-    border-left: 2px solid #000;
-    border-right: 2px solid #000;
+    /* Линии внутри ячейки не зависят от отрисовки объединённых границ. */
+    box-shadow: inset 2px 0 0 #000, inset -2px 0 0 #000;
+}
+
+.manager-efficiency-table .metric-duration-subset + .metric-duration-subset {
+    /* Общую границу рисует только предыдущая колонка. */
+    box-shadow: inset -2px 0 0 #000;
 }
 
 .manager-efficiency-table th.metric-duration-subset {

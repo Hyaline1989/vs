@@ -728,7 +728,7 @@ function renderManagerEfficiencyReport(data) {
                     <tr>
                         <th>Система</th>
                         <th>Менеджер</th>
-                        <th class="metric-duration-subset">Исх неусп &gt;15 сек</th>
+                        <th class="metric-duration-subset">Исх усп &gt;15 сек</th>
                         <th class="metric-duration-subset">Исх усп &gt;30 сек</th>
                         <th>Вх неприн</th>
                         <th>Вх прин</th>
@@ -759,7 +759,7 @@ function renderManagerEfficiencyRow(item) {
         <tr>
             <td>${escapeHtml(item.system)}</td>
             <td>${escapeHtml(item.manager)}</td>
-            <td class="metric-duration-subset">${item.out_failed_over_15 || 0}</td>
+            <td class="metric-duration-subset">${item.out_over_15 || 0}</td>
             <td class="metric-duration-subset">${item.out_over_30 || 0}</td>
             <td class="metric-out-failed">${item.lost_row || item.manager === 'Итого' ? (item.in_missed || 0) : ''}</td>
             <td class="metric-in">${item.in_accepted}</td>

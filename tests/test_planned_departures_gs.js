@@ -193,3 +193,9 @@ const yearlessBook = namedBook(shiftNames('Ноябрь', '').map(name => name.r
 assert.equal(context.api.chooseMonthSheet_(yearlessBook, 2026, 11, auto).sheet.length, 3);
 assert.equal(context.api.chooseMonthSheet_(yearlessBook, 2027, 11, auto).warning, 'sheet_missing');
 console.log('Автоматический выбор смен по месяцу и году проверен');
+const klin = vm.runInNewContext('DEPARTURE_SOURCES.find(s => s[0] === "Клинский Мясокомбинат")', context);
+assert.equal(context.sourceIdForMonth_(klin, 2026, 9), '1rNGTooID-_PTpYEIMkRdlygdExelHQvoqaG_g4ZPJqk');
+for (const [year, month] of [[2026, 10], [2026, 11], [2027, 1]]) {
+    assert.equal(context.sourceIdForMonth_(klin, year, month), '14Z-4jiqH8DtQM-Q4Ae67h37LIo4hPY2ar14oZ7TZzrQ');
+}
+assert.equal(context.sourceIdForMonth_(['Другой объект', 'original'], 2026, 11), 'original');

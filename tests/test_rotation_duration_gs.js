@@ -1,5 +1,6 @@
 const fs=require('fs'), vm=require('vm'), assert=require('assert'), crypto=require('crypto');
 const context={console, monthDays_:()=>31,isWork_:v=>Number(v)>0,
+    sourceIdForMonth_:source=>source[1],
     looksLikePerson_:v=>String(v).trim().split(/\s+/).length>=2,
     chooseMonthSheet_:()=>({sheet}),
     locateCalendar_:()=>({nameCol:1,dayCol:3,firstDataRow:2,available:Array(31).fill(true)}),

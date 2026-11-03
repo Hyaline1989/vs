@@ -23,8 +23,18 @@ const DEPARTURE_SOURCES = [
   ['Шашлык Тамбов', '1Q6Wwm1BuUtoHh_BA79fM_50ir11FRy3D'],
   ['ФитнесШок', '1F0Ys8jQJ8TixxXAUaamGscSzi9VefOlB'],
   ['Креветки Клинский', '1AtApIPq-P4RVMTdYy9BPmSMe6rJuXluxRsItLk-BSe0'],
-  ['Клинский Мясокомбинат', '1rNGTooID-_PTpYEIMkRdlygdExelHQvoqaG_g4ZPJqk']
+  ['Клинский Мясокомбинат', '1rNGTooID-_PTpYEIMkRdlygdExelHQvoqaG_g4ZPJqk', {
+    sourceFromMonth: '2026-10',
+    sourceFromId: '14Z-4jiqH8DtQM-Q4Ae67h37LIo4hPY2ar14oZ7TZzrQ'
+  }]
 ];
+
+function sourceIdForMonth_(source, year, month) {
+  const [, id, options = {}] = source;
+  const period = year + '-' + String(month).padStart(2, '0');
+  return options.sourceFromMonth && period >= options.sourceFromMonth
+    ? options.sourceFromId : id;
+}
 
 const RUSSIAN_MONTHS = [
   'январ', 'феврал', 'март', 'апрел', 'май', 'июн', 'июл', 'август',
@@ -221,7 +231,7 @@ function summarizeSource_(source, year, month) {
   });
   let book;
   try {
-    book = SpreadsheetApp.openById(id);
+    book = SpreadsheetApp.openById(sourceIdForMonth_(source, year, month));
   } catch (error) {
     console.log(name + ': не удалось открыть таблицу');
     return empty('source_unavailable');

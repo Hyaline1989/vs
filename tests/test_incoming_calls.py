@@ -43,7 +43,7 @@ class IncomingTests(unittest.TestCase):
 
     def test_missed_grouped_and_strict_thirty_seconds(self):
         api=ns['UISAPI']()
-        calls=[self.call(1,employees=[dict(employee_id=1,employee_full_name='Анна')]),self.call(2)]
+        calls=[self.call(1,employees=[dict(employee_id=1,employee_full_name='Анна', is_talked=True)]),self.call(2)]
         for i,seconds in enumerate((0,30,31),10):
             calls.append(self.call(i,direction='out',clean_talk_duration=seconds,
                 employees=[dict(employee_id=1,employee_full_name='Анна',is_talked=True)]))
@@ -59,17 +59,18 @@ class IncomingTests(unittest.TestCase):
         self.assertEqual(rating_totals(rating)['out_over_30'],1)
 
 
-    def test_failed_over_fifteen_uses_total_duration(self):
-        calls = [self.call(i, direction='out', clean_talk_duration=0,
-                          total_duration=seconds,
-                          employees=[dict(employee_id=1, employee_full_name='Анна')])
+    def test_success_over_fifteen_uses_talk_duration(self):
+        calls = [self.call(i, direction='out', clean_talk_duration=seconds,
+                          total_duration=60,
+                          employees=[dict(employee_id=1, employee_full_name='Анна', is_talked=True)])
                  for i, seconds in enumerate((0, 15, 16, 40), 20)]
         rating = calculate_efficiency_rating(report_calls(ns['UISAPI'](), 'Комплект', calls))
-        self.assertEqual(rating[0]['out_failed_over_15'], 2)
-        self.assertEqual(rating[0]['out_failed'], 4)
-        self.assertEqual(rating_totals(rating)['out_failed_over_15'], 2)
+        self.assertEqual(rating[0]['out_over_15'], 2)
+        self.assertEqual(rating[0]['out_failed'], 1)
+        self.assertEqual(rating[0]['out_success'], 3)
+        self.assertEqual(rating_totals(rating)['out_over_15'], 2)
         self.assertEqual(rating_totals(rating)['total_calls'], 4)
-        self.assertIn('Менеджер;Исх неусп >15 сек;Исх усп >30 сек;Вх неприн', save_rating_csv(rating))
+        self.assertIn('Менеджер;Исх усп >15 сек;Исх усп >30 сек;Вх неприн', save_rating_csv(rating))
 
 
 if __name__=='__main__': unittest.main()

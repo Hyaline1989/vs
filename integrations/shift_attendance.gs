@@ -8,7 +8,7 @@ function summarizeShiftAttendanceSource_(source, year, month) {
   const empty = reason => ({name, counts: Array(days).fill(null), reasons: Array(days).fill(reason)});
   let book;
   try {
-    book = SpreadsheetApp.openById(id);
+    book = SpreadsheetApp.openById(sourceIdForMonth_(source, year, month));
   } catch (error) {
     console.log(name + ': не удалось открыть таблицу смен');
     return empty('source_unavailable');
